@@ -29,24 +29,21 @@ module.exports = {
 
     networks: {
 
-        bsc: {
-            url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/bsc/mainnet`,
-            chainId: 56,
+        polygon: {
+            url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/polygon/mainnet`,
+            chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
 
-        bsc_testnet: {
-            url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/bsc/testnet`,
-            chainId: 97,
+        mumbai: {
+            url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/polygon/mumbai`,
+            chainId: 80001,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
     },
 
     etherscan: {
-        apiKey: {
-            bsc: process.env.BSC_API_KEY,
-            bscTestnet: process.env.BSC_API_KEY
-        }
+        apiKey: process.env.POLYGON_API_KEY
     },
 
     mocha: {
