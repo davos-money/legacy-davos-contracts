@@ -30,7 +30,7 @@ interface ICerosRouter {
 
     event ChangeDex(address dex);
 
-    event ChangePool(address pool);
+    // event ChangePool(address pool);
 
     event ChangeDao(address dao);
 
@@ -43,6 +43,8 @@ interface ICerosRouter {
     event ChangeCollateralToken(address collateralToken);
 
     event ChangeProvider(address provider);
+
+    event ChangePairFee(uint24 fee);
 
     /**
      * Methods
@@ -73,15 +75,15 @@ interface ICerosRouter {
      * Withdrawal
      */
 
-    // MATIC
-    function withdraw(address recipient, uint256 amount)
-    external
-    returns (uint256);
+    // // MATIC
+    // function withdraw(address recipient, uint256 amount)
+    // external
+    // returns (uint256);
 
     // MATIC
-    function withdrawFor(address recipient, uint256 amount)
-    external
-    returns (uint256);
+    // function withdrawFor(address recipient, uint256 amount)
+    // external
+    // returns (uint256);
 
     // MATIC
     function withdrawWithSlippage(

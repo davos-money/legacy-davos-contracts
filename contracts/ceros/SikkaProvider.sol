@@ -113,24 +113,24 @@ ReentrancyGuardUpgradeable
     /**
      * RELEASE
      */
-    // withdrawal in MATIC via staking pool
-    function release(address recipient, uint256 amount)
-    external
-    override
-    whenNotPaused
-    nonReentrant
-    returns (uint256 realAmount)
-    {
-        uint256 minumumUnstake = _pool.getMinimumStake();
-        require(
-            amount >= minumumUnstake,
-            "value must be greater than min unstake amount"
-        );
-        _withdrawCollateral(msg.sender, amount);
-        realAmount = _ceRouter.withdrawFor(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, amount);
-        return realAmount;
-    }
+    // // withdrawal in MATIC via staking pool
+    // function release(address recipient, uint256 amount)
+    // external
+    // override
+    // whenNotPaused
+    // nonReentrant
+    // returns (uint256 realAmount)
+    // {
+    //     uint256 minumumUnstake = _pool.getMinimumStake();
+    //     require(
+    //         amount >= minumumUnstake,
+    //         "value must be greater than min unstake amount"
+    //     );
+    //     _withdrawCollateral(msg.sender, amount);
+    //     realAmount = _ceRouter.withdrawFor(recipient, amount);
+    //     emit Withdrawal(msg.sender, recipient, amount);
+    //     return realAmount;
+    // }
     function releaseInAMATICc(address recipient, uint256 amount)
     external
     override
