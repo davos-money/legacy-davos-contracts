@@ -17,7 +17,6 @@ async function main() {
     // Contracts Fetching
     this.Rewards = await hre.ethers.getContractFactory("IkkaRewards");
     let rewards = this.Rewards.attach(_rewards);
-    // const interaction = Interaction.attach(INTERACTION);
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
     const auctionProxy = await this.AuctionProxy.deploy();
     await auctionProxy.deployed();

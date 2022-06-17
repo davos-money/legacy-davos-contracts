@@ -6,12 +6,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./iMath.sol";
+import "./sMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
 import "./interfaces/VatLike.sol";
 import "./interfaces/SikkaLike.sol";
-import "./interfaces/SikkaGemLike.sol";
+import "./interfaces/SikkaJoinLike.sol";
 import "./interfaces/GemJoinLike.sol";
 import "./interfaces/JugLike.sol";
 import "./interfaces/DogLike.sol";
@@ -19,7 +19,7 @@ import "./interfaces/PipLike.sol";
 import "./interfaces/SpotLike.sol";
 import "./interfaces/IRewards.sol";
 import "./interfaces/IAuctionProxy.sol";
-import "./ceros/interfaces/IIkkaProvider.sol";
+import "./ceros/interfaces/ISikkaProvider.sol";
 import "./ceros/interfaces/IDao.sol";
 
 import "./libraries/AuctionProxy.sol";
@@ -51,7 +51,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     VatLike public vat;
     SpotLike public spotter;
     SikkaLike public sikka;
-    SikkaGemLike public sikkaJoin;
+    SikkaJoinLike public sikkaJoin;
     JugLike public jug;
     address public dog;
     IRewards public ikkaRewards;
@@ -64,7 +64,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
     EnumerableSet.AddressSet private usersInDebt;
 
-    mapping(address => address) public ikkaProviders; // e.g. Auction purchase from ceamaticc to amaticc
+    mapping(address => address) public sikkaProviders; // e.g. Auction purchase from ceamaticc to amaticc
 
     function initialize(address vat_,
         address spot_,
@@ -81,7 +81,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         vat = VatLike(vat_);
         spotter = SpotLike(spot_);
         sikka = SikkaLike(sikka_);
-        sikkaJoin = SikkaGemLike(sikkaJoin_);
+        sikkaJoin = SikkaJoinLike(sikkaJoin_);
         jug = JugLike(jug_);
         dog = dog_;
         ikkaRewards = IRewards(rewards_);
@@ -100,7 +100,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
         vat = VatLike(vat_);
         spotter = SpotLike(spot_);
-        sikkaJoin = SikkaGemLike(sikkaJoin_);
+        sikkaJoin = SikkaJoinLike(sikkaJoin_);
         jug = JugLike(jug_);
 
         vat.hope(sikkaJoin_);
@@ -128,8 +128,8 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         emit CollateralEnabled(token, ilk);
     }
 
-    function setIkkaProvider(address token, address ikkaProvider) external auth {
-        ikkaProviders[token] = ikkaProvider;
+    function setSikkaProvider(address token, address sikkaProvider) external auth {
+        sikkaProviders[token] = sikkaProvider;
     }
 
     function removeCollateralType(address token) external auth {
@@ -158,9 +158,9 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     ) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
-        if (ikkaProviders[token] != address(0)) {
+        if (sikkaProviders[token] != address(0)) {
             require(
-                msg.sender == ikkaProviders[token],
+                msg.sender == sikkaProviders[token],
                 "Interaction/only ikka provider can deposit for this token"
             );
         }
@@ -264,9 +264,9 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     ) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
-        if (ikkaProviders[token] != address(0)) {
+        if (sikkaProviders[token] != address(0)) {
             require(
-                msg.sender == ikkaProviders[token],
+                msg.sender == sikkaProviders[token],
                 "Interaction/Only ikka provider can call this function for this token"
             );
         } else {
@@ -480,7 +480,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         _checkIsLive(collateralType.live);
 
         (uint256 duty,) = jug.ilks(collateralType.ilk);
-        uint256 principal = iMath.rpow((jug.base() + duty), YEAR, RAY);
+        uint256 principal = sMath.rpow((jug.base() + duty), YEAR, RAY);
         return (principal - RAY) / (10 ** 7);
     }
 
@@ -498,7 +498,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
             sikkaJoin,
             vat,
             DogLike(dog),
-            IIkkaProvider(ikkaProviders[token]),
+            ISikkaProvider(sikkaProviders[token]),
             collaterals[token]
         );
     }
@@ -511,7 +511,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         address receiverAddress
     ) external {
         CollateralType memory collateral = collaterals[token];
-        IIkkaProvider ikkaProvider = IIkkaProvider(ikkaProviders[token]);
+        ISikkaProvider sikkaProvider = ISikkaProvider(sikkaProviders[token]);
         AuctionProxy.buyFromAuction(
             auctionId,
             collateralAmount,
@@ -520,7 +520,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
             sikka,
             sikkaJoin,
             vat,
-            ikkaProvider,
+            sikkaProvider,
             collateral
         );
 

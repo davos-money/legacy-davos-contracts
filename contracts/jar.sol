@@ -51,13 +51,13 @@ contract Jar {
     mapping(address => uint) public balanceOf;
 
     // --- Reward Data ---
-    uint public spread;      // Distribution time     [sec]
-    uint public endTime;     // Time "now" + spread   [sec]
-    uint public rate;        // Emission per second   [wad]
+    uint public spread;      // Distribution time       [sec]
+    uint public endTime;     // Time "now" + spread     [sec]
+    uint public rate;        // Emission per second     [wad]
     uint public tps;         // SIKKA tokens per share  [wad]
-    uint public lastUpdate;  // Last tps update       [sec]
-    uint public exitDelay;   // User unstake delay    [sec]
-    address public SIKKA;      // The SIKKA Stable Coin
+    uint public lastUpdate;  // Last tps update         [sec]
+    uint public exitDelay;   // User unstake delay      [sec]
+    address public SIKKA;    // The SIKKA Stable Coin
 
     mapping(address => uint) public tpsPaid;      // SIKKA per share paid
     mapping(address => uint) public rewards;      // Accumulated rewards

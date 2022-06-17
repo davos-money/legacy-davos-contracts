@@ -18,7 +18,7 @@ async function main() {
         sikka,
         clip,
         vow,
-        ikkaProvider,
+        sikkaProvider,
         ceaMATICc,
         oracle,
         abacus;
@@ -34,7 +34,7 @@ async function main() {
         _sikka = "",
         _clip = "",
         _vow = "",
-        _ikkaProvider = "",
+        _sikkaProvider = "",
         _ceaMATICc = "",
         _oracle = "",
         _abacus = "",
@@ -64,7 +64,7 @@ async function main() {
     this.Sikka = await hre.ethers.getContractFactory("Sikka");
     this.Clip = await hre.ethers.getContractFactory("Clipper");
     this.Vow = await hre.ethers.getContractFactory("Vow");
-    this.IkkaProvider = await hre.ethers.getContractFactory("IkkaProvider");
+    this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
     this.CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     this.Oracle = await hre.ethers.getContractFactory("Oracle");
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
@@ -80,7 +80,7 @@ async function main() {
     sikka = await this.Sikka.attach(_sikka);
     clip = await this.Clip.attach(_clip);
     vow = await this.Vow.attach(_vow);
-    ikkaProvider = await this.IkkaProvider.attach(_ikkaProvider);
+    sikkaProvider = await this.SikkaProvider.attach(_sikkaProvider);
     ceaMATICc = await this.CeaMATICc.attach(_ceaMATICc);
     oracle = await this.Oracle.attach(_oracle);
     abacus = await this.Abacus.attach(_abacus);
@@ -103,7 +103,7 @@ async function main() {
     await sikkaJoin.rely(_interaction);
     await dog.rely(_interaction);
     await jug.rely(_interaction);
-    await interaction.setIkkaProvider(_ceaMATICc, _ikkaProvider);
+    await interaction.setSikkaProvider(_ceaMATICc, _sikkaProvider);
 
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,
     // 2.000000000000000000000000000 / 1.600000000000000000000000000 = 1.250000000000000000000000000 = mat

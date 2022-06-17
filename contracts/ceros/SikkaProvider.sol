@@ -8,11 +8,11 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IDex.sol";
 import "./interfaces/IDao.sol";
 import "./interfaces/ICerosRouter.sol";
-import "./interfaces/IIkkaProvider.sol";
+import "./interfaces/ISikkaProvider.sol";
 import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
-contract IkkaProvider is
-IIkkaProvider,
+contract SikkaProvider is
+ISikkaProvider,
 OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable

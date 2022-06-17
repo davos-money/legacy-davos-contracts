@@ -14,7 +14,6 @@ async function main() {
     this.IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
     this.IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
     this.IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle");
-    // this.Interaction = await hre.ethers.getContractFactory("Interaction");
 
     // Contracts deployment
     const rewards = await upgrades.deployProxy(this.IkkaRewards, [vat, ether("100000000").toString()], {initializer: "initialize"});
@@ -23,7 +22,6 @@ async function main() {
     console.log("Rewards             :", rewards.address);
     console.log("Imp                 :", rewardsImplementation);
 
-    // let interaction = this.Interaction.attach(INTERACTION);
     const ikkaToken = await this.IkkaToken.deploy(ether("100000000").toString(), rewards.address);
     await ikkaToken.deployed();
     console.log("ikkaToken           :", ikkaToken.address);
@@ -37,7 +35,6 @@ async function main() {
     await ikkaToken.rely(rewards.address);
     await rewards.setIkkaToken(ikkaToken.address);
     await rewards.initPool(ceaMATICc, ilkCeaMATICc, "1000000001847694957439350500", {gasLimit: 2000000}); //6%
-    // await interaction.setRewards(rewards.address);
     await rewards.setOracle(ikkaOracle.address);
 
     console.log("Verifying Rewards...");

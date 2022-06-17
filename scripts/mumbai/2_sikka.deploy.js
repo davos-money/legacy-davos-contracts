@@ -19,7 +19,6 @@ async function main() {
     this.Vow = await hre.ethers.getContractFactory("Vow");
     this.Dog = await hre.ethers.getContractFactory("Dog");
     this.Clip = await hre.ethers.getContractFactory("Clipper");
-    // this.Jar = await hre.ethers.getContractFactory("Jar");
     this.Oracle = await hre.ethers.getContractFactory("Oracle"); // Mock Oracle
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
 
@@ -40,7 +39,7 @@ async function main() {
 
     const sikkaJoin = await this.SikkaJoin.deploy(vat.address, sikka.address);
     await sikkaJoin.deployed();
-    console.log("sikkaJoin      :", sikkaJoin.address);
+    console.log("SikkaJoin      :", sikkaJoin.address);
 
     const ceaMATICcJoin = await this.GemJoin.deploy(vat.address, ilkCeaMATICc, ceaMATICc);
     await ceaMATICcJoin.deployed();

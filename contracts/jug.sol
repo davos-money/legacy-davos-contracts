@@ -23,7 +23,7 @@ pragma solidity ^0.8.10;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-import "./iMath.sol";
+import "./sMath.sol";
 import "./interfaces/JugLike.sol";
 import "./interfaces/VatLike.sol";
 
@@ -71,7 +71,7 @@ contract Jug is JugLike {
         unchecked {
             z = x * y;
             require(y == 0 || z / y == x);
-            z = z / iMath.ONE;
+            z = z / sMath.ONE;
         }
     }
 
@@ -79,7 +79,7 @@ contract Jug is JugLike {
     function init(bytes32 ilk) external auth {
         Ilk storage i = ilks[ilk];
         require(i.duty == 0, "Jug/ilk-already-init");
-        i.duty = iMath.ONE;
+        i.duty = sMath.ONE;
         i.rho  = block.timestamp;
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
@@ -100,7 +100,7 @@ contract Jug is JugLike {
     function drip(bytes32 ilk) external returns (uint rate) {
         require(block.timestamp >= ilks[ilk].rho, "Jug/invalid-now");
         (, uint prev,,,) = vat.ilks(ilk);
-        rate = _rmul(iMath.rpow(_add(base, ilks[ilk].duty), block.timestamp - ilks[ilk].rho, iMath.ONE), prev);
+        rate = _rmul(sMath.rpow(_add(base, ilks[ilk].duty), block.timestamp - ilks[ilk].rho, sMath.ONE), prev);
         vat.fold(ilk, vow, _diff(rate, prev));
         ilks[ilk].rho = block.timestamp;
     }

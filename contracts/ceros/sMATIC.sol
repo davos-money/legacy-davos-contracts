@@ -4,7 +4,7 @@ pragma solidity ^0.8.10;
 import "./NonTransferableERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract iMATIC is OwnableUpgradeable, NonTransferableERC20 {
+contract sMATIC is OwnableUpgradeable, NonTransferableERC20 {
     /**
      * Variables
      */
@@ -28,7 +28,7 @@ contract iMATIC is OwnableUpgradeable, NonTransferableERC20 {
 
     function initialize() external initializer {
         __Ownable_init();
-        __ERC20_init_unchained("Ikka MATIC", "iMATIC");
+        __ERC20_init_unchained("Sikka MATIC", "sMATIC");
     }
 
     function burn(address account, uint256 amount) external onlyMinter {

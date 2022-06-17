@@ -9,7 +9,7 @@ async function main() {
         ceVault, 
         aMATICb, 
         aMATICc, 
-        iMatic, 
+        sMatic, 
         cerosRouter;
     // External Addresses
     let _aMATICc = "0xaC32206a73C8406D74eB21cF7bd060bf841e64aD", 
@@ -23,7 +23,7 @@ async function main() {
     this.CeVault = await hre.ethers.getContractFactory("CeVault");
     this.AMATICb = await hre.ethers.getContractFactory("aMATICb");
     this.AMATICc = await hre.ethers.getContractFactory("aMATICc");
-    this.IMatic = await hre.ethers.getContractFactory("iMATIC");
+    this.SMatic = await hre.ethers.getContractFactory("sMATIC");
     this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
 
     // Contracts deployment and initialization
@@ -51,11 +51,11 @@ async function main() {
     console.log("ceVault    : " + ceVault.address);
     console.log("imp        : " + ceVaultImplementation);
 
-    iMatic = await upgrades.deployProxy(this.IMatic, [], {initializer: "initialize"});
-    await iMatic.deployed();
-    let iMaticImplementation = await upgrades.erc1967.getImplementationAddress(iMatic.address);
-    console.log("iMatic     : " + iMatic.address);
-    console.log("imp        : " + iMaticImplementation);
+    sMatic = await upgrades.deployProxy(this.SMatic, [], {initializer: "initialize"});
+    await sMatic.deployed();
+    let sMaticImplementation = await upgrades.erc1967.getImplementationAddress(sMatic.address);
+    console.log("sMatic     : " + sMatic.address);
+    console.log("imp        : " + sMaticImplementation);
 
     cerosRouter = await upgrades.deployProxy(this.CerosRouter, [_aMATICc, _wMatic, ceaMATICc.address, _aMaticb, ceVault.address, _dex, _pool], {initializer: "initialize"}, {gasLimit: 2000000});
     await cerosRouter.deployed();

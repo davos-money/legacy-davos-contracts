@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-library iMath {
+library sMath {
 
     uint256 constant ONE = 10 ** 27;
 

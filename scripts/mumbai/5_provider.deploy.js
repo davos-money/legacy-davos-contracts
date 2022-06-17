@@ -5,10 +5,10 @@ async function main() {
 
     // Variables Declaration
     let [deployer] = await ethers.getSigners();
-    let ikkaProvider,
-        iMatic,
+    let sikkaProvider,
+        sMatic,
         cerosRouter;
-    let _iMatic = "",
+    let _sMatic = "",
         _aMATICc = "0xaC32206a73C8406D74eB21cF7bd060bf841e64aD",
         _ceaMATICc = "",
         _cerosRouter = "",
@@ -16,35 +16,35 @@ async function main() {
         _pool = "";
 
     // Contracts Fetching
-    this.IkkaProvider = await hre.ethers.getContractFactory("IkkaProvider");
-    this.IMatic = await hre.ethers.getContractFactory("iMATIC");
+    this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+    this.SMatic = await hre.ethers.getContractFactory("sMATIC");
     this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
 
     // Contracts Deployment and initialization
-    ikkaProvider = await upgrades.deployProxy(this.IkkaProvider, [_iMatic, _aMATICc, _ceaMATICc, _cerosRouter, _dao, _pool], {initializer: "initialize"});
-    await ikkaProvider.deployed();
-    let ikkaProviderImplementation = await upgrades.erc1967.getImplementationAddress(ikkaProvider.address);
-    console.log("ikkaProvider  : " + ikkaProvider.address);
-    console.log("imp           : " + ikkaProviderImplementation);
+    sikkaProvider = await upgrades.deployProxy(this.SikkaProvider, [_sMatic, _aMATICc, _ceaMATICc, _cerosRouter, _dao, _pool], {initializer: "initialize"});
+    await sikkaProvider.deployed();
+    let sikkaProviderImplementation = await upgrades.erc1967.getImplementationAddress(sikkaProvider.address);
+    console.log("sikkaProvider  : " + sikkaProvider.address);
+    console.log("imp           : " + sikkaProviderImplementation);
 
-    iMatic = await this.IMatic.attach(_iMatic);
+    sMatic = await this.SMatic.attach(_sMatic);
     cerosRouter = await this.CerosRouter.attach(_cerosRouter);
-    iMatic.changeMinter(ikkaProvider.address);
-    cerosRouter.changeProvider(ikkaProvider.address);
+    sMatic.changeMinter(sikkaProvider.address);
+    cerosRouter.changeProvider(sikkaProvider.address);
     // let interaction = this.Interaction.attach(INTERACTION);
 
     console.log("Verifying Provider...");
 
     // Verify implementations
     await hre.run("verify:verify", {
-        address: ikkaProviderImplementation,
+        address: sikkaProviderImplementation,
     });
 
     // Verify proxies
     await hre.run("verify:verify", {
-        address: ikkaProvider.address,
+        address: sikkaProvider.address,
         constructorArguments: [
-            _iMatic, _aMATICc, _ceaMATICc, _cerosRouter, _dao, _pool
+            _sMatic, _aMATICc, _ceaMATICc, _cerosRouter, _dao, _pool
         ],
     });
 }

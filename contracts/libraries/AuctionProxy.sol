@@ -5,11 +5,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 
 import "../interfaces/ClipperLike.sol";
 import "../interfaces/GemJoinLike.sol";
-import "../interfaces/SikkaGemLike.sol";
+import "../interfaces/SikkaJoinLike.sol";
 import "../interfaces/SikkaLike.sol";
 import "../interfaces/DogLike.sol";
 import "../interfaces/VatLike.sol";
-import "../ceros/interfaces/IIkkaProvider.sol";
+import "../ceros/interfaces/ISikkaProvider.sol";
 
 import { CollateralType } from  "../ceros/interfaces/IDao.sol";
 
@@ -23,10 +23,10 @@ library AuctionProxy {
     address user,
     address keeper,
     SikkaLike sikka,
-    SikkaGemLike sikkaJoin,
+    SikkaJoinLike sikkaJoin,
     VatLike vat,
     DogLike dog,
-    IIkkaProvider ikkaProvider,
+    ISikkaProvider sikkaProvider,
     CollateralType calldata collateral
   ) public returns (uint256 id) {
     uint256 sikkaBal = sikka.balanceOf(address(this));
@@ -37,8 +37,8 @@ library AuctionProxy {
     sikka.transfer(keeper, sikkaBal);
 
     // Burn any derivative token (hMATIC incase of ceaMATICc collateral)
-    if (address(ikkaProvider) != address(0)) {
-      ikkaProvider.daoBurn(user, ClipperLike(collateral.clip).sales(id).lot);
+    if (address(sikkaProvider) != address(0)) {
+      sikkaProvider.daoBurn(user, ClipperLike(collateral.clip).sales(id).lot);
     }
   }
 
@@ -46,7 +46,7 @@ library AuctionProxy {
     uint auctionId,
     address keeper,
     SikkaLike sikka,
-    SikkaGemLike sikkaJoin,
+    SikkaJoinLike sikkaJoin,
     VatLike vat,
     CollateralType calldata collateral
   ) public {
@@ -65,9 +65,9 @@ library AuctionProxy {
     uint256 maxPrice,
     address receiverAddress,
     SikkaLike sikka,
-    SikkaGemLike sikkaJoin,
+    SikkaJoinLike sikkaJoin,
     VatLike vat,
-    IIkkaProvider ikkaProvider,
+    ISikkaProvider sikkaProvider,
     CollateralType calldata collateral
   ) public {
     // Balances before
@@ -94,9 +94,9 @@ library AuctionProxy {
     gemBal = collateral.gem.gem().balanceOf(address(this)) - gemBal;
     sikka.transfer(receiverAddress, sikkaBal);
 
-    if (address(ikkaProvider) != address(0)) {
-      IERC20Upgradeable(collateral.gem.gem()).safeTransfer(address(ikkaProvider), gemBal);
-      ikkaProvider.liquidation(receiverAddress, gemBal); // Burn router ceToken and mint amaticc to receiver
+    if (address(sikkaProvider) != address(0)) {
+      IERC20Upgradeable(collateral.gem.gem()).safeTransfer(address(sikkaProvider), gemBal);
+      sikkaProvider.liquidation(receiverAddress, gemBal); // Burn router ceToken and mint amaticc to receiver
 
       // TODO: emit in the Interaction. Return liquidated amount from here
       // // liquidated user, collateral address, amount of collateral bought, price
@@ -105,8 +105,8 @@ library AuctionProxy {
       if (leftover != 0) {
         // Auction ended with leftover
         vat.flux(collateral.ilk, urn, address(this), leftover);
-        collateral.gem.exit(address(ikkaProvider), leftover); // Router (disc) gets the remaining ceamaticc
-        ikkaProvider.liquidation(urn, leftover); // Router burns them and gives amaticc remaining
+        collateral.gem.exit(address(sikkaProvider), leftover); // Router (disc) gets the remaining ceamaticc
+        sikkaProvider.liquidation(urn, leftover); // Router burns them and gives amaticc remaining
       }
     } else {
       IERC20Upgradeable(collateral.gem.gem()).safeTransfer(receiverAddress, gemBal);

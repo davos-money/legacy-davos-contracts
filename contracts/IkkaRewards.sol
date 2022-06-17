@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./iMath.sol";
+import "./sMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
 import "./interfaces/VatLike.sol";
@@ -141,7 +141,7 @@ contract IkkaRewards is IRewards, Initializable, UUPSUpgradeable, OwnableUpgrade
 
     // Yearly api in percents with 18 decimals
     function distributionApy(address token) public view returns(uint256) {
-        return (iMath.rpow(pools[token].rewardRate, YEAR, ONE) - ONE) / 10 ** 7;
+        return (sMath.rpow(pools[token].rewardRate, YEAR, ONE) - ONE) / 10 ** 7;
     }
 //
     function claimable(address token, address usr) public poolInit(token) view returns (uint256) {
@@ -173,7 +173,7 @@ contract IkkaRewards is IRewards, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (last == 0) {
             return 0;
         }
-        uint256 rate = iMath.rpow(pools[token].rewardRate, block.timestamp - last, ONE);
+        uint256 rate = sMath.rpow(pools[token].rewardRate, block.timestamp - last, ONE);
         uint256 rewards = FullMath.mulDiv(rate, usrDebt, 10 ** 27) - usrDebt; //$ amount
         return FullMath.mulDiv(rewards, ikkaPrice(), 10 ** 18); //ikka tokens
     }

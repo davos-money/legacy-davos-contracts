@@ -2,12 +2,12 @@
 pragma solidity ^0.8.10;
 
 import "./SikkaLike.sol";
-import "./SikkaGemLike.sol";
+import "./SikkaJoinLike.sol";
 import "./VatLike.sol";
 import "./ClipperLike.sol";
 import "./DogLike.sol";
 import { CollateralType } from "./../ceros/interfaces/IDao.sol";
-import "../ceros/interfaces/IIkkaProvider.sol";
+import "../ceros/interfaces/ISikkaProvider.sol";
 
 interface IAuctionProxy {
 
