@@ -24,7 +24,7 @@ ReentrancyGuardUpgradeable
     // Tokens
     address private _certToken;
     address private _ceToken;
-    ICertToken private _collateralToken; // (default hMATIC)
+    ICertToken private _collateralToken; // (default sMATIC)
     ICerosRouter private _ceRouter;
     IDao private _dao;
     IMaticPool private _pool;
