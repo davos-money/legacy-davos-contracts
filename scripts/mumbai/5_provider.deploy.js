@@ -30,15 +30,6 @@ async function main() {
     cerosRouter = await this.CerosRouter.attach(_cerosRouter);
     await sMatic.changeMinter(sikkaProvider.address);
     await cerosRouter.changeProvider(sikkaProvider.address);
-    
-    const Interaction = await hre.ethers.getContractFactory("Interaction", {
-        unsafeAllow: ['external-library-linking'],
-        libraries: {
-            AuctionProxy: _auctionProxy
-        }
-    });
-    const interaction = await Interaction.attach(_dao);
-    await interaction.setIkkaProvider(_ceaMATICc, sikkaProvider.address)
 
     console.log("Verifying Provider...");
 
