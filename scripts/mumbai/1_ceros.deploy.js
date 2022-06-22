@@ -16,7 +16,6 @@ async function main() {
         _wMatic = "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
         // _aMaticb = "",
         _dex = "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-        _dexFactory = "0x1F98431c8aD98523631AE4a59f267346ea31F984",
         _dexPairFee = "3000";
         // _pool = "";
 
@@ -59,7 +58,7 @@ async function main() {
     console.log("sMatic     : " + sMatic.address);
     console.log("imp        : " + sMaticImplementation);
 
-    cerosRouter = await upgrades.deployProxy(this.CerosRouter, [_aMATICc, _wMatic, ceaMATICc.address, ceVault.address, _dex, _dexPairFee, _dexFactory], {initializer: "initialize"}, {gasLimit: 2000000});
+    cerosRouter = await upgrades.deployProxy(this.CerosRouter, [_aMATICc, _wMatic, ceaMATICc.address, ceVault.address, _dex, _dexPairFee], {initializer: "initialize"}, {gasLimit: 2000000});
     await cerosRouter.deployed();
     let cerosRouterImplementation = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
     console.log("cerosRouter: " + cerosRouter.address);
