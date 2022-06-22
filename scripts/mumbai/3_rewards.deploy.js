@@ -8,7 +8,7 @@ async function main() {
     let [deployer] = await ethers.getSigners();
     let ilkCeaMATICc = ethers.utils.formatBytes32String("ceaMATICc");
     let vat = "",
-        ceaMATICc = "";
+        sikka = "";
 
     // Contracts Fetching
     this.IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
@@ -28,13 +28,13 @@ async function main() {
     
     const ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, ["100000000000000000"], {initializer: "initialize"}); // 0.1
     await ikkaOracle.deployed();
-    let ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(rewards.address);
+    let ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
     console.log("ikkaOracle          :", ikkaOracle.address);
     console.log("Imp                 :", ikkaOracleImplementation);
 
     await ikkaToken.rely(rewards.address);
     await rewards.setIkkaToken(ikkaToken.address);
-    await rewards.initPool(ceaMATICc, ilkCeaMATICc, "1000000001847694957439350500", {gasLimit: 2000000}); //6%
+    await rewards.initPool(sikka, ilkCeaMATICc, "1000000001847694957439350500", {gasLimit: 2000000}); //6%
     await rewards.setOracle(ikkaOracle.address);
 
     console.log("Verifying Rewards...");

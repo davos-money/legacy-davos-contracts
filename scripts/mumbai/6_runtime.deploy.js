@@ -18,7 +18,7 @@ async function main() {
         sikka,
         clip,
         vow,
-        sikkaProvider,
+        // sikkaProvider,
         ceaMATICc,
         oracle,
         abacus;
@@ -93,9 +93,13 @@ async function main() {
     await vat.rely(_jug);
     await vat.rely(_dog);
     await vat.rely(_interaction);
+    await vat.rely(_clip);
     await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), "500000000" + rad);
     await vat["file(bytes32,bytes32,uint256)"](_ilkCeaMATICc, ethers.utils.formatBytes32String("line"), "50000000" + rad);
     await vat["file(bytes32,bytes32,uint256)"](_ilkCeaMATICc, ethers.utils.formatBytes32String("dust"), "1" + ray);
+
+    console.log("Vow init...");
+    await vow.rely(_dog);
 
     console.log("All init...");
     await rewards.rely(_interaction);
@@ -103,6 +107,7 @@ async function main() {
     await sikkaJoin.rely(_interaction);
     await dog.rely(_interaction);
     await jug.rely(_interaction);
+    await clip.rely(_interaction);
     await interaction.setSikkaProvider(_ceaMATICc, _sikkaProvider);
 
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,

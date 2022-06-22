@@ -81,9 +81,11 @@ struct ExactInputSingleParams {
 error Unauthorized(address _caller);
 error NotLive(address _contract);
 error InsufficientSurplus(uint256 _surplus);
-error LossySurge();
-error MoreDebt();
-error DebtfulSurge();
+error BufZone();
+error AbsurdPrice();
+error SinZone();
+error AbsurdThreshold();
+error InactiveZone();
 error InvalidPrice();
 error ZeroSpread();
 
@@ -199,13 +201,13 @@ contract Colander is ReentrancyGuardUpgradeable {
         // Checks
         if (live != 1) revert NotLive(address(this));
 
+        // Update rewards
+        rewards.reflect(msg.sender, 0);
+
         // State changes
         uint256 deposit = balanceOf[msg.sender];
         balanceOf[msg.sender] += _wad;
         totalSupply += _wad;
-
-        // Update rewards
-        rewards.reflect(msg.sender, 0);
 
         // Method calls
         stablecoin.safeTransferFrom(msg.sender, address(this), _wad);
@@ -218,17 +220,17 @@ contract Colander is ReentrancyGuardUpgradeable {
         // Checks
         if (live != 1) revert NotLive(address(this));
 
-        // State changes
+        // Update rewards
         uint256 deposit = balanceOf[msg.sender];
         uint256 amount = _wad > deposit ? deposit: _wad;
+        rewards.reflect(msg.sender, amount);
+
+        // State changes
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
 
-        // Update rewards
-        rewards.reflect(msg.sender, amount);
-
         // Method calls
-        stablecoin.safeTransfer(msg.sender, amount);
+        stablecoin.safeTransfer(address(rewards), amount);
 
         // Events
         emit Exit(msg.sender, deposit, balanceOf[msg.sender]);
@@ -245,28 +247,31 @@ contract Colander is ReentrancyGuardUpgradeable {
         uint256 tab;          // Auction debt        [rad]
         uint256 lot;          // Auction collateral  [wad]
         {
-            address clip = IInteraction(interaction).collaterals(_collateral).clip;
-            (,abacusPrice,,) = IClipper(clip).getStatus(_auction_id);
-            bytes32 ilk = IInteraction(interaction).collaterals(_collateral).ilk;
-            feedPrice = _getFeedPrice(ilk);
+            CollateralType memory collateral = IInteraction(interaction).collaterals(_collateral);
+            (,abacusPrice,,) = IClipper(collateral.clip).getStatus(_auction_id);
+            feedPrice = _getFeedPrice(collateral.ilk);  // [ray]
 
-            if (abacusPrice >= feedPrice) revert LossySurge();
-            // require(abacusPrice < feedPrice, "Colander/lossy-surge");
+            if (abacusPrice >= feedPrice) revert BufZone();
+            // require(abacusPrice < feedPrice, "Colander/buf-zone");
 
-            tab = IClipper(clip).sales(_auction_id).tab;
-            lot = IClipper(clip).sales(_auction_id).lot;
+            tab = IClipper(collateral.clip).sales(_auction_id).tab;
+            lot = IClipper(collateral.clip).sales(_auction_id).lot;
 
             // Calculate debt per collateral
             uint256 auctionPrice = tab / lot;  // [ray]
 
-            if (auctionPrice >= feedPrice) revert MoreDebt();
-            // require(auctionPrice < feedPrice, "Colander/more-debt");
+            if (auctionPrice >= feedPrice) revert AbsurdPrice();
+            else if (auctionPrice >= abacusPrice) revert SinZone();
+            // require(auctionPrice < feedPrice, "Colander/absurd-price");
+            // require(auctionPrice < abacusPrice, "Colander/sin-zone");
 
             uint256 y = (feedPrice * profitRange) / RAY;
             uint256 threshold = feedPrice - y;
 
-            if (threshold <= auctionPrice || threshold < abacusPrice) revert DebtfulSurge();
-            // require(threshold > auctionPrice && threshold >= abacusPrice, "Colander/debtful-surge");
+            if (auctionPrice > threshold) revert AbsurdThreshold();
+            else if (abacusPrice > threshold) revert InactiveZone();
+            // require(auctionPrice <= threshold, "Colander/absurd-threshold");
+            // require(abacusPrice <= threshold, "Colander/inactive-zone");
         }
 
         // Calculate lot and buy
@@ -280,7 +285,9 @@ contract Colander is ReentrancyGuardUpgradeable {
         uint256 amount = IERC20Upgradeable(_collateral).balanceOf(address(this));
         uint256 z = (feedPrice * amount) / RAY;
         uint256 expectedAmount = z - (z * priceImpact) / WAD;
-        uint256 amountOut = _swap(_collateral, 0, expectedAmount, 300);
+        IERC20Upgradeable(_collateral).safeApprove(address(dex), amount);
+        uint256 amountOut = _swap(_collateral, amount, expectedAmount, block.timestamp + 300);
+        IERC20Upgradeable(_collateral).safeApprove(address(dex), 0);
        
         // Recalculate surplus
         surplus = stablecoin.balanceOf(address(this)) - totalSupply;
@@ -296,20 +303,20 @@ contract Colander is ReentrancyGuardUpgradeable {
         // require(has, "Colander/invalid-price");
         _feedPrice = rdiv(mul(uint256(val), BLN), spotter.par());
     }
-    function _swap(address _tokenOut, uint256 _amountIn, uint256 _amountOutMin, uint256 _deadline) private returns(uint256) {
+    function _swap(address _tokenIn, uint256 _amountIn, uint256 _amountOutMin, uint256 _deadline) private returns(uint256) {
 
         uint24 fee = 3000;
         uint160 sqrtPriceLimitX96 = 0;
         
         ExactInputSingleParams memory params = ExactInputSingleParams(
-            address(stablecoin),
-            _tokenOut,
-            fee,
-            address(this),
-            _deadline,
-            _amountIn,
-            _amountOutMin,
-            sqrtPriceLimitX96
+            _tokenIn,             // tokenIn
+            address(stablecoin),  // tokenOut
+            fee,                  // fee
+            address(this),        // recipient
+            _deadline,            // deadline
+            _amountIn,            // amountIn
+            _amountOutMin,        // amountOut (priceImpact included)
+            sqrtPriceLimitX96     // 0
         );
 
         return dex.exactInputSingle(params);
@@ -320,6 +327,8 @@ contract Colander is ReentrancyGuardUpgradeable {
 
         if (live != 1) revert NotLive(address(this));
         else if (surplus < _wad) revert InsufficientSurplus(surplus);
+
+        surplus -= _wad;
 
         IERC20Upgradeable(stablecoin).approve(address(rewards), _wad);
 
@@ -445,8 +454,8 @@ contract ColanderRewards is Initializable {
     function reflect(address _depositor, uint256 _wad) external auth update(_depositor) {
 
         if (_wad != 0) {
-            withdrawn[msg.sender] += _wad;
-            unstakeTime[msg.sender] = block.timestamp + exitDelay;
+            withdrawn[_depositor] += _wad;
+            unstakeTime[_depositor] = block.timestamp + exitDelay;
         }
     }
     function replenish(uint _wad) external update(address(0)) {

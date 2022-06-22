@@ -1,4 +1,4 @@
-# IKKA
+# SIKKA
 
 `cp .env.example .env`
 edit .env with your variables 
@@ -25,7 +25,7 @@ edit .env with your variables
 * **CerosRouter** — finds the best way to obtain aMATICc.
 * **CeToken** — underlying collateral token inside makerDao
 * **CeVault** — stores obtained aMATICc
-* **IkkaProvider** — wraps MATIC into ceaMATICc via _CerosRouter_
+* **SikkaProvider** — wraps MATIC into ceaMATICc via _CerosRouter_
 
 ### Interaction
 * **Interaction** — proxy for makerDao contracts. 
