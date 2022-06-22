@@ -9,7 +9,7 @@ import "./interfaces/IDex.sol";
 import "./interfaces/IDao.sol";
 import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ISikkaProvider.sol";
-import "./interfaces/IMaticPool.sol";
+// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
 contract SikkaProvider is
 ISikkaProvider,
@@ -27,7 +27,7 @@ ReentrancyGuardUpgradeable
     ICertToken private _collateralToken; // (default sMATIC)
     ICerosRouter private _ceRouter;
     IDao private _dao;
-    IMaticPool private _pool;
+    // IMaticPool private _pool;
     address private _proxy;
     /**
      * Modifiers
@@ -51,8 +51,8 @@ ReentrancyGuardUpgradeable
         address certToken,
         address ceToken,
         address ceRouter,
-        address daoAddress,
-        address pool
+        address daoAddress
+        // address pool
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -63,7 +63,7 @@ ReentrancyGuardUpgradeable
         _ceToken = ceToken;
         _ceRouter = ICerosRouter(ceRouter);
         _dao = IDao(daoAddress);
-        _pool = IMaticPool(pool);
+        // _pool = IMaticPool(pool);
         IERC20(_ceToken).approve(daoAddress, type(uint256).max);
     }
     /**
@@ -113,24 +113,19 @@ ReentrancyGuardUpgradeable
     /**
      * RELEASE
      */
-    // // withdrawal in MATIC via staking pool
-    // function release(address recipient, uint256 amount)
-    // external
-    // override
-    // whenNotPaused
-    // nonReentrant
-    // returns (uint256 realAmount)
-    // {
-    //     uint256 minumumUnstake = _pool.getMinimumStake();
-    //     require(
-    //         amount >= minumumUnstake,
-    //         "value must be greater than min unstake amount"
-    //     );
-    //     _withdrawCollateral(msg.sender, amount);
-    //     realAmount = _ceRouter.withdrawFor(recipient, amount);
-    //     emit Withdrawal(msg.sender, recipient, amount);
-    //     return realAmount;
-    // }
+    // withdrawal in MATIC via staking pool
+    function release(address recipient, uint256 amount)
+    external
+    override
+    whenNotPaused
+    nonReentrant
+    returns (uint256 realAmount)
+    {
+        _withdrawCollateral(msg.sender, amount);
+        realAmount = _ceRouter.withdrawWithSlippage(recipient, amount, 0);
+        emit Withdrawal(msg.sender, recipient, amount);
+        return realAmount;
+    }
     function releaseInAMATICc(address recipient, uint256 amount)
     external
     override

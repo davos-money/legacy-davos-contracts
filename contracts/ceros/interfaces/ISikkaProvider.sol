@@ -46,9 +46,9 @@ interface ISikkaProvider {
      */
 
     // MATIC
-    // function release(address recipient, uint256 amount)
-    // external
-    // returns (uint256);
+    function release(address recipient, uint256 amount)
+    external
+    returns (uint256);
 
     // aMATICc
     function releaseInAMATICc(address recipient, uint256 amount)

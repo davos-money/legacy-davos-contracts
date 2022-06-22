@@ -30,6 +30,8 @@ interface ICerosRouter {
 
     event ChangeDex(address dex);
 
+    event ChangeDexFactory(address factory);
+
     // event ChangePool(address pool);
 
     event ChangeDao(address dao);

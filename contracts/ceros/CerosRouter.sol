@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/ICerosRouter.sol";
-import "./interfaces/IMaticPool.sol";
+// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
 
 contract CerosRouter is
@@ -75,55 +75,23 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        // uint256 profit = realAmount - 0;
-        // _profits[msg.sender] += profit;
-        uint256 realAmount = swapETHForTokens(msg.value, 0);
-        value = _vault.depositFor(msg.sender, realAmount);
-        emit Deposit(msg.sender, _wMaticAddress, realAmount, 0);
+        uint256 amount = msg.value;
+        uint256 realAmount = swapETHForTokens(amount, 0);
+        uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
+        
+        require(realAmount > minAmount, "price too small");
+
+        require(
+            _certToken.balanceOf(address(this)) >= realAmount,
+            "insufficient amount of CerosRouter in cert token"
+        );
+        uint256 profit = realAmount - minAmount;
+        // add profit
+        _profits[msg.sender] += profit;
+
+        value = _vault.depositFor(msg.sender, realAmount - profit);
+        emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
         return value;
-        // uint256 amount = msg.value;
-        // // get returned amount from Dex
-        // address[] memory path = new address[](2);
-        // path[0] = _wMaticAddress;
-        // path[1] = address(_certToken);
-        // uint256[] memory outAmounts = _dex.getAmountsOut(amount, path);
-        // uint256 dexAMATICcAmount = outAmounts[outAmounts.length - 1];
-        // // let's calculate returned amount of aMATICc
-        // // poolAMATICcAmount = amount - relayerFee - amount*(1-ratio);
-        // uint256 minumunStake = _pool.getMinimumStake();
-        // uint256 relayerFee = _pool.getRelayerFee();
-        // uint256 ratio = _certToken.ratio();
-        // uint256 poolAMATICcAmount;
-        // if (amount >= minumunStake + relayerFee) {
-        //     poolAMATICcAmount = ((amount - relayerFee) * ratio) / 1e18;
-        // }
-        // // compare poolAMATICcAmount with dexAMATICcAmount from Dex
-        // // if poolAMATICcAmount >= dexAMATICcAmount -> stake via BinancePool
-        // // else -> swap on Dex
-        // uint256 realAmount;
-        // uint256 profit;
-        // if (poolAMATICcAmount >= dexAMATICcAmount) {
-        //     realAmount = poolAMATICcAmount;
-        //     _pool.stakeAndClaimCerts{value: amount}();
-        // } else {
-        //     uint256[] memory amounts = _dex.swapExactETHForTokens{
-        //     value: amount
-        //     }(dexAMATICcAmount, path, address(this), block.timestamp + 300);
-        //     realAmount = amounts[1];
-        //     if (realAmount > poolAMATICcAmount && poolAMATICcAmount != 0) {
-        //         profit = realAmount - poolAMATICcAmount;
-        //     }
-        // }
-        // // let's check balance of CeRouter in aMATICc
-        // require(
-        //     _certToken.balanceOf(address(this)) >= realAmount,
-        //     "insufficient amount of CerosRouter in cert token"
-        // );
-        // // add profit
-        // _profits[msg.sender] += profit;
-        // value = _vault.depositFor(msg.sender, realAmount - profit);
-        // emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
-        // return value;
     }
     function depositAMATICcFrom(address owner, uint256 amount)
     external
@@ -229,6 +197,7 @@ ReentrancyGuardUpgradeable
     ) external override nonReentrant returns (uint256 realAmount) {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
         uint amountOut = swapExactTokensForETH(recipient, realAmount, outAmount);
+        require(amountOut > (amount * 1e18 / _certToken.ratio()), "price too small");
         emit Withdrawal(msg.sender, recipient, _wMaticAddress, amountOut);
         return amountOut;
     }
