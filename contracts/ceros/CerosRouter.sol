@@ -197,7 +197,7 @@ ReentrancyGuardUpgradeable
     ) external override nonReentrant returns (uint256 realAmount) {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
         uint amountOut = swapExactTokensForETH(recipient, realAmount, outAmount);
-        require(amountOut > (amount * 1e18 / _certToken.ratio()), "price too small");
+        require(amountOut < (amount * 1e18 / _certToken.ratio()), "price too small");
         emit Withdrawal(msg.sender, recipient, _wMaticAddress, amountOut);
         return amountOut;
     }
