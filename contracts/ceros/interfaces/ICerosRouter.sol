@@ -59,6 +59,8 @@ interface ICerosRouter {
     // in MATIC
     function deposit() external payable returns (uint256);
 
+    function depositWMatic(uint256 amount) external returns (uint256);
+
     // in aMATICc
     function depositAMATICcFrom(address owner, uint256 amount)
     external

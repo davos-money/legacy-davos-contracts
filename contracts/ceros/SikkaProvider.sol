@@ -9,8 +9,9 @@ import "./interfaces/IDex.sol";
 import "./interfaces/IDao.sol";
 import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ISikkaProvider.sol";
-// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
+import "../MasterVault/interfaces/IMasterVault.sol";
+
 contract SikkaProvider is
 ISikkaProvider,
 OwnableUpgradeable,
@@ -25,9 +26,8 @@ ReentrancyGuardUpgradeable
     address private _certToken;
     address private _ceToken;
     ICertToken private _collateralToken; // (default sMATIC)
-    ICerosRouter private _ceRouter;
+    IMasterVault private _ceRouter;
     IDao private _dao;
-    // IMaticPool private _pool;
     address private _proxy;
     /**
      * Modifiers
@@ -52,7 +52,6 @@ ReentrancyGuardUpgradeable
         address ceToken,
         address ceRouter,
         address daoAddress
-        // address pool
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -61,9 +60,10 @@ ReentrancyGuardUpgradeable
         _collateralToken = ICertToken(collateralToken);
         _certToken = certToken;
         _ceToken = ceToken;
-        _ceRouter = ICerosRouter(ceRouter);
+        _ceRouter = IMasterVault(ceRouter);
         _dao = IDao(daoAddress);
         // _pool = IMaticPool(pool);
+        _ceRouter.approve(ceRouter, type(uint256).max);
         IERC20(_ceToken).approve(daoAddress, type(uint256).max);
     }
     /**
@@ -77,39 +77,39 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        value = _ceRouter.deposit{value: msg.value}();
+        value = _ceRouter.depositETH{value: msg.value}();
         // deposit ceToken as collateral
         _provideCollateral(msg.sender, value);
         emit Deposit(msg.sender, value);
         return value;
     }
-    function provideInAMATICc(uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 value)
-    {
-        value = _ceRouter.depositAMATICcFrom(msg.sender, amount);
-        // deposit ceToken as collateral
-        _provideCollateral(msg.sender, value);
-        emit Deposit(msg.sender, value);
-        return value;
-    }
+    // function provideInAMATICc(uint256 amount)
+    // external
+    // override
+    // nonReentrant
+    // returns (uint256 value)
+    // {
+    //     value = _ceRouter.depositAMATICcFrom(msg.sender, amount);
+    //     // deposit ceToken as collateral
+    //     _provideCollateral(msg.sender, value);
+    //     emit Deposit(msg.sender, value);
+    //     return value;
+    // }
     /**
      * CLAIM
      */
     // claim in aMATICc
-    function claimInAMATICc(address recipient)
-    external
-    override
-    nonReentrant
-    onlyOperator
-    returns (uint256 yields)
-    {
-        yields = _ceRouter.claim(recipient);
-        emit Claim(recipient, yields);
-        return yields;
-    }
+    // function claimInAMATICc(address recipient)
+    // external
+    // override
+    // nonReentrant
+    // onlyOperator
+    // returns (uint256 yields)
+    // {
+    //     yields = _ceRouter.claim(recipient);
+    //     emit Claim(recipient, yields);
+    //     return yields;
+    // }
     /**
      * RELEASE
      */
@@ -122,21 +122,21 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         _withdrawCollateral(msg.sender, amount);
-        realAmount = _ceRouter.withdrawWithSlippage(recipient, amount, 0);
+        realAmount = _ceRouter.withdrawETH(recipient, amount);
         emit Withdrawal(msg.sender, recipient, amount);
         return realAmount;
     }
-    function releaseInAMATICc(address recipient, uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 value)
-    {
-        _withdrawCollateral(msg.sender, amount);
-        value = _ceRouter.withdrawAMATICc(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, value);
-        return value;
-    }
+    // function releaseInAMATICc(address recipient, uint256 amount)
+    // external
+    // override
+    // nonReentrant
+    // returns (uint256 value)
+    // {
+    //     _withdrawCollateral(msg.sender, amount);
+    //     value = _ceRouter.withdrawAMATICc(recipient, amount);
+    //     emit Withdrawal(msg.sender, recipient, value);
+    //     return value;
+    // }
     /**
      * DAO FUNCTIONALITY
      */
@@ -146,7 +146,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
-        _ceRouter.withdrawAMATICc(recipient, amount);
+        _ceRouter.withdrawETH(recipient, amount);
     }
     function daoBurn(address account, uint256 value)
     external

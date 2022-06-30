@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/ICerosRouter.sol";
-// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
+import "../MasterVault/interfaces/IMasterVault.sol";
 
 contract CerosRouter is
 ICerosRouter,
@@ -27,14 +27,14 @@ ReentrancyGuardUpgradeable
     address private _wMaticAddress;
     IERC20 private _ceToken; // (default ceAMATICc)
     mapping(address => uint256) private _profits;
-    address private _provider;
+    IMasterVault private _masterVault;
     uint24 private _pairFee;
     /**
      * Modifiers
      */
     modifier onlyProvider() {
         require(
-            msg.sender == owner() || msg.sender == _provider,
+            msg.sender == owner() || msg.sender == address(_masterVault),
             "Provider: not allowed"
         );
         _;
@@ -46,6 +46,7 @@ ReentrancyGuardUpgradeable
         // address bondToken,
         address vault,
         address dexAddress,
+        // address masterVault,
         // address pool,
         uint24 pairFee
     ) public initializer {
@@ -58,6 +59,7 @@ ReentrancyGuardUpgradeable
         _vault = IVault(vault);
         _dex = ISwapRouter(dexAddress);
         _pairFee = pairFee;
+        // _masterVault = IMasterVault(masterVault);
         // _pool = IMaticPool(pool);
         IERC20(wMaticToken).approve(dexAddress, type(uint256).max);
         IERC20(certToken).approve(dexAddress, type(uint256).max);
@@ -93,6 +95,30 @@ ReentrancyGuardUpgradeable
         emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
         return value;
     }
+
+    function depositWMatic(uint256 amount) 
+    external
+    nonReentrant
+    returns (uint256 value)
+    {
+        uint256 realAmount = swapETHForTokens(amount, 0);
+        uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
+        
+        require(realAmount > minAmount, "price too small");
+
+        require(
+            _certToken.balanceOf(address(this)) >= realAmount,
+            "insufficient amount of CerosRouter in cert token"
+        );
+        uint256 profit = realAmount - minAmount;
+        // add profit
+        _profits[msg.sender] += profit;
+
+        value = _vault.depositFor(msg.sender, realAmount - profit);
+        emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
+        return value;
+    }
+
     function depositAMATICcFrom(address owner, uint256 amount)
     external
     override
@@ -212,7 +238,7 @@ ReentrancyGuardUpgradeable
             amountOutMinimum,                   // amountOutMinimum
             0                                   // sqrtPriceLimitX96
         );
-        amountOut = _dex.exactInputSingle{ value: amountIn }(params);
+        amountOut = _dex.exactInputSingle(params);
     }
     function swapExactTokensForETH(
         address recipient,
@@ -265,9 +291,9 @@ ReentrancyGuardUpgradeable
     //     _certToken.approve(address(_pool), type(uint256).max);
     //     emit ChangePool(pool);
     // }
-    function changeProvider(address provider) external onlyOwner {
-        _provider = provider;
-        emit ChangeProvider(provider);
+    function changeProvider(address masterVault) external onlyOwner {
+        _masterVault = IMasterVault(masterVault);
+        emit ChangeProvider(masterVault);
     }
     function changePairFee(uint24 fee) external onlyOwner {
         _pairFee = fee;
