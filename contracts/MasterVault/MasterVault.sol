@@ -94,17 +94,16 @@ ReentrancyGuardUpgradeable
     returns (uint256) {
         // maxAmount check
         uint256 amount = msg.value;
-        
-        IWETH(asset()).deposit{value: amount}();
         uint256 shares = previewDeposit(amount);
+        IWETH(asset()).deposit{value: amount}();
         _deposit(address(this), msg.sender, amount, shares);
 
         // for now deposit funds to ceros Router or just hold the wMatic in this contract
-        if (ifTradable(amount)) {
-            IWETH(asset()).transfer(address(_ceRouter), amount);
-            _ceRouter.depositWMatic(amount);
-        }
-        return amount;
+        // if (ifTradable(amount)) {
+        //     IWETH(asset()).transfer(address(_ceRouter), amount);
+        //     _ceRouter.depositWMatic(amount);
+        // }
+        return shares;
     }
 
     function withdrawETH(address account, uint256 amount) 
@@ -114,15 +113,21 @@ ReentrancyGuardUpgradeable
     whenNotPaused
     onlyProvider 
     returns (uint256 shares) {
-        // maxAmount check
+
+        // // _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        // _withdraw(msg.sender, address(this), msg.sender, amount, shares);
+        
+        // if(IERC20(asset()).balanceOf(address(this)) <= amount) {
+        //     amount = _ceRouter.withdrawWithSlippage(address(this), amount, 0);
+        //     IWETH(asset()).deposit{value: amount}();
+        // }
         shares = previewWithdraw(amount);
-        _withdraw(msg.sender, address(this), msg.sender, amount, shares);
-        if(ICertToken(asset()).balanceOf(msg.sender) > amount) {
-            IWETH(asset()).withdraw(amount);
-            payable(account).transfer(amount);
-        } else {
-            // get from ceros
-        }
+        _burn(msg.sender, shares);
+        IWETH(asset()).withdraw(shares);
+        payable(account).transfer(amount);
+        // maxAmount check
+
+        // _ceRouter.withdrawWithSlippage(account, amount, 0);
     }
 
     // receive() external payable {
@@ -175,5 +180,9 @@ ReentrancyGuardUpgradeable
     function changePriceGetter(address priceGetter) external onlyOwner {
         _priceGetter = priceGetter;
         // emit PriceGetterChanged(priceGetter);
+    }
+
+    receive() external payable {
+
     }
 }
