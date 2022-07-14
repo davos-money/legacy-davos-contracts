@@ -2,15 +2,17 @@
 
 pragma solidity ^0.8.0;
 
-import "./IERC4626Upgradeable.sol";
+// import "./IERC4626Upgradeable.sol";
 
-interface IMasterVault is IERC4626Upgradeable {
+interface IMasterVault {
     event DepositFeeChanged(uint256 newDepositFee);
     event MaxDepositFeeChanged(uint256 newMaxDepositFee);
     event WithdrawalFeeChanged(uint256 newWithdrawalFee);
     event MaxWithdrawalFeeChanged(uint256 newMaxWithdrawalFee);
     event ProviderChanged(address provider);
     event RouterChanged(address ceRouter);
+    event ManagerAdded(address newManager);
+    event ManagerRemoved(address manager);
 
     function withdrawETH(address account, uint256 amount) external  returns (uint256);
     function depositETH() external payable returns (uint256);

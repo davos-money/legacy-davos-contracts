@@ -23,10 +23,10 @@ ReentrancyGuardUpgradeable
      */
     address private _operator;
     // Tokens
-    address private _certToken;
+    // address private _certToken;
     address private _ceToken;
     ICertToken private _collateralToken; // (default sMATIC)
-    IMasterVault private _ceRouter;
+    IMasterVault private _masterVault;
     IDao private _dao;
     address private _proxy;
     /**
@@ -48,9 +48,8 @@ ReentrancyGuardUpgradeable
     }
     function initialize(
         address collateralToken,
-        address certToken,
-        address ceToken,
-        address ceRouter,
+        // address certToken,
+        address masterVault,
         address daoAddress
     ) public initializer {
         __Ownable_init();
@@ -58,12 +57,12 @@ ReentrancyGuardUpgradeable
         __ReentrancyGuard_init();
         _operator = msg.sender;
         _collateralToken = ICertToken(collateralToken);
-        _certToken = certToken;
-        _ceToken = ceToken;
-        _ceRouter = IMasterVault(ceRouter);
+        // _certToken = certToken;
+        _ceToken = masterVault;
+        _masterVault = IMasterVault(masterVault);
         _dao = IDao(daoAddress);
         // _pool = IMaticPool(pool);
-        _ceRouter.approve(ceRouter, type(uint256).max);
+        IERC20(masterVault).approve(masterVault, type(uint256).max);
         IERC20(_ceToken).approve(daoAddress, type(uint256).max);
     }
     /**
@@ -77,7 +76,7 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        value = _ceRouter.depositETH{value: msg.value}();
+        value = _masterVault.depositETH{value: msg.value}();
         // deposit ceToken as collateral
         _provideCollateral(msg.sender, value);
         emit Deposit(msg.sender, value);
@@ -89,7 +88,7 @@ ReentrancyGuardUpgradeable
     // nonReentrant
     // returns (uint256 value)
     // {
-    //     value = _ceRouter.depositAMATICcFrom(msg.sender, amount);
+    //     value = _masterVault.depositAMATICcFrom(msg.sender, amount);
     //     // deposit ceToken as collateral
     //     _provideCollateral(msg.sender, value);
     //     emit Deposit(msg.sender, value);
@@ -106,7 +105,7 @@ ReentrancyGuardUpgradeable
     // onlyOperator
     // returns (uint256 yields)
     // {
-    //     yields = _ceRouter.claim(recipient);
+    //     yields = _masterVault.claim(recipient);
     //     emit Claim(recipient, yields);
     //     return yields;
     // }
@@ -122,7 +121,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         _withdrawCollateral(msg.sender, amount);
-        realAmount = _ceRouter.withdrawETH(recipient, amount);
+        realAmount = _masterVault.withdrawETH(recipient, amount);
         emit Withdrawal(msg.sender, recipient, amount);
         return realAmount;
     }
@@ -133,7 +132,7 @@ ReentrancyGuardUpgradeable
     // returns (uint256 value)
     // {
     //     _withdrawCollateral(msg.sender, amount);
-    //     value = _ceRouter.withdrawAMATICc(recipient, amount);
+    //     value = _masterVault.withdrawAMATICc(recipient, amount);
     //     emit Withdrawal(msg.sender, recipient, value);
     //     return value;
     // }
@@ -146,7 +145,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
-        _ceRouter.withdrawETH(recipient, amount);
+        _masterVault.withdrawETH(recipient, amount);
     }
     function daoBurn(address account, uint256 value)
     external

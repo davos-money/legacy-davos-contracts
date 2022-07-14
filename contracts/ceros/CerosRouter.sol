@@ -78,22 +78,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         uint256 amount = msg.value;
-        uint256 realAmount = swapETHForTokens(amount, 0);
-        uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
-        
-        require(realAmount > minAmount, "price too small");
-
-        require(
-            _certToken.balanceOf(address(this)) >= realAmount,
-            "insufficient amount of CerosRouter in cert token"
-        );
-        uint256 profit = realAmount - minAmount;
-        // add profit
-        _profits[msg.sender] += profit;
-
-        value = _vault.depositFor(msg.sender, realAmount - profit);
-        emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
-        return value;
+        return _deposit(amount);
     }
 
     function depositWMatic(uint256 amount) 
@@ -101,10 +86,16 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
+        IERC20(_wMaticAddress).transferFrom(msg.sender, address(this), amount);
+        return _deposit(amount);
+    }
+
+    function _deposit(uint256 amount) internal returns (uint256 value) {
+        require(amount > 0, "invalid deposit amount");
         uint256 realAmount = swapETHForTokens(amount, 0);
         uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
         
-        require(realAmount > minAmount, "price too small");
+        require(realAmount > minAmount, "price too low");
 
         require(
             _certToken.balanceOf(address(this)) >= realAmount,
@@ -223,7 +214,7 @@ ReentrancyGuardUpgradeable
     ) external override nonReentrant returns (uint256 realAmount) {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
         uint amountOut = swapExactTokensForETH(recipient, realAmount, outAmount);
-        require(amountOut < (amount * 1e18 / _certToken.ratio()), "price too small");
+        require(amountOut < (amount * 1e18 / _certToken.ratio()), "price too low");
         emit Withdrawal(msg.sender, recipient, _wMaticAddress, amountOut);
         return amountOut;
     }
@@ -256,7 +247,7 @@ ReentrancyGuardUpgradeable
             0                                   // sqrtPriceLimitX96
         );
         amountOut = _dex.exactInputSingle(params);
-        _dex.unwrapWETH9(outAmount, recipient);
+        _dex.unwrapWETH9(amountOut, recipient);
     }
     function getProfitFor(address account) external view returns (uint256) {
         return _profits[account];
