@@ -67,7 +67,8 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         require(amount > 0, "invalid amount");
         // for now deposit funds to ceros Router or just hold the wMatic in this contract
         beforeDeposit(amount);
-        if (ifTradable(amount)) {
+        uint256 amountOut = getAmountOut(address(underlying), address(_certToken), amount);
+        if (amountOut >= (amount * _certToken.ratio()) / 1e18) {
             return _ceRouter.depositWMatic(amount);
         }
     }
@@ -77,23 +78,40 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     }
 
     function panic() external onlyStrategist returns (uint256 value) {
+        //TODO maintain and withdraw the total amount deposited to ceros
         return _withdraw(balanceOfPool());
     }
 
     function _withdraw(uint256 amount) internal returns (uint256 value) {
-        // TODO:  check if fair price
+        require(amount > 0, "invalid amount");
         uint256 wethBalance = underlying.balanceOf(address(this));
-        if( wethBalance < amount) {
-            value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, 0);
+        if(amount < wethBalance) {
+            underlying.transferFrom(address(this), address(vault), amount);
+            return amount;
+        }
+        
+        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), amount);
+        if (amountOut >= (amount * 1e18) / _certToken.ratio() && 
+            (amountOut + wethBalance) >= amount
+        ) {
+            value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
             underlying.deposit{value: value}();
             amount = wethBalance + value;
+            underlying.transferFrom(address(this), address(vault), amount);
+            return amount;
         }
-        underlying.transferFrom(address(this), address(vault), amount);
-        return value;
+
+        // if( wethBalance < amount) {
+        //     value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, 0);
+        //     underlying.deposit{value: value}();
+        //     amount = wethBalance + value;
+        // }
+        // underlying.transferFrom(address(this), address(vault), amount);
+        // return value;
     }
 
     receive() external payable {
-        
+
     }
 
     function retireStrat() external onlyOwner {
@@ -109,15 +127,15 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         _certToken.transfer(_rewardsPool, yeild);
     }
 
-    function ifTradable(uint amountIn) public view returns (bool) {
-        uint256 amountOut = IPriceGetter(_priceGetter).getPrice(
-            address(underlying),
-            address(_certToken),
+    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
+        amountOut = IPriceGetter(_priceGetter).getPrice(
+            tokenIn,
+            tokenOut,
             amountIn,
             0,
             3000
         );
-        return amountOut > (amountIn * _certToken.ratio()) / 1e18;
+        // return amountOut > (amountIn * _certToken.ratio()) / 1e18;
     }
 
     function changePriceGetter(address priceGetter) external onlyOwner {

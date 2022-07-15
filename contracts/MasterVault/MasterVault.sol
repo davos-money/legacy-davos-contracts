@@ -99,12 +99,15 @@ ReentrancyGuardUpgradeable
     nonReentrant
     whenNotPaused 
     onlyProvider 
-    returns (uint256) {
+    returns (uint256 shares) {
+        address src = msg.sender;
         uint256 amount = msg.value;
-        uint256 shares = _assessFee(amount, _depositFee);
+        shares = _assessFee(amount, _depositFee);
         IWETH(asset()).deposit{value: shares}();
-        _deposit(address(this), msg.sender, shares, shares);
-        return shares;
+        // _deposit(address(this), msg.sender, shares, shares);
+        _mint(src, shares);
+
+        emit Deposit(src, src, amount, shares);
     }
 
     function withdrawETH(address account, uint256 amount) 
@@ -114,27 +117,28 @@ ReentrancyGuardUpgradeable
     whenNotPaused
     onlyProvider 
     returns (uint256 shares) {
-
+        address src = msg.sender;
         shares = amount;
-        _burn(msg.sender, shares);
+        _burn(src, shares);
         uint256 wethBalance = IERC20(asset()).balanceOf(address(this));
         if(wethBalance < amount) {
             shares = _withdrawFromStrategy(cerosStrategy, amount - wethBalance);
             shares += wethBalance;
         }
         IWETH(asset()).withdraw(shares);
-        shares = _assessFee(shares,_depositFee);
+        shares = _assessFee(shares, _withdrawalFee);
         payable(account).transfer(shares);
-
+        
+        emit Withdraw(src, src, src, amount, shares);
     }
 
     function _depositToStrategy(address strategy, uint256 amount) internal {
         require(amount > 0, "invalid deposit amount");
         IWETH weth = IWETH(asset());
         require(weth.balanceOf(address(this)) >= amount, "insufficient balance");
-        weth.transfer(strategy, amount);
         totalDebt += amount;
         _strategies[strategy].debt += amount;
+        weth.transfer(strategy, amount);
     }
 
     function depositAllToStrategy(address strategy) public onlyManager {
@@ -189,12 +193,24 @@ ReentrancyGuardUpgradeable
         // allocate to all active strategies based on respective allocation
         for(uint8 i = 0; i < strategies.length; i++) {
             if(_strategies[strategies[i]].active) {
-                uint256 allocation = _strategies[strategies[i]].allocation;
+                StrategyParams memory strategy =  _strategies[strategies[i]];
+                uint256 allocation = strategy.allocation;
                 if(allocation > 0) {
-                    depositAllToStrategy(strategies[i]);
+                    uint256 totalAssets = IWETH(asset()).balanceOf(address(this)) + totalDebt;
+                    uint256 strategyRatio = (strategy.debt / totalAssets) * 1e6;
+                    if(strategyRatio < allocation) {
+                        _depositToStrategy(strategies[i], ((totalAssets * allocation) / 1e6) - strategy.debt);
+                        // depositToStrategy(strategy, amount);
+                    } else {
+                        _withdrawFromStrategy(strategies[i], strategy.debt - (totalAssets * allocation) / 1e6);
+                    }
                 }
             }
         }
+    }
+
+    function availableToWithdraw() public view returns(uint256) {
+
     }
 
     function _assessFee(uint256 amount, uint256 fees) internal returns(uint256 value) {
