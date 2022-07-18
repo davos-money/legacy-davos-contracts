@@ -16,4 +16,6 @@ interface IMasterVault {
 
     function withdrawETH(address account, uint256 amount) external  returns (uint256);
     function depositETH() external payable returns (uint256);
+    function feeReceiver() external returns (address payable);
+    function withdrawalFee() external view returns (uint256);
 }

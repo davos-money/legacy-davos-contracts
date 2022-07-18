@@ -13,6 +13,7 @@ import "./ERC4626Upgradeable.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IMasterVault.sol";
 import "./interfaces/IPriceGetter.sol";
+import "./interfaces/IWaitingPool.sol";
 import "../Strategy/IBaseStrategy.sol";
 
 contract MasterVault is
@@ -28,7 +29,7 @@ ReentrancyGuardUpgradeable
      */
     uint256 private _depositFee;
     uint256 private _maxDepositFee;
-    uint256 private _withdrawalFee;
+    uint256 public withdrawalFee;
     uint256 private _maxWithdrawalFee;
 
     // Tokens
@@ -55,6 +56,7 @@ ReentrancyGuardUpgradeable
 
     uint256 public MAX_STRATEGIES;
     uint256 public totalDebt;          // Amount of tokens that all strategies have borrowed
+    IWaitingPool private _waitingPool;
 
     /**
      * Modifiers
@@ -81,6 +83,7 @@ ReentrancyGuardUpgradeable
         uint256 maxWithdrawalFee,
         IERC20MetadataUpgradeable asset,
         uint8 maxStrategies
+        // address waitingPool
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -91,6 +94,8 @@ ReentrancyGuardUpgradeable
         _maxDepositFee = maxDepositFee;
         _maxWithdrawalFee = maxWithdrawalFee;
         MAX_STRATEGIES = maxStrategies;
+        feeReceiver = payable(msg.sender);
+        // _waitingPool = IWaitingPool(waitingPool);
     }
 
     function depositETH() public 
@@ -102,8 +107,16 @@ ReentrancyGuardUpgradeable
     returns (uint256 shares) {
         address src = msg.sender;
         uint256 amount = msg.value;
+        require(amount > 0, "invalid amount");
         shares = _assessFee(amount, _depositFee);
-        IWETH(asset()).deposit{value: shares}();
+        uint256 waitingPoolDebt = _waitingPool.totalDebt();
+        uint256 waitingPoolBalance = address(_waitingPool).balance;
+        if(waitingPoolDebt > 0 && waitingPoolBalance < waitingPoolDebt) {
+            uint256 poolAmount = (waitingPoolDebt < amount) ? waitingPoolDebt - waitingPoolBalance : amount;
+            payable(address(_waitingPool)).transfer(poolAmount);
+        } else {
+            IWETH(asset()).deposit{value: shares}();
+        }
         // _deposit(address(this), msg.sender, shares, shares);
         _mint(src, shares);
 
@@ -122,14 +135,29 @@ ReentrancyGuardUpgradeable
         _burn(src, shares);
         uint256 wethBalance = IERC20(asset()).balanceOf(address(this));
         if(wethBalance < amount) {
+            // withdraw from which strategy?
             shares = _withdrawFromStrategy(cerosStrategy, amount - wethBalance);
+            if(shares == 0) {
+                // revert("withdrawal not available");
+                // waiting pool logic
+                _waitingPool.addToQueue(account, amount);
+                if(wethBalance > 0) {
+                    IWETH(asset()).withdraw(wethBalance);
+                    payable(address(_waitingPool)).transfer(wethBalance);
+                }
+                return amount;
+            }
             shares += wethBalance;
         }
         IWETH(asset()).withdraw(shares);
-        shares = _assessFee(shares, _withdrawalFee);
+        shares = _assessFee(shares, withdrawalFee);
         payable(account).transfer(shares);
         
         emit Withdraw(src, src, src, amount, shares);
+    }
+
+    function payDebt() public {
+        _waitingPool.tryRemove();
     }
 
     function _depositToStrategy(address strategy, uint256 amount) internal {
@@ -200,6 +228,7 @@ ReentrancyGuardUpgradeable
                     uint256 strategyRatio = (strategy.debt / totalAssets) * 1e6;
                     if(strategyRatio < allocation) {
                         _depositToStrategy(strategies[i], ((totalAssets * allocation) / 1e6) - strategy.debt);
+                        IBaseStrategy(strategies[i]).depositAll();
                         // depositToStrategy(strategy, amount);
                     } else {
                         _withdrawFromStrategy(strategies[i], strategy.debt - (totalAssets * allocation) / 1e6);
@@ -209,8 +238,12 @@ ReentrancyGuardUpgradeable
         }
     }
 
-    function availableToWithdraw() public view returns(uint256) {
-
+    function availableToWithdraw() public view returns(uint256 available) {
+        // totalAssets() + IWETH(asset()).balaanceOf()
+        for(uint8 i = 0; i < strategies.length; i++) {
+            available += IWETH(asset()).balanceOf(strategies[i]);   // excluding the amount that is deposited to ceros contracts
+        }
+        available += totalAssets();
     }
 
     function _assessFee(uint256 amount, uint256 fees) internal returns(uint256 value) {
@@ -239,7 +272,7 @@ ReentrancyGuardUpgradeable
     }
 
     function setWithdrawalFee(uint256 newWithdrawalFee) external onlyOwner {
-        _withdrawalFee = newWithdrawalFee;
+        withdrawalFee = newWithdrawalFee;
         emit WithdrawalFeeChanged(newWithdrawalFee);
     }
 
@@ -265,8 +298,14 @@ ReentrancyGuardUpgradeable
         emit ProviderChanged(provider);
     }
 
+    //TODO remove cerosStrategy
     function setStrategyAddress(address _strategy) external onlyOwner {
         cerosStrategy = _strategy;
         approve(cerosStrategy, type(uint256).max);
+    }
+
+    function setWaitingPool(address waitingPool) external onlyOwner {
+        require(waitingPool != address(0));
+        _waitingPool = IWaitingPool(waitingPool);
     }
 }

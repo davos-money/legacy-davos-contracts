@@ -45,19 +45,19 @@ contract CerosYieldConverterStrategy is BaseStrategy {
      * Modifiers
      */
     modifier onlyVault() {
-        require(msg.sender == address(vault),"!vault");
+        require(msg.sender == address(vault), "!vault");
         _;
     }
 
     function beforeDeposit(uint256 amount) internal {
     }
 
-    function deposit(uint256 amount) external onlyVault returns(uint256 value) {
+    function deposit(uint256 amount) external returns(uint256 value) {
         require(amount <= underlying.balanceOf(address(this)), "insufficient balance");
         return _deposit(amount);
     }
 
-    function depositAll() external onlyVault returns(uint256 value) {
+    function depositAll() external returns(uint256 value) {
         uint256 amount = underlying.balanceOf(address(this));
         return _deposit(amount);
     }
@@ -73,7 +73,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
     }
 
-    function withdraw(uint256 amount) external onlyVault returns(uint256 value) {
+    function withdraw(uint256 amount) external returns(uint256 value) {
         return _withdraw(amount);
     }
 
@@ -90,8 +90,8 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             return amount;
         }
         
-        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), amount);
-        if (amountOut >= (amount * 1e18) / _certToken.ratio() && 
+        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), (amount * _certToken.ratio()) / 1e18); // (amount * ratio) / 1e18
+        if (amountOut >= amount &&        // (amount * 1e18) / _certToken.ratio() && 
             (amountOut + wethBalance) >= amount
         ) {
             value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
