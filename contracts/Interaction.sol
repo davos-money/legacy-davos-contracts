@@ -27,7 +27,7 @@ import "./libraries/AuctionProxy.sol";
 
 uint256 constant WAD = 10 ** 18;
 uint256 constant RAD = 10 ** 45;
-uint256 constant YEAR = 31864500; //seconds in year (365 * 24.25 * 3600)
+uint256 constant YEAR = 31556952; //seconds in year (365.2425 * 24 * 3600)
 
 contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao, IAuctionProxy {
 
@@ -40,13 +40,6 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         require(wards[msg.sender] == 1, "Interaction/not-authorized");
         _;
     }
-
-    event Deposit(address indexed user, uint256 amount);
-    event Borrow(address indexed user, uint256 amount);
-    event Payback(address indexed user, uint256 amount);
-    event Withdraw(address indexed user, uint256 amount);
-    event CollateralEnabled(address token, bytes32 ilk);
-    event CollateralDisabled(address token, bytes32 ilk);
 
     VatLike public vat;
     SpotLike public spotter;
@@ -218,7 +211,11 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         if (!EnumerableSet.contains(usersInDebt, msg.sender)) {
             EnumerableSet.add(usersInDebt, msg.sender);
         }
-        emit Borrow(msg.sender, sikkaAmount);
+
+        (uint256 ink, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
+        uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, art);
+
+        emit Borrow(msg.sender, token, sikkaAmount, liqPrice);
         return uint256(dart);
     }
 
@@ -252,7 +249,10 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
         tryRemoveFromDebtList(collateralType.ilk, msg.sender);
 
-        emit Payback(msg.sender, sikkaAmount);
+        (uint256 ink, uint256 userDebt) = vat.urns(collateralType.ilk, msg.sender);
+        uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, userDebt);
+
+        emit Payback(msg.sender, token, sikkaAmount, userDebt, liqPrice);
         return dart;
     }
 
@@ -490,17 +490,21 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         address keeper
     ) external returns (uint256) {
         dropRewards(token, user);
-        return
-        AuctionProxy.startAuction(
+        CollateralType memory collateral = collaterals[token];
+        (uint256 ink,) = vat.urns(collateral.ilk, user);
+        ISikkaProvider provider = ISikkaProvider(sikkaProviders[token]);
+        uint256 auctionAmount = AuctionProxy.startAuction(
             user,
             keeper,
             sikka,
             sikkaJoin,
             vat,
             DogLike(dog),
-            ISikkaProvider(sikkaProviders[token]),
-            collaterals[token]
+            provider,
+            collateral
         );
+        emit AuctionStarted(token, user, ink, collateralPrice(token));
+        return auctionAmount;
     }
 
     function buyFromAuction(
@@ -512,7 +516,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     ) external {
         CollateralType memory collateral = collaterals[token];
         ISikkaProvider sikkaProvider = ISikkaProvider(sikkaProviders[token]);
-        AuctionProxy.buyFromAuction(
+        uint256 leftover = AuctionProxy.buyFromAuction(
             auctionId,
             collateralAmount,
             maxPrice,
@@ -527,6 +531,8 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         address urn = ClipperLike(collateral.clip).sales(auctionId).usr; // Liquidated address
         dropRewards(address(sikka), urn);
         tryRemoveFromDebtList(collateral.ilk, urn);
+
+        emit Liquidation(urn, token, collateralAmount, leftover);
     }
 
     function getAuctionStatus(address token, uint256 auctionId) external view returns(bool, uint256, uint256, uint256) {
