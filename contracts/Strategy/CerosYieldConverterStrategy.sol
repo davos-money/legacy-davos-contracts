@@ -28,10 +28,9 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         address certToekn,
         address masterVault,
         address rewardsPool,
-        address priceGetter,
-        uint256 performanceFees
+        address priceGetter
     ) public initializer {
-        __BaseStrategy_init(destination, feeRecipient, underlyingToken, performanceFees);
+        __BaseStrategy_init(destination, feeRecipient, underlyingToken);
         _ceRouter = ICerosRouter(ceRouter);
         _certToken = ICertToken(certToekn);
         _priceGetter = priceGetter;
@@ -90,24 +89,16 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             return amount;
         }
         
-        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), (amount * _certToken.ratio()) / 1e18); // (amount * ratio) / 1e18
-        if (amountOut >= amount &&        // (amount * 1e18) / _certToken.ratio() && 
-            (amountOut + wethBalance) >= amount
+        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), ((amount - wethBalance ) * _certToken.ratio()) / 1e18); // (amount * ratio) / 1e18
+        if (amountOut + wethBalance >= amount // &&        // (amount * 1e18) / _certToken.ratio() && 
+            // (amountOut + wethBalance) >= amount
         ) {
             value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
             underlying.deposit{value: value}();
-            amount = wethBalance + value;
+            // amount = wethBalance + value;
             underlying.transferFrom(address(this), address(vault), amount);
             return amount;
         }
-
-        // if( wethBalance < amount) {
-        //     value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, 0);
-        //     underlying.deposit{value: value}();
-        //     amount = wethBalance + value;
-        // }
-        // underlying.transferFrom(address(this), address(vault), amount);
-        // return value;
     }
 
     receive() external payable {
@@ -122,9 +113,22 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
     }
 
-    function harvest() external {
-        uint256 yeild = _ceRouter.claim(address(this));
-        _certToken.transfer(_rewardsPool, yeild);
+    function harvest() external onlyStrategist {
+        _harvestTo(_rewardsPool);
+    }
+
+    function harvestAndSwap() external onlyStrategist {
+        uint256 yeild = _harvestTo(address(this));
+        //TODO swap and transfer to desired address
+    }
+
+    function _harvestTo(address to) private returns(uint256 yeild) {
+        yeild = _ceRouter.claim(to);
+        uint256 profit = _ceRouter.getProfitFor(address(this));
+        if(profit > 0) {
+            yeild += profit;
+            _ceRouter.claimProfit(to);
+        }
     }
 
     function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
@@ -133,9 +137,8 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             tokenOut,
             amountIn,
             0,
-            3000
+            3000     //TODO set in initializer
         );
-        // return amountOut > (amountIn * _certToken.ratio()) / 1e18;
     }
 
     function changePriceGetter(address priceGetter) external onlyOwner {

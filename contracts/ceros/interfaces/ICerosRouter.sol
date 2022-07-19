@@ -75,6 +75,10 @@ interface ICerosRouter {
     // claim in aMATICc
     function claim(address recipient) external returns (uint256);
 
+    function claimProfit(address recipient) external;
+
+    function getProfitFor(address account) external view returns (uint256);
+
     /**
      * Withdrawal
      */

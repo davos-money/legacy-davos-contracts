@@ -41,13 +41,17 @@ contract WaitingPool is Initializable {
     function tryRemove() external onlyMasterVault {
         uint256 balance;
         for(uint256 i = index; i < people.length; i++) {
+            // TODO capping
             balance = address(this).balance;
             if(balance >= people[index]._debt && people[index]._debt != 0) {
                 uint256 amount = _assessFee(people[index]._debt, masterVault.withdrawalFee());
                 totalDebt -= people[index]._debt;
                 // we can get stuck if caller is a contract that doesn't accept matic
-                payable(people[index]._address).transfer(amount);
+                // payable(people[index]._address).transfer(amount);
+                (bool success, ) = payable(people[index]._address).call{value: amount }("");
                 index++;
+            } else {
+                return;
             }
         }
     }

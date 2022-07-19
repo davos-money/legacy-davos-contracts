@@ -15,9 +15,6 @@ ReentrancyGuardUpgradeable {
     address private _destination;
     address private _feeRecipient;
 
-    uint256 public performanceFee;
-    uint256 MAX_BPS;
-
     IWETH public underlying;
 
     bool public depositPaused;
@@ -29,8 +26,7 @@ ReentrancyGuardUpgradeable {
     function __BaseStrategy_init(
         address destination,
         address feeRecipient,
-        address underlyingToken,
-        uint256 performanceFees
+        address underlyingToken
     ) internal initializer {
         __Ownable_init();
         __Pausable_init();
@@ -39,8 +35,6 @@ ReentrancyGuardUpgradeable {
         _destination = destination;
         _feeRecipient = feeRecipient;
         underlying = IWETH(underlyingToken);
-        performanceFee = performanceFees;
-        MAX_BPS = 10000;
     }
 
     /**
@@ -81,11 +75,5 @@ ReentrancyGuardUpgradeable {
         require(newFeeRecipient != address(0));
         _feeRecipient = newFeeRecipient;
         emit UpdatedFeeRecipient(newFeeRecipient);
-    }
-
-    function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
-        require(newPerformanceFee < MAX_BPS);
-        performanceFee = newPerformanceFee;
-        emit UpdatedPerformanceFee(newPerformanceFee);
     }
 }

@@ -13,6 +13,8 @@ interface IMasterVault {
     event RouterChanged(address ceRouter);
     event ManagerAdded(address newManager);
     event ManagerRemoved(address manager);
+    event FeeReceiverChanged(address feeReceiver);
+    event WaitingPoolChanged(address waitingPool);
 
     function withdrawETH(address account, uint256 amount) external  returns (uint256);
     function depositETH() external payable returns (uint256);
