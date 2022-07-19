@@ -52,12 +52,12 @@ library AuctionProxy {
   ) public {
     uint256 sikkaBal = sikka.balanceOf(address(this));
     ClipperLike(collateral.clip).redo(auctionId, keeper);
-    
+
 
     sikkaJoin.exit(address(this), vat.sikka(address(this)) / RAY);
     sikkaBal = sikka.balanceOf(address(this)) - sikkaBal;
     sikka.transfer(keeper, sikkaBal);
-  } 
+  }
 
   function buyFromAuction(
     uint256 auctionId,
@@ -69,7 +69,7 @@ library AuctionProxy {
     VatLike vat,
     ISikkaProvider sikkaProvider,
     CollateralType calldata collateral
-  ) public {
+  ) public returns (uint256 leftover) {
     // Balances before
     uint256 sikkaBal = sikka.balanceOf(address(this));
     uint256 gemBal = collateral.gem.gem().balanceOf(address(this));
@@ -82,7 +82,7 @@ library AuctionProxy {
     vat.hope(address(collateral.clip));
     address urn = ClipperLike(collateral.clip).sales(auctionId).usr; // Liquidated address
 
-    uint256 leftover = vat.gem(collateral.ilk, urn); // userGemBalanceBefore
+    leftover = vat.gem(collateral.ilk, urn); // userGemBalanceBefore
     ClipperLike(collateral.clip).take(auctionId, collateralAmount, maxPrice, address(this), "");
     leftover = vat.gem(collateral.ilk, urn) - leftover; // leftover
 
