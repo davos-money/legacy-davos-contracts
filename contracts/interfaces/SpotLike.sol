@@ -5,4 +5,6 @@ import "./PipLike.sol";
 
 interface SpotLike {
     function ilks(bytes32) external view returns (PipLike, uint256);
+
+    function poke(bytes32) external;
 }

@@ -302,6 +302,12 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         ikkaRewards = IRewards(rewards);
     }
 
+    function poke(address token) public {
+        CollateralType memory collateralType = collaterals[token];
+        _checkIsLive(collateralType.live);
+        spotter.poke(collateralType.ilk);
+    }
+
     function tryRemoveFromDebtList(bytes32 ilk, address usr) internal {
         (, uint256 art) = vat.urns(ilk, usr);
         if (art == 0) {
@@ -342,9 +348,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         _checkIsLive(collateralType.live);
 
         (,uint256 mat) = spotter.ilks(collateralType.ilk);
-
-        //        (,,uint256 spot,,) = vat.ilks(collateralType.ilk);
-        //        return spot / 10**9;
+        require(mat != 0, "Interaction/spot-not-init");
         return 10 ** 45 / mat;
     }
 
