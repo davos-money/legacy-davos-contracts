@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../MasterVault/interfaces/IMasterVault.sol";
-import "../MasterVault/interfaces/IPriceGetter.sol";
+import "../ceros/interfaces/ISwapPool.sol";
 import "../MasterVault/interfaces/IWETH.sol";
 import "../ceros/interfaces/ICertToken.sol";
 import "../ceros/interfaces/ICerosRouter.sol";
@@ -14,10 +14,10 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     ICertToken private _certToken;
     IMasterVault public vault;
 
-    address private _priceGetter;
-    address private _rewardsPool;
+    address private _swapPool;
+    address public _rewardsPool;
 
-    event PriceGetterChanged(address priceGetter);
+    event SwapPoolChanged(address swapPool);
     event CeRouterChanged(address ceRouter);
 
     function initialize(
@@ -28,12 +28,12 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         address certToekn,
         address masterVault,
         address rewardsPool,
-        address priceGetter
+        address swapPool
     ) public initializer {
         __BaseStrategy_init(destination, feeRecipient, underlyingToken);
         _ceRouter = ICerosRouter(ceRouter);
         _certToken = ICertToken(certToekn);
-        _priceGetter = priceGetter;
+        _swapPool = swapPool;
         _rewardsPool = rewardsPool;
         vault = IMasterVault(masterVault);
         underlying.approve(address(_ceRouter), type(uint256).max);
@@ -51,12 +51,12 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     function beforeDeposit(uint256 amount) internal {
     }
 
-    function deposit(uint256 amount) external returns(uint256 value) {
+    function deposit(uint256 amount) external onlyVault returns(uint256 value) {
         require(amount <= underlying.balanceOf(address(this)), "insufficient balance");
         return _deposit(amount);
     }
 
-    function depositAll() external returns(uint256 value) {
+    function depositAll() external onlyVault returns(uint256 value) {
         uint256 amount = underlying.balanceOf(address(this));
         return _deposit(amount);
     }
@@ -64,39 +64,36 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     function _deposit(uint256 amount) internal returns (uint256 value) {
         require(!depositPaused, "deposits are paused");
         require(amount > 0, "invalid amount");
-        // for now deposit funds to ceros Router or just hold the wMatic in this contract
         beforeDeposit(amount);
-        uint256 amountOut = getAmountOut(address(underlying), address(_certToken), amount);
-        if (amountOut >= (amount * _certToken.ratio()) / 1e18) {
+        (, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false); // (amount * ratio) / 1e18
+        if (enoughLiquidity) {
             return _ceRouter.depositWMatic(amount);
         }
     }
 
-    function withdraw(uint256 amount) external returns(uint256 value) {
+    function withdraw(uint256 amount) onlyVault external returns(uint256 value) {
         return _withdraw(amount);
     }
 
-    function panic() external onlyStrategist returns (uint256 value) {
+    function panic() external onlyVault returns (uint256 value) {
         //TODO maintain and withdraw the total amount deposited to ceros
-        return _withdraw(balanceOfPool());
+        (,, uint256 debt) = vault.strategyParams(address(this));
+        return _withdraw(debt);
     }
 
     function _withdraw(uint256 amount) internal returns (uint256 value) {
         require(amount > 0, "invalid amount");
         uint256 wethBalance = underlying.balanceOf(address(this));
         if(amount < wethBalance) {
-            underlying.transferFrom(address(this), address(vault), amount);
+            underlying.transfer(address(vault), amount);
             return amount;
         }
         
-        uint256 amountOut = getAmountOut(address(_certToken), address(underlying), ((amount - wethBalance ) * _certToken.ratio()) / 1e18); // (amount * ratio) / 1e18
-        if (amountOut + wethBalance >= amount // &&        // (amount * 1e18) / _certToken.ratio() && 
-            // (amountOut + wethBalance) >= amount
-        ) {
+        (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, ((amount - wethBalance) * _certToken.ratio()) / 1e18, false); // (amount * ratio) / 1e18
+        if (enoughLiquidity) {
             value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
-            underlying.deposit{value: value}();
-            // amount = wethBalance + value;
-            underlying.transferFrom(address(this), address(vault), amount);
+            amount = wethBalance + value;
+            underlying.transfer(address(vault), amount);
             return amount;
         }
     }
@@ -105,21 +102,16 @@ contract CerosYieldConverterStrategy is BaseStrategy {
 
     }
 
-    function retireStrat() external onlyOwner {
-        _withdraw(balanceOfPool());
-        uint256 underlyingBal = underlying.balanceOf(address(this));
-        if(underlyingBal > 0) {
-            underlying.transferFrom(address(this), address(vault), underlyingBal);
-        }
-    }
-
     function harvest() external onlyStrategist {
         _harvestTo(_rewardsPool);
     }
 
     function harvestAndSwap() external onlyStrategist {
         uint256 yeild = _harvestTo(address(this));
-        //TODO swap and transfer to desired address
+        (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, yeild, true);
+        if (enoughLiquidity && amountOut > 0) {
+            ISwapPool(_swapPool).swap(false, yeild, address(this));
+        }
     }
 
     function _harvestTo(address to) private returns(uint256 yeild) {
@@ -131,20 +123,10 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
     }
 
-    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
-        amountOut = IPriceGetter(_priceGetter).getPrice(
-            tokenIn,
-            tokenOut,
-            amountIn,
-            0,
-            3000     //TODO set in initializer
-        );
-    }
-
-    function changePriceGetter(address priceGetter) external onlyOwner {
-        require(priceGetter != address(0));
-        _priceGetter = priceGetter;
-        emit PriceGetterChanged(priceGetter);
+    function changeSwapPool(address swapPool) external onlyOwner {
+        require(swapPool != address(0));
+        _swapPool = swapPool;
+        emit SwapPoolChanged(swapPool);
     }
 
     function changeCeRouter(address ceRouter) external onlyOwner {

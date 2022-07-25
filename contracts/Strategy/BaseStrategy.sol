@@ -11,10 +11,13 @@ OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable {
 
-    address private _strategist;
-    address private _destination;
-    address private _feeRecipient;
+    address public strategist;
+    address public destination;
+    address public feeRecipient;
 
+    uint256 public performanceFee;
+    uint256 MAX_BPS;
+    
     IWETH public underlying;
 
     bool public depositPaused;
@@ -24,16 +27,16 @@ ReentrancyGuardUpgradeable {
     event UpdatedPerformanceFee(uint256 performanceFee);
 
     function __BaseStrategy_init(
-        address destination,
-        address feeRecipient,
+        address destinationAddr,
+        address feeRecipientAddr,
         address underlyingToken
     ) internal initializer {
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
-        _strategist = msg.sender;
-        _destination = destination;
-        _feeRecipient = feeRecipient;
+        strategist = msg.sender;
+        destination = destinationAddr;
+        feeRecipient = feeRecipientAddr;
         underlying = IWETH(underlyingToken);
     }
 
@@ -41,7 +44,7 @@ ReentrancyGuardUpgradeable {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyStrategist() {
-        require(msg.sender == _strategist);
+        require(msg.sender == strategist);
         _;
     }
 
@@ -50,11 +53,11 @@ ReentrancyGuardUpgradeable {
     }
 
     function balanceOfPool() public view returns(uint256) {
-        return underlying.balanceOf(address(_destination));
+        return underlying.balanceOf(address(destination));
     }
 
     function balanceOf() public view returns(uint256) {
-        return underlying.balanceOf(address(this)) + underlying.balanceOf(address(_destination));
+        return underlying.balanceOf(address(this)) + underlying.balanceOf(address(destination));
     }
 
     function pause() external onlyStrategist {
@@ -67,13 +70,13 @@ ReentrancyGuardUpgradeable {
 
     function setStrategist(address newStrategist) external onlyOwner {
         require(newStrategist != address(0));
-        _strategist = newStrategist;
+        strategist = newStrategist;
         emit UpdatedStrategist(newStrategist);
     }
     
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
         require(newFeeRecipient != address(0));
-        _feeRecipient = newFeeRecipient;
+        feeRecipient = newFeeRecipient;
         emit UpdatedFeeRecipient(newFeeRecipient);
     }
 }

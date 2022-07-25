@@ -9,15 +9,16 @@ async function main() {
         waitingPool;
     // External Addresses
     let _wMatic = "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-        _maxDepositFee = 0, 
-        _maxWithdrawalFee = 0;
+        _swapPool = "0xFCC0937847030e91567c78a147e6e36F719Dc46b",
+        _maxDepositFee = 500000,  // 50%
+        _maxWithdrawalFee = 500000,
         _maxStrategies = 10;
 
     // Contracts Fetching
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.WaitingPool = await hre.ethers.getContractFactory("WaitingPool");
-
-    masterVault = await upgrades.deployProxy(this.MasterVault, ["CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies], {initializer: "initialize"});
+    console.log('here')
+    masterVault = await upgrades.deployProxy(this.MasterVault, ["CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies, _swapPool], {initializer: "initialize"});
     await masterVault.deployed();
     let masterVaultImplementation = await upgrades.erc1967.getImplementationAddress(masterVault.address);
     console.log("masterVault    : " + masterVault.address);
@@ -48,7 +49,7 @@ async function main() {
     await hre.run("verify:verify", {
         address: masterVault.address,
         constructorArguments: [
-            "CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies
+            "CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies, _swapPool
         ],
     });
 

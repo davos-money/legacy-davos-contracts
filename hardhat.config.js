@@ -29,12 +29,15 @@ module.exports = {
 
     networks: {
 
+        mumbai_fork: {
+            url: "http://127.0.0.1:8545/",
+            timeout: 10000000
+        },
         polygon: {
             url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/polygon/mainnet`,
             chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
-
         mumbai: {
             url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/polygon/mumbai`,
             chainId: 80001,

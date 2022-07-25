@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 interface IPriceGetter {
-    
     function getPrice(
         address tokenIn,
         address tokenOut,

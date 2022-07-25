@@ -13,7 +13,7 @@ async function main() {
 
         _ceRouter = "",
         _masterVault = "",
-        _priceGetter = "0x081CCd6331b816584F42cBAa09c556798F41fef7",
+        _swapPool = "0xFCC0937847030e91567c78a147e6e36F719Dc46b",
         _destination = _ceRouter,
         _feeRecipient = deployer.address,
         _underlyingToken = _wMatic,
@@ -25,7 +25,7 @@ async function main() {
     this.CerosYieldConverterStrategy = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     
-    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [_destination, _feeRecipient, _underlyingToken, _ceRouter, _certToekn, _masterVault, _rewardsPool, _priceGetter], {initializer: "initialize"});
+    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [_destination, _feeRecipient, _underlyingToken, _ceRouter, _certToekn, _masterVault, _rewardsPool, _swapPool], {initializer: "initialize"});
     await cerosYieldConverterStrategy.deployed();
     let cerosYieldConverterStrategyImp = await upgrades.erc1967.getImplementationAddress(cerosYieldConverterStrategy.address);
     console.log("cerosYieldConverterStrategy    : " + cerosYieldConverterStrategy.address);
@@ -46,7 +46,7 @@ async function main() {
     await hre.run("verify:verify", {
         address: cerosYieldConverterStrategy.address,
         constructorArguments: [
-            _destination, _feeRecipient, _underlyingToken, _ceRouter, _certToekn, _masterVault, _rewardsPool, _priceGetter, _performanceFees
+            _destination, _feeRecipient, _underlyingToken, _ceRouter, _certToekn, _masterVault, _rewardsPool, _swapPool
         ],
     });
 }

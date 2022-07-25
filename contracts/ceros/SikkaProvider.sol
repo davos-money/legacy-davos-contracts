@@ -82,37 +82,10 @@ ReentrancyGuardUpgradeable
         emit Deposit(msg.sender, value);
         return value;
     }
-    // function provideInAMATICc(uint256 amount)
-    // external
-    // override
-    // nonReentrant
-    // returns (uint256 value)
-    // {
-    //     value = _masterVault.depositAMATICcFrom(msg.sender, amount);
-    //     // deposit ceToken as collateral
-    //     _provideCollateral(msg.sender, value);
-    //     emit Deposit(msg.sender, value);
-    //     return value;
-    // }
-    /**
-     * CLAIM
-     */
-    // claim in aMATICc
-    // function claimInAMATICc(address recipient)
-    // external
-    // override
-    // nonReentrant
-    // onlyOperator
-    // returns (uint256 yields)
-    // {
-    //     yields = _masterVault.claim(recipient);
-    //     emit Claim(recipient, yields);
-    //     return yields;
-    // }
     /**
      * RELEASE
      */
-    // withdrawal in MATIC via staking pool
+    // withdrawal in MATIC
     function release(address recipient, uint256 amount)
     external
     override
@@ -125,17 +98,6 @@ ReentrancyGuardUpgradeable
         emit Withdrawal(msg.sender, recipient, amount);
         return realAmount;
     }
-    // function releaseInAMATICc(address recipient, uint256 amount)
-    // external
-    // override
-    // nonReentrant
-    // returns (uint256 value)
-    // {
-    //     _withdrawCollateral(msg.sender, amount);
-    //     value = _masterVault.withdrawAMATICc(recipient, amount);
-    //     emit Withdrawal(msg.sender, recipient, value);
-    //     return value;
-    // }
     /**
      * DAO FUNCTIONALITY
      */
