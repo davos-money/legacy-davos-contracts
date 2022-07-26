@@ -17,7 +17,6 @@ async function main() {
     // Contracts Fetching
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.WaitingPool = await hre.ethers.getContractFactory("WaitingPool");
-    console.log('here')
     masterVault = await upgrades.deployProxy(this.MasterVault, ["CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies, _swapPool], {initializer: "initialize"});
     await masterVault.deployed();
     let masterVaultImplementation = await upgrades.erc1967.getImplementationAddress(masterVault.address);

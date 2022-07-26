@@ -204,6 +204,7 @@ ReentrancyGuardUpgradeable
 
     function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256) {
         require(amount > 0, "invalid withdrawal amount");
+        require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
         uint256 value = IBaseStrategy(strategy).withdraw(amount);
         totalDebt -= value;
         strategyParams[strategy].debt -= value;
@@ -216,7 +217,7 @@ ReentrancyGuardUpgradeable
         )
         external onlyOwner {
         require(strategy != address(0));
-        //TODO check maxStrategies
+        require(strategies.length < MAX_STRATEGIES, "max strategies exceeded");
         StrategyParams memory params = StrategyParams({
             active: true,
             allocation: allocation,
@@ -226,15 +227,16 @@ ReentrancyGuardUpgradeable
         strategyParams[strategy] = params;
         strategies.push(strategy);
         approve(strategy, type(uint256).max);
+        emit StrategyAdded(strategy, allocation);
     }
 
     function retireStrat(address strategy) external onlyManager {
+        require(strategyParams[strategy].active, "strategy is not active");
         strategyParams[strategy].active = false;
         _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
     }
 
     function allocate() external onlyManager {
-        // TODO manage list of strategies
         // allocate to all active strategies based on respective allocation
         for(uint8 i = 0; i < strategies.length; i++) {
             if(strategyParams[strategies[i]].active) {
@@ -248,7 +250,6 @@ ReentrancyGuardUpgradeable
                         if(totalAssetInVault() > depositAmount) {
                             _depositToStrategy(strategies[i], depositAmount);
                             IBaseStrategy(strategies[i]).depositAll();
-                            // depositToStrategy(strategy, amount);
                         }
                     } else {
                         _withdrawFromStrategy(strategies[i], strategy.debt - (totalAssets * allocation) / 1e6);
@@ -267,6 +268,31 @@ ReentrancyGuardUpgradeable
 
     function totalAssetInVault() public view returns(uint256 balance) {
         return (totalAssets() > feeEarned) ? totalAssets() - feeEarned : 0;
+    }
+
+    function migrateStrategy(address oldStrategy, address newStrategy, uint256 newAllocation) external onlyManager {
+        require(oldStrategy != address(0));
+        require(newStrategy != address(0));
+        
+        uint256 oldStrategyDebt = strategyParams[oldStrategy].debt;
+        
+        if(oldStrategyDebt > 0) {
+            _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt);
+        }
+        StrategyParams memory params = StrategyParams({
+            active: true,
+            allocation: newAllocation,
+            debt: 0
+        });
+        
+        strategyParams[newStrategy] = params;
+        for(uint256 i = 0; i < strategies.length; i++) {
+            if(strategies[i] == oldStrategy) {
+                strategies[i] = newStrategy;
+            }
+        }
+        approve(newStrategy, type(uint256).max);
+        emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
     }
 
     function _assessFee(uint256 amount, uint256 fees) private returns(uint256 value) {
@@ -292,6 +318,14 @@ ReentrancyGuardUpgradeable
     receive() external payable {
 
     }
+
+    function withdrawFee() external onlyOwner{
+        if(feeEarned > 0) {
+            IWETH(asset()).withdraw(feeEarned);
+            feeEarned = 0;
+            feeReceiver.transfer(feeEarned);
+        }
+    } 
 
     function setDepositFee(uint256 newDepositFee) external onlyOwner {
         require(maxDepositFee > newDepositFee,"more than maxDepositFee");

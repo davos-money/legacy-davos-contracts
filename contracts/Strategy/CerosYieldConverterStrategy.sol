@@ -76,7 +76,6 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     }
 
     function panic() external onlyVault returns (uint256 value) {
-        //TODO maintain and withdraw the total amount deposited to ceros
         (,, uint256 debt) = vault.strategyParams(address(this));
         return _withdraw(debt);
     }
