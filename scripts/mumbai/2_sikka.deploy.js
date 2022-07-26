@@ -5,9 +5,9 @@ async function main() {
 
     // Variables Declaration
     let [deployer] = await ethers.getSigners();
-    let ilkCeaMATICc = ethers.utils.formatBytes32String("ceaMATICc");
-    console.log("Ilk ceaMATICc  :", ilkCeaMATICc);
-    let ceaMATICc = "";
+    let ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
+    console.log("Ilk masterVault  :", ilkCeMatic);
+    let masterVault = ""; // masterVault address
 
     // Contracts Fetching
     this.Vat = await hre.ethers.getContractFactory("Vat");
@@ -41,7 +41,7 @@ async function main() {
     await sikkaJoin.deployed();
     console.log("SikkaJoin      :", sikkaJoin.address);
 
-    const ceaMATICcJoin = await this.GemJoin.deploy(vat.address, ilkCeaMATICc, ceaMATICc);
+    const ceaMATICcJoin = await this.GemJoin.deploy(vat.address, ilkCeMatic, masterVault);
     await ceaMATICcJoin.deployed();
     console.log("ceaMATICcJoin  :", ceaMATICcJoin.address);
 
@@ -57,7 +57,7 @@ async function main() {
     await dog.deployed();
     console.log("Dog            :", dog.address);
 
-    const clip = await this.Clip.deploy(vat.address, spot.address, dog.address, ilkCeaMATICc);
+    const clip = await this.Clip.deploy(vat.address, spot.address, dog.address, ilkCeMatic);
     await clip.deployed();
     console.log("Clip           :", clip.address);
 
@@ -89,7 +89,7 @@ async function main() {
     });
     await hre.run("verify:verify", {
         address: ceaMATICcJoin.address,
-        constructorArguments: [vat.address, ilkCeaMATICc, ceaMATICc],
+        constructorArguments: [vat.address, ilkCeMatic, masterVault],
     });
     await hre.run("verify:verify", {
         address: jug.address,
@@ -105,7 +105,7 @@ async function main() {
     });
     await hre.run("verify:verify", {
         address: clip.address,
-        constructorArguments: [vat.address, spot.address, dog.address, ilkCeaMATICc]
+        constructorArguments: [vat.address, spot.address, dog.address, ilkCeMatic]
     });
     await hre.run("verify:verify", {
         address: oracle.address,

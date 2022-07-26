@@ -6,9 +6,11 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ISwapRouter.sol";
+import "./interfaces/ISwapPool.sol";
+import "./interfaces/IPriceGetter.sol";
 import "./interfaces/ICerosRouter.sol";
-// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
+import "../MasterVault/interfaces/IMasterVault.sol";
 
 contract CerosRouter is
 ICerosRouter,
@@ -21,24 +23,19 @@ ReentrancyGuardUpgradeable
      */
     IVault private _vault;
     ISwapRouter private _dex;
-    // IMaticPool private _pool; // default (BinancePool)
     // Tokens
     ICertToken private _certToken; // (default aMATICc)
     address private _wMaticAddress;
     IERC20 private _ceToken; // (default ceAMATICc)
     mapping(address => uint256) private _profits;
-    address private _provider;
+    IMasterVault private _masterVault;
     uint24 private _pairFee;
+    ISwapPool private _pool;
+    IPriceGetter private _priceGetter;
     /**
      * Modifiers
      */
-    modifier onlyProvider() {
-        require(
-            msg.sender == owner() || msg.sender == _provider,
-            "Provider: not allowed"
-        );
-        _;
-    }
+
     function initialize(
         address certToken,
         address wMaticToken,
@@ -46,8 +43,11 @@ ReentrancyGuardUpgradeable
         // address bondToken,
         address vault,
         address dexAddress,
+        // address masterVault,
         // address pool,
-        uint24 pairFee
+        uint24 pairFee,
+        address swapPool,
+        address priceGetter
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -58,11 +58,12 @@ ReentrancyGuardUpgradeable
         _vault = IVault(vault);
         _dex = ISwapRouter(dexAddress);
         _pairFee = pairFee;
-        // _pool = IMaticPool(pool);
+        _pool = ISwapPool(swapPool);
+        _priceGetter = IPriceGetter(priceGetter);
+        IERC20(wMaticToken).approve(swapPool, type(uint256).max);
+        IERC20(certToken).approve(swapPool, type(uint256).max);
         IERC20(wMaticToken).approve(dexAddress, type(uint256).max);
         IERC20(certToken).approve(dexAddress, type(uint256).max);
-        // IERC20(certToken).approve(bondToken, type(uint256).max);
-        // IERC20(certToken).approve(pool, type(uint256).max);
         IERC20(certToken).approve(vault, type(uint256).max);
     }
     /**
@@ -76,10 +77,30 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         uint256 amount = msg.value;
-        uint256 realAmount = swapETHForTokens(amount, 0);
+        return _deposit(amount);
+    }
+
+    function depositWMatic(uint256 amount) 
+    external
+    nonReentrant
+    returns (uint256 value)
+    {
+        IERC20(_wMaticAddress).transferFrom(msg.sender, address(this), amount);
+        return _deposit(amount);
+    }
+
+    function _deposit(uint256 amount) internal returns (uint256 value) {
+        require(amount > 0, "invalid deposit amount");
+        uint256 dexAmount = getAmountOut(_wMaticAddress, address(_certToken), amount);
         uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
-        
-        require(realAmount > minAmount, "price too small");
+        uint256 realAmount;
+        if(dexAmount > minAmount) {
+            realAmount = swapV3(_wMaticAddress, address(_certToken), amount, minAmount - 100, address(this));
+        } else {
+            realAmount = _pool.swap(true, amount, address(this));
+        }
+
+        require(realAmount > minAmount, "price too low");
 
         require(
             _certToken.balanceOf(address(this)) >= realAmount,
@@ -93,29 +114,7 @@ ReentrancyGuardUpgradeable
         emit Deposit(msg.sender, _wMaticAddress, realAmount - profit, profit);
         return value;
     }
-    function depositAMATICcFrom(address owner, uint256 amount)
-    external
-    override
-    onlyProvider
-    nonReentrant
-    returns (uint256 value)
-    {
-        _certToken.transferFrom(owner, address(this), amount);
-        value = _vault.depositFor(msg.sender, amount);
-        emit Deposit(msg.sender, address(_certToken), amount, 0);
-        return value;
-    }
-    function depositAMATICc(uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 value)
-    {
-        _certToken.transferFrom(msg.sender, address(this), amount);
-        value = _vault.depositFor(msg.sender, amount);
-        emit Deposit(msg.sender, address(_certToken), amount, 0);
-        return value;
-    }
+
     /**
      * CLAIM
      */
@@ -143,105 +142,55 @@ ReentrancyGuardUpgradeable
         _profits[msg.sender] -= profit;
         emit Claim(recipient, address(_certToken), profit);
     }
-    // /**
-    //  * WITHDRAWAL
-    //  */
-    // // withdrawal in MATIC via staking pool
-    // /// @param recipient address to receive withdrawan MATIC
-    // /// @param amount in MATIC to withdraw from vault
-    // function withdraw(address recipient, uint256 amount)
-    // external
-    // override
-    // nonReentrant
-    // returns (uint256 realAmount)
-    // {
-    //     require(
-    //         amount >= _pool.getMinimumStake(),
-    //         "value must be greater than min unstake amount"
-    //     );
-    //     realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-    //     _pool.unstakeCertsFor(recipient, realAmount);
-    //     emit Withdrawal(msg.sender, recipient, _wMaticAddress, amount);
-    //     return realAmount;
-    // }
-    // withdrawal aMATICc
-    /// @param recipient address to receive withdrawan aMATICc
-    /// @param amount in MATIC
-    function withdrawAMATICc(address recipient, uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 realAmount)
-    {
-        realAmount = _vault.withdrawFor(msg.sender, recipient, amount);
-        emit Withdrawal(msg.sender, recipient, address(_certToken), realAmount);
-        return realAmount;
+    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
+        amountOut = IPriceGetter(_priceGetter).getPrice(
+            tokenIn,
+            tokenOut,
+            amountIn,
+            0,
+            _pairFee
+        );
     }
-    // function withdrawFor(address recipient, uint256 amount)
-    // external
-    // override
-    // nonReentrant
-    // onlyProvider
-    // returns (uint256 realAmount)
-    // {
-    //     realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-    //     // _pool.unstakeCertsFor(recipient, realAmount); // realAmount -> MATIC
-    //     emit Withdrawal(msg.sender, recipient, _wMaticAddress, realAmount);
-    //     return realAmount;
-    // }
-    // withdrawal in MATIC via DEX
+
+    // withdrawal in MATIC via DEX or Swap Pool
     function withdrawWithSlippage(
         address recipient,
         uint256 amount,
         uint256 outAmount
     ) external override nonReentrant returns (uint256 realAmount) {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-        uint amountOut = swapExactTokensForETH(recipient, realAmount, outAmount);
-        require(amountOut < (amount * 1e18 / _certToken.ratio()), "price too small");
+        uint256 dexAmount = getAmountOut(address(_certToken), _wMaticAddress, realAmount);
+        uint256 amountOut;
+        if(dexAmount > outAmount) {
+            amountOut = swapV3(address(_certToken), _wMaticAddress, realAmount, amount, recipient);
+        } else {
+            amountOut = _pool.swap(false, realAmount, recipient);
+        }
+        // require(amountOut >= amount, "price too low");
         emit Withdrawal(msg.sender, recipient, _wMaticAddress, amountOut);
         return amountOut;
     }
-    function swapETHForTokens(uint256 amountIn, uint256 amountOutMinimum) private returns (uint256 amountOut) {
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
-             _wMaticAddress,                    // tokenIn
-            address(_certToken),                // tokenOut
-            _pairFee,                           // fee
-            address(this),                      // recipient
-            block.timestamp + 300,              // deadline
-            amountIn,                           // amountIn
-            amountOutMinimum,                   // amountOutMinimum
-            0                                   // sqrtPriceLimitX96
-        );
-        amountOut = _dex.exactInputSingle{ value: amountIn }(params);
-    }
-    function swapExactTokensForETH(
-        address recipient,
-        uint256 realAmount,
-        uint256 outAmount
-    ) private returns(uint256 amountOut) {
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
-            address(_certToken),                // tokenIn
-            _wMaticAddress,                     // tokenOut
-            _pairFee,                           // fee
-            address(0),                         // recipient
-            block.timestamp + 300,              // deadline
-            realAmount,                         // amountIn
-            outAmount,                          // amountOutMinimum
-            0                                   // sqrtPriceLimitX96
+    function swapV3(
+        address tokenIn, 
+        address tokenOut, 
+        uint256 amountIn, 
+        uint256 amountOutMin, 
+        address recipient) private returns (uint256 amountOut) {
+            ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
+            tokenIn,                // tokenIn
+            tokenOut,               // tokenOut
+            _pairFee,               // fee
+            recipient,              // recipient
+            block.timestamp + 300,  // deadline
+            amountIn,               // amountIn
+            amountOutMin,           // amountOutMinimum
+            0                       // sqrtPriceLimitX96
         );
         amountOut = _dex.exactInputSingle(params);
-        _dex.unwrapWETH9(outAmount, recipient);
     }
     function getProfitFor(address account) external view returns (uint256) {
         return _profits[account];
     }
-    // function getPendingWithdrawalOf(address account)
-    // external
-    // view
-    // returns (uint256)
-    // {
-    //     return _pool.pendingUnstakesOf(account);
-    // }
     function changeVault(address vault) external onlyOwner {
         // update allowances
         _certToken.approve(address(_vault), 0);
@@ -258,19 +207,23 @@ ReentrancyGuardUpgradeable
         _certToken.approve(address(_dex), type(uint256).max);
         emit ChangeDex(dex);
     }
-    // function changePool(address pool) external onlyOwner {
-    //     // update allowances
-    //     _certToken.approve(address(_pool), 0);
-    //     _pool = IMaticPool(pool);
-    //     _certToken.approve(address(_pool), type(uint256).max);
-    //     emit ChangePool(pool);
-    // }
-    function changeProvider(address provider) external onlyOwner {
-        _provider = provider;
-        emit ChangeProvider(provider);
+    function changeSwapPool(address swapPool) external onlyOwner {
+        IERC20(_wMaticAddress).approve(address(_pool), 0);
+        _certToken.approve(address(_pool), 0);
+        _pool = ISwapPool(swapPool);
+        IERC20(_wMaticAddress).approve(swapPool, type(uint256).max);
+        _certToken.approve(swapPool, type(uint256).max);
+        emit ChangeSwapPool(swapPool);
+    }
+    function changeProvider(address masterVault) external onlyOwner {
+        _masterVault = IMasterVault(masterVault);
+        emit ChangeProvider(masterVault);
     }
     function changePairFee(uint24 fee) external onlyOwner {
         _pairFee = fee;
         emit ChangePairFee(fee);
+    }
+    function changePriceGetter(address priceGetter) external onlyOwner {
+        _priceGetter = IPriceGetter(priceGetter);
     }
 }

@@ -9,8 +9,9 @@ import "./interfaces/IDex.sol";
 import "./interfaces/IDao.sol";
 import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ISikkaProvider.sol";
-// import "./interfaces/IMaticPool.sol";
 import "./interfaces/ICertToken.sol";
+import "../MasterVault/interfaces/IMasterVault.sol";
+
 contract SikkaProvider is
 ISikkaProvider,
 OwnableUpgradeable,
@@ -22,12 +23,11 @@ ReentrancyGuardUpgradeable
      */
     address private _operator;
     // Tokens
-    address private _certToken;
+    // address private _certToken;
     address private _ceToken;
     ICertToken private _collateralToken; // (default sMATIC)
-    ICerosRouter private _ceRouter;
+    IMasterVault private _masterVault;
     IDao private _dao;
-    // IMaticPool private _pool;
     address private _proxy;
     /**
      * Modifiers
@@ -48,22 +48,21 @@ ReentrancyGuardUpgradeable
     }
     function initialize(
         address collateralToken,
-        address certToken,
-        address ceToken,
-        address ceRouter,
+        // address certToken,
+        address masterVault,
         address daoAddress
-        // address pool
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         _operator = msg.sender;
         _collateralToken = ICertToken(collateralToken);
-        _certToken = certToken;
-        _ceToken = ceToken;
-        _ceRouter = ICerosRouter(ceRouter);
+        // _certToken = certToken;
+        _ceToken = masterVault;
+        _masterVault = IMasterVault(masterVault);
         _dao = IDao(daoAddress);
         // _pool = IMaticPool(pool);
+        IERC20(masterVault).approve(masterVault, type(uint256).max);
         IERC20(_ceToken).approve(daoAddress, type(uint256).max);
     }
     /**
@@ -77,43 +76,16 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        value = _ceRouter.deposit{value: msg.value}();
+        value = _masterVault.depositETH{value: msg.value}();
         // deposit ceToken as collateral
         _provideCollateral(msg.sender, value);
         emit Deposit(msg.sender, value);
         return value;
-    }
-    function provideInAMATICc(uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 value)
-    {
-        value = _ceRouter.depositAMATICcFrom(msg.sender, amount);
-        // deposit ceToken as collateral
-        _provideCollateral(msg.sender, value);
-        emit Deposit(msg.sender, value);
-        return value;
-    }
-    /**
-     * CLAIM
-     */
-    // claim in aMATICc
-    function claimInAMATICc(address recipient)
-    external
-    override
-    nonReentrant
-    onlyOperator
-    returns (uint256 yields)
-    {
-        yields = _ceRouter.claim(recipient);
-        emit Claim(recipient, yields);
-        return yields;
     }
     /**
      * RELEASE
      */
-    // withdrawal in MATIC via staking pool
+    // withdrawal in MATIC
     function release(address recipient, uint256 amount)
     external
     override
@@ -122,20 +94,9 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         _withdrawCollateral(msg.sender, amount);
-        realAmount = _ceRouter.withdrawWithSlippage(recipient, amount, 0);
+        realAmount = _masterVault.withdrawETH(recipient, amount);
         emit Withdrawal(msg.sender, recipient, amount);
         return realAmount;
-    }
-    function releaseInAMATICc(address recipient, uint256 amount)
-    external
-    override
-    nonReentrant
-    returns (uint256 value)
-    {
-        _withdrawCollateral(msg.sender, amount);
-        value = _ceRouter.withdrawAMATICc(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, value);
-        return value;
     }
     /**
      * DAO FUNCTIONALITY
@@ -146,7 +107,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
-        _ceRouter.withdrawAMATICc(recipient, amount);
+        _masterVault.withdrawETH(recipient, amount);
     }
     function daoBurn(address account, uint256 value)
     external

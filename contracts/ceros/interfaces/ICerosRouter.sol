@@ -32,7 +32,7 @@ interface ICerosRouter {
 
     event ChangeDexFactory(address factory);
 
-    // event ChangePool(address pool);
+    event ChangeSwapPool(address pool);
 
     event ChangeDao(address dao);
 
@@ -59,12 +59,14 @@ interface ICerosRouter {
     // in MATIC
     function deposit() external payable returns (uint256);
 
-    // in aMATICc
-    function depositAMATICcFrom(address owner, uint256 amount)
-    external
-    returns (uint256);
+    function depositWMatic(uint256 amount) external returns (uint256);
 
-    function depositAMATICc(uint256 amount) external returns (uint256);
+    // // in aMATICc
+    // function depositAMATICcFrom(address owner, uint256 amount)
+    // external
+    // returns (uint256);
+
+    // function depositAMATICc(uint256 amount) external returns (uint256);
 
     /**
      * Claim
@@ -73,11 +75,15 @@ interface ICerosRouter {
     // claim in aMATICc
     function claim(address recipient) external returns (uint256);
 
+    function claimProfit(address recipient) external;
+
+    function getProfitFor(address account) external view returns (uint256);
+
     /**
      * Withdrawal
      */
 
-    // // MATIC
+    // MATIC
     // function withdraw(address recipient, uint256 amount)
     // external
     // returns (uint256);
@@ -94,8 +100,8 @@ interface ICerosRouter {
         uint256 slippage
     ) external returns (uint256);
 
-    // aMATICc
-    function withdrawAMATICc(address recipient, uint256 amount)
-    external
-    returns (uint256);
+    // // aMATICc
+    // function withdrawAMATICc(address recipient, uint256 amount)
+    // external
+    // returns (uint256);
 }

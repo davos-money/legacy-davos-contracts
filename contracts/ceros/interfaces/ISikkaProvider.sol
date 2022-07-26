@@ -32,14 +32,14 @@ interface ISikkaProvider {
     function provide() external payable returns (uint256);
 
     // in aMATICc
-    function provideInAMATICc(uint256 amount) external returns (uint256);
+    // function provideInAMATICc(uint256 amount) external returns (uint256);
 
     /**
      * Claim
      */
 
     // claim in aMATICc
-    function claimInAMATICc(address recipient) external returns (uint256);
+    // function claimInAMATICc(address recipient) external returns (uint256);
 
     /**
      * Withdrawal
@@ -51,9 +51,9 @@ interface ISikkaProvider {
     returns (uint256);
 
     // aMATICc
-    function releaseInAMATICc(address recipient, uint256 amount)
-    external
-    returns (uint256);
+    // function releaseInAMATICc(address recipient, uint256 amount)
+    // external
+    // returns (uint256);
 
     /**
      * DAO FUNCTIONALITY
