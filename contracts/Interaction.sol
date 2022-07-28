@@ -194,7 +194,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     }
     }
 
-    function borrow(address token, uint256 hayAmount) external returns (uint256) {
+    function borrow(address token, uint256 sikkaAmount) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         require(collateralType.live == 1, "Interaction/inactive-collateral");
 
@@ -202,19 +202,19 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         dropRewards(token, msg.sender);
 
         (, uint256 rate, , ,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(hayAmount * 10 ** 27 / rate);
+        int256 dart = int256(sikkaAmount * 10 ** 27 / rate);
         require(dart >= 0, "Interaction/too-much-requested");
 
-        if (uint256(dart) * rate < hayAmount * (10 ** 27)) {
+        if (uint256(dart) * rate < sikkaAmount * (10 ** 27)) {
             dart += 1; //ceiling
         }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, dart);
-        vat.move(msg.sender, address(this), hayAmount * RAY);
-        sikkaJoin.exit(msg.sender, hayAmount);
+        vat.move(msg.sender, address(this), sikkaAmount * RAY);
+        sikkaJoin.exit(msg.sender, sikkaAmount);
 
         (uint256 ink, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, art);
-        emit Borrow(msg.sender, token, hayAmount, liqPrice);
+        emit Borrow(msg.sender, token, sikkaAmount, liqPrice);
         return uint256(dart);
     }
 
@@ -224,17 +224,17 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
     // Burn user's SIKKA.
     // N.B. User collateral stays the same.
-    function payback(address token, uint256 hayAmount) external returns (int256) {
+    function payback(address token, uint256 sikkaAmount) external returns (int256) {
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
 
-        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), hayAmount);
-        sikkaJoin.join(msg.sender, hayAmount);
+        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), sikkaAmount);
+        sikkaJoin.join(msg.sender, sikkaAmount);
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(FullMath.mulDiv(hayAmount, 10 ** 27, rate));
+        int256 dart = int256(FullMath.mulDiv(sikkaAmount, 10 ** 27, rate));
         require(dart >= 0, "Interaction/too-much-requested");
 
-        if (uint256(dart) * rate < hayAmount * (10 ** 27) &&
+        if (uint256(dart) * rate < sikkaAmount * (10 ** 27) &&
             uint256(dart + 1) * rate <= vat.sikka(msg.sender)
         ) {
             dart += 1;
@@ -248,7 +248,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         (uint256 ink, uint256 userDebt) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, userDebt);
 
-        emit Payback(msg.sender, token, hayAmount, userDebt, liqPrice);
+        emit Payback(msg.sender, token, sikkaAmount, userDebt, liqPrice);
         return dart;
     }
 
