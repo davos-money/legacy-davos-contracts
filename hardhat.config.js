@@ -37,7 +37,12 @@ module.exports = {
     },
 
     networks: {
-
+        hardhat: 
+        {
+            accounts: {
+                accountsBalance: "100000000000000000000000000",
+              },
+        },
         mumbai_fork: {
             url: "http://127.0.0.1:8545/",
             timeout: 10000000

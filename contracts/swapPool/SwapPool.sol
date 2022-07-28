@@ -369,14 +369,13 @@ contract SwapPool is Ownable, ReentrancyGuard {
     if (amount0Raw == type(uint256).max) {
       amount0 = ownerFeeCollected.nativeFee;
     } else {
-      amount0 = uint128(amount0);
+      amount0 = uint128(amount0Raw);
     }
     if (amount1Raw == type(uint256).max) {
       amount1 = ownerFeeCollected.nativeFee;
     } else {
-      amount1 = uint128(amount0);
+      amount1 = uint128(amount1Raw);
     }
-
     if (amount0 > 0) {
       ownerFeeCollected.nativeFee -= amount0;
       if (useEth) {
