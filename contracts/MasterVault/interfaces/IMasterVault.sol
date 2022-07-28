@@ -19,10 +19,12 @@ interface IMasterVault {
     event SwapPoolChanged(address swapPool);
     event StrategyAdded(address strategy, uint256 allocation);
     event StrategyMigrated(address oldStrategy, address newStrategy, uint256 newAllocation);
+    event DepositedToStrategy(address strategy, uint256 amount);
+    event WithdrawnFromStrategy(address strategy, uint256 value);
 
     function withdrawETH(address account, uint256 amount) external  returns (uint256);
     function depositETH() external payable returns (uint256);
     function feeReceiver() external returns (address payable);
     function withdrawalFee() external view returns (uint256);
-    function strategyParams(address strategy) external view returns(bool activ, uint256 allocation, uint256 debt);
+    function strategyParams(address strategy) external view returns(bool active, uint256 allocation, uint256 debt);
 }

@@ -15,9 +15,6 @@ ReentrancyGuardUpgradeable {
     address public destination;
     address public feeRecipient;
 
-    uint256 public performanceFee;
-    uint256 MAX_BPS;
-    
     IWETH public underlying;
 
     bool public depositPaused;
