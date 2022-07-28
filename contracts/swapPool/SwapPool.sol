@@ -7,7 +7,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuar
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import { ILP } from "./interfaces/ILP.sol";
-import { IRatioToken } from "./interfaces/IRatioToken.sol";
+import { ICerosToken } from "./interfaces/ICerosToken.sol";
 import { INativeERC20 } from "./interfaces/INativeERC20.sol";
 
 enum UserType {
@@ -26,7 +26,7 @@ enum FeeType {
 
 struct FeeAmounts {
   uint128 nativeFee;
-  uint128 stkTokenFee;
+  uint128 cerosFee;
 }
 
 // solhint-disable max-states-count
@@ -35,6 +35,8 @@ contract SwapPool is Ownable, ReentrancyGuard {
 
   event UserTypeChanged(address indexed user, UserType indexed utype, bool indexed added);
   event FeeChanged(FeeType indexed utype, uint24 oldFee, uint24 newFee);
+  event IntegratorLockEnabled(bool indexed enabled);
+  event ProviderLockEnabled(bool indexed enabled);
   event ExcludedFromFee(address indexed user, bool indexed excluded);
   event LiquidityChange(
     address indexed user,
@@ -59,7 +61,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
   EnumerableSet.AddressSet private liquidityProviders_;
 
   INativeERC20 public nativeToken;
-  IRatioToken public cerosToken;
+  ICerosToken public cerosToken;
   ILP public lpToken;
 
   uint256 public nativeTokenAmount;
@@ -85,7 +87,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
   modifier onlyOwnerOrManager() {
     require(
       msg.sender == owner() || managers_.contains(msg.sender),
-      "Only owner or manager can call this function"
+      "only owner or manager can call this function"
     );
     _;
   }
@@ -120,13 +122,25 @@ contract SwapPool is Ownable, ReentrancyGuard {
     bool _providerLockEnabled
   ) {
     nativeToken = INativeERC20(_nativeToken);
-    cerosToken = IRatioToken(_cerosToken);
+    cerosToken = ICerosToken(_cerosToken);
     lpToken = ILP(_lpToken);
     integratorLockEnabled = _integratorLockEnabled;
     providerLockEnabled = _providerLockEnabled;
   }
 
+  function addLiquidityEth(uint256 amount1) external payable onlyProvider nonReentrant {
+    _addLiquidity(msg.value, amount1, true);
+  }
+
   function addLiquidity(uint256 amount0, uint256 amount1) external onlyProvider nonReentrant {
+    _addLiquidity(amount0, amount1, false);
+  }
+
+  function _addLiquidity(
+    uint256 amount0,
+    uint256 amount1,
+    bool useEth
+  ) internal {
     uint256 ratio = cerosToken.ratio();
     uint256 value = (amount0 * ratio) / 1e18;
     if (amount1 < value) {
@@ -134,7 +148,11 @@ contract SwapPool is Ownable, ReentrancyGuard {
     } else {
       amount1 = value;
     }
-    nativeToken.transferFrom(msg.sender, address(this), amount0);
+    if (useEth) {
+      nativeToken.deposit{ value: amount0 }();
+    } else {
+      nativeToken.transferFrom(msg.sender, address(this), amount0);
+    }
     cerosToken.transferFrom(msg.sender, address(this), amount1);
     if (nativeTokenAmount == 0 && cerosTokenAmount == 0) {
       require(amount0 > 1e18, "cannot add first time less than 1 token");
@@ -154,37 +172,41 @@ contract SwapPool is Ownable, ReentrancyGuard {
   }
 
   function removeLiquidity(uint256 lpAmount) external nonReentrant {
-    uint256 balance = lpToken.balanceOf(msg.sender);
-    if (lpAmount == type(uint256).max) {
-      lpAmount = balance;
-    } else {
-      require(lpAmount <= balance, "you want to remove more than your lp balance");
-    }
-    uint256 totalSupply = lpToken.totalSupply();
-    lpToken.burn(msg.sender, lpAmount);
-    uint256 amount0Removed = (lpAmount * nativeTokenAmount) / totalSupply;
-    uint256 amount1Removed = (lpAmount * cerosTokenAmount) / totalSupply;
+    _removeLiquidityLp(lpAmount, false);
+  }
 
-    nativeTokenAmount -= amount0Removed;
-    cerosTokenAmount -= amount1Removed;
-
-    nativeToken.transfer(msg.sender, amount0Removed);
-    cerosToken.transfer(msg.sender, amount1Removed);
-    emit LiquidityChange(
-      msg.sender,
-      amount0Removed,
-      amount1Removed,
-      nativeTokenAmount,
-      cerosTokenAmount,
-      false
-    );
+  function removeLiquidityEth(uint256 lpAmount) external nonReentrant {
+    _removeLiquidityLp(lpAmount, true);
   }
 
   function removeLiquidityPercent(uint256 percent) external nonReentrant {
-    require(percent <= 1e18, "percnet should be less than 1e18"); // max percnet(100%) is -> 10 ** 18
+    _removeLiquidityPercent(percent, false);
+  }
+
+  function removeLiquidityPercentEth(uint256 percent) external nonReentrant {
+    _removeLiquidityPercent(percent, true);
+  }
+
+  function _removeLiquidityPercent(uint256 percent, bool useEth) internal {
+    require(percent > 0 && percent <= 1e18, "percent should be more than 0 and less than 1e18"); // max percnet(100%) is -> 10 ** 18
     uint256 balance = lpToken.balanceOf(msg.sender);
-    uint256 totalSupply = lpToken.totalSupply();
     uint256 removedLp = (balance * percent) / 1e18;
+    _removeLiquidity(removedLp, useEth);
+  }
+
+  function _removeLiquidityLp(uint256 removedLp, bool useEth) internal {
+    uint256 balance = lpToken.balanceOf(msg.sender);
+    if (removedLp == type(uint256).max) {
+      removedLp = balance;
+    } else {
+      require(removedLp <= balance, "you want to remove more than your lp balance");
+    }
+    require(removedLp > 0, "lp amount should be more than 0");
+    _removeLiquidity(removedLp, useEth);
+  }
+
+  function _removeLiquidity(uint256 removedLp, bool useEth) internal {
+    uint256 totalSupply = lpToken.totalSupply();
     lpToken.burn(msg.sender, removedLp);
     uint256 amount0Removed = (removedLp * nativeTokenAmount) / totalSupply;
     uint256 amount1Removed = (removedLp * cerosTokenAmount) / totalSupply;
@@ -192,7 +214,12 @@ contract SwapPool is Ownable, ReentrancyGuard {
     nativeTokenAmount -= amount0Removed;
     cerosTokenAmount -= amount1Removed;
 
-    nativeToken.transfer(msg.sender, amount0Removed);
+    if (useEth) {
+      nativeToken.withdraw(amount0Removed);
+      _sendValue(msg.sender, amount0Removed);
+    } else {
+      nativeToken.transfer(msg.sender, amount0Removed);
+    }
     cerosToken.transfer(msg.sender, amount1Removed);
     emit LiquidityChange(
       msg.sender,
@@ -204,14 +231,35 @@ contract SwapPool is Ownable, ReentrancyGuard {
     );
   }
 
+  function swapEth(
+    bool nativeToCeros,
+    uint256 amountIn,
+    address receiver
+  ) external payable onlyIntegrator nonReentrant returns (uint256 amountOut) {
+    return _swap(nativeToCeros, amountIn, receiver, true);
+  }
+
   function swap(
     bool nativeToCeros,
     uint256 amountIn,
     address receiver
   ) external onlyIntegrator nonReentrant returns (uint256 amountOut) {
+    return _swap(nativeToCeros, amountIn, receiver, false);
+  }
+
+  function _swap(
+    bool nativeToCeros,
+    uint256 amountIn,
+    address receiver,
+    bool useEth
+  ) internal returns (uint256 amountOut) {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
-      nativeToken.transferFrom(msg.sender, address(this), amountIn);
+      if (useEth) {
+        nativeToken.deposit{ value: msg.value }();
+      } else {
+        nativeToken.transferFrom(msg.sender, address(this), amountIn);
+      }
       if (!excludedFromFee[msg.sender]) {
         uint256 stakeFeeAmt = (amountIn * stakeFee) / FEE_MAX;
         amountIn -= stakeFeeAmt;
@@ -230,6 +278,8 @@ contract SwapPool is Ownable, ReentrancyGuard {
 
         ownerFeeCollected.nativeFee += uint128(ownerFeeAmt);
         managerFeeCollected.nativeFee += uint128(managerFeeAmt);
+      } else {
+        nativeTokenAmount += amountIn;
       }
       amountOut = (amountIn * ratio) / 1e18;
       require(cerosTokenAmount >= amountOut, "Not enough liquidity");
@@ -254,13 +304,20 @@ contract SwapPool is Ownable, ReentrancyGuard {
           amountIn +
           (unstakeFeeAmt - managerFeeAmt - ownerFeeAmt - integratorFeeAmt);
 
-        ownerFeeCollected.stkTokenFee += uint128(ownerFeeAmt);
-        managerFeeCollected.stkTokenFee += uint128(managerFeeAmt);
+        ownerFeeCollected.cerosFee += uint128(ownerFeeAmt);
+        managerFeeCollected.cerosFee += uint128(managerFeeAmt);
+      } else {
+        cerosTokenAmount += amountIn;
       }
       amountOut = (amountIn * 1e18) / ratio;
       require(nativeTokenAmount >= amountOut, "Not enough liquidity");
       nativeTokenAmount -= amountOut;
-      nativeToken.transfer(receiver, amountOut);
+      if (useEth) {
+        nativeToken.withdraw(amountOut);
+        _sendValue(receiver, amountOut);
+      } else {
+        nativeToken.transfer(receiver, amountOut);
+      }
       emit Swap(msg.sender, receiver, nativeToCeros, amountIn, amountOut);
     }
   }
@@ -288,31 +345,48 @@ contract SwapPool is Ownable, ReentrancyGuard {
     }
   }
 
-  function _sendValue(address value, uint256 amount) private {
+  function _sendValue(address receiver, uint256 amount) private {
     // solhint-disable-next-line avoid-low-level-calls
-    (bool success, ) = payable(value).call{ value: amount }("");
+    (bool success, ) = payable(receiver).call{ value: amount }("");
     require(success, "unable to send value, recipient may have reverted");
   }
 
-  function withdrawOwnerFeeEth(uint128 amount0, uint128 amount1) external onlyOwner {
-    if (amount0 > 0) {
-      ownerFeeCollected.nativeFee -= amount0;
-      nativeToken.withdraw(amount0);
-      _sendValue(msg.sender, amount0);
-    }
-    if (amount1 > 0) {
-      ownerFeeCollected.stkTokenFee -= amount1;
-      cerosToken.transfer(msg.sender, amount1);
-    }
+  function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1) external onlyOwner {
+    _withdrawOwnerFee(amount0, amount1, true);
   }
 
-  function withdrawOwnerFee(uint128 amount0, uint128 amount1) external onlyOwner {
+  function withdrawOwnerFee(uint256 amount0, uint256 amount1) external onlyOwner {
+    _withdrawOwnerFee(amount0, amount1, false);
+  }
+
+  function _withdrawOwnerFee(
+    uint256 amount0Raw,
+    uint256 amount1Raw,
+    bool useEth
+  ) internal {
+    uint128 amount0;
+    uint128 amount1;
+    if (amount0Raw == type(uint256).max) {
+      amount0 = ownerFeeCollected.nativeFee;
+    } else {
+      amount0 = uint128(amount0Raw);
+    }
+    if (amount1Raw == type(uint256).max) {
+      amount1 = ownerFeeCollected.nativeFee;
+    } else {
+      amount1 = uint128(amount1Raw);
+    }
     if (amount0 > 0) {
       ownerFeeCollected.nativeFee -= amount0;
-      nativeToken.transfer(msg.sender, amount0);
+      if (useEth) {
+        nativeToken.withdraw(amount0);
+        _sendValue(msg.sender, amount0);
+      } else {
+        nativeToken.transfer(msg.sender, amount0);
+      }
     }
     if (amount1 > 0) {
-      ownerFeeCollected.stkTokenFee -= amount1;
+      ownerFeeCollected.cerosFee -= amount1;
       cerosToken.transfer(msg.sender, amount1);
     }
   }
@@ -334,10 +408,10 @@ contract SwapPool is Ownable, ReentrancyGuard {
       managerFeeCollected.nativeFee /
       uint128(managersLength) -
       currentManagerRewardDebt.nativeFee;
-    feeRewards.stkTokenFee =
-      managerFeeCollected.stkTokenFee /
+    feeRewards.cerosFee =
+      managerFeeCollected.cerosFee /
       uint128(managersLength) -
-      currentManagerRewardDebt.stkTokenFee;
+      currentManagerRewardDebt.cerosFee;
     if (feeRewards.nativeFee > 0) {
       currentManagerRewardDebt.nativeFee += feeRewards.nativeFee;
       if (useNative) {
@@ -347,22 +421,25 @@ contract SwapPool is Ownable, ReentrancyGuard {
         nativeToken.transfer(managerAddress, feeRewards.nativeFee);
       }
     }
-    if (feeRewards.stkTokenFee > 0) {
-      currentManagerRewardDebt.stkTokenFee += feeRewards.stkTokenFee;
-      cerosToken.transfer(managerAddress, feeRewards.stkTokenFee);
+    if (feeRewards.cerosFee > 0) {
+      currentManagerRewardDebt.cerosFee += feeRewards.cerosFee;
+      cerosToken.transfer(managerAddress, feeRewards.cerosFee);
     }
   }
 
   function setFee(uint24 newFee, FeeType feeType) external onlyOwnerOrManager {
-    require(newFee < FEE_MAX, "Unsuported size of fee!");
+    require(newFee < FEE_MAX, "Unsupported size of fee!");
     if (feeType == FeeType.OWNER) {
       require(msg.sender == owner(), "only owner can call this function");
+      require(newFee + managerFee + integratorFee < FEE_MAX, "fee sum is more than 100%");
       emit FeeChanged(feeType, ownerFee, newFee);
       ownerFee = newFee;
     } else if (feeType == FeeType.MANAGER) {
+      require(newFee + ownerFee + integratorFee < FEE_MAX, "fee sum is more than 100%");
       emit FeeChanged(feeType, managerFee, newFee);
       managerFee = newFee;
     } else if (feeType == FeeType.INTEGRATOR) {
+      require(newFee + ownerFee + managerFee < FEE_MAX, "fee sum is more than 100%");
       emit FeeChanged(feeType, integratorFee, newFee);
       integratorFee = newFee;
     } else if (feeType == FeeType.STAKE) {
@@ -376,17 +453,21 @@ contract SwapPool is Ownable, ReentrancyGuard {
 
   function enableIntegratorLock(bool enable) external onlyOwnerOrManager {
     integratorLockEnabled = enable;
+    emit IntegratorLockEnabled(enable);
   }
 
   function enableProviderLock(bool enable) external onlyOwnerOrManager {
     providerLockEnabled = enable;
+    emit ProviderLockEnabled(enable);
   }
 
   function excludeFromFee(address value, bool exclude) external onlyOwnerOrManager {
     excludedFromFee[value] = exclude;
+    emit ExcludedFromFee(value, exclude);
   }
 
   function add(address value, UserType utype) public returns (bool) {
+    require(value != address(0), "cannot add address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
       require(msg.sender == owner(), "Only owner can add manager");
@@ -396,8 +477,8 @@ contract SwapPool is Ownable, ReentrancyGuard {
           managerRewardDebt[value].nativeFee =
             managerFeeCollected.nativeFee /
             uint128(managersLength);
-          managerRewardDebt[value].stkTokenFee =
-            managerFeeCollected.stkTokenFee /
+          managerRewardDebt[value].cerosFee =
+            managerFeeCollected.cerosFee /
             uint128(managersLength);
         }
         success = managers_.add(value);
@@ -416,6 +497,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
   }
 
   function remove(address value, UserType utype) public returns (bool) {
+    require(value != address(0), "cannot remove address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
       require(msg.sender == owner(), "Only owner can remove manager");
@@ -466,4 +548,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
       return integrators_.at(index);
     }
   }
+
+  // solhint-disable-next-line no-empty-blocks
+  receive() external payable {}
 }

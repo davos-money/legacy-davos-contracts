@@ -10,6 +10,7 @@ import "../interfaces/SikkaLike.sol";
 import "../interfaces/DogLike.sol";
 import "../interfaces/VatLike.sol";
 import "../ceros/interfaces/ISikkaProvider.sol";
+import "../oracle/libraries/FullMath.sol";
 
 import { CollateralType } from  "../ceros/interfaces/IDao.sol";
 
@@ -29,6 +30,8 @@ library AuctionProxy {
     ISikkaProvider sikkaProvider,
     CollateralType calldata collateral
   ) public returns (uint256 id) {
+    ClipperLike _clip = ClipperLike(collateral.clip);
+    _clip.upchost();
     uint256 sikkaBal = sikka.balanceOf(address(this));
     id = dog.bark(collateral.ilk, user, address(this));
 
@@ -50,8 +53,9 @@ library AuctionProxy {
     VatLike vat,
     CollateralType calldata collateral
   ) public {
+    ClipperLike _clip = ClipperLike(collateral.clip);
     uint256 sikkaBal = sikka.balanceOf(address(this));
-    ClipperLike(collateral.clip).redo(auctionId, keeper);
+    _clip.redo(auctionId, keeper);
 
 
     sikkaJoin.exit(address(this), vat.sikka(address(this)) / RAY);
@@ -74,7 +78,7 @@ library AuctionProxy {
     uint256 sikkaBal = sikka.balanceOf(address(this));
     uint256 gemBal = collateral.gem.gem().balanceOf(address(this));
 
-    uint256 sikkaMaxAmount = ((maxPrice * collateralAmount) / RAY) + 1;
+    uint256 sikkaMaxAmount = FullMath.mulDiv(maxPrice, collateralAmount, RAY) + 1;
 
     sikka.transferFrom(msg.sender, address(this), sikkaMaxAmount);
     sikkaJoin.join(address(this), sikkaMaxAmount);
@@ -94,13 +98,11 @@ library AuctionProxy {
     gemBal = collateral.gem.gem().balanceOf(address(this)) - gemBal;
     sikka.transfer(receiverAddress, sikkaBal);
 
+    vat.nope(address(collateral.clip));
+
     if (address(sikkaProvider) != address(0)) {
       IERC20Upgradeable(collateral.gem.gem()).safeTransfer(address(sikkaProvider), gemBal);
       sikkaProvider.liquidation(receiverAddress, gemBal); // Burn router ceToken and mint amaticc to receiver
-
-      // TODO: emit in the Interaction. Return liquidated amount from here
-      // // liquidated user, collateral address, amount of collateral bought, price
-      // emit Liquidation(urn, address(collateral.gem.gem()), gemBal, maxPrice);
 
       if (leftover != 0) {
         // Auction ended with leftover
