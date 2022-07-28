@@ -23,26 +23,7 @@ pragma solidity ^0.8.10;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface FlopLike {
-    function kick(address gal, uint lot, uint bid) external returns (uint);
-    function cage() external;
-    function live() external returns (uint);
-}
-
-interface FlapLike {
-    function kick(uint lot, uint bid) external returns (uint);
-    function cage(uint) external;
-    function live() external returns (uint);
-}
-
-interface VatLike {
-    function sikka (address) external view returns (uint);
-    function sin (address) external view returns (uint);
-    function move(address src, address dst, uint256 rad) external;
-    function heal(uint256) external;
-    function hope(address) external;
-    function nope(address) external;
-}
+import "./interfaces/VatLike.sol";
 
 contract Vow {
     // --- Auth ---
@@ -56,8 +37,6 @@ contract Vow {
 
     // --- Data ---
     VatLike public vat;          // CDP Engine
-    FlapLike public flapper;     // Surplus Auction House
-    FlopLike public flopper;     // Debt Auction House
     address public multisig;     // Surplus multisig 
 
     mapping (uint256 => uint256) public sin;  // debt queue
@@ -79,8 +58,6 @@ contract Vow {
     constructor(address vat_, address flapper_, address flopper_, address multisig_) {
         wards[msg.sender] = 1;
         vat     = VatLike(vat_);
-        flapper = FlapLike(flapper_);
-        flopper = FlopLike(flopper_);
         multisig = multisig_;
         vat.hope(flapper_);
         live = 1;
@@ -113,13 +90,7 @@ contract Vow {
     }
 
     function file(bytes32 what, address data) external auth {
-        if (what == "flapper") {
-            vat.nope(address(flapper));
-            flapper = FlapLike(data);
-            vat.hope(data);
-        }
-        else if (what == "flopper") flopper = FlopLike(data);
-        else if (what == "multisig") multisig = data;
+        if (what == "multisig") multisig = data;
         else revert("Vow/file-unrecognized-param");
     }
 
@@ -148,34 +119,11 @@ contract Vow {
         vat.heal(rad);
     }
 
-    // Debt auction
-    function flop() external returns (uint id) {
-        require(sump <= sub(sub(vat.sin(address(this)), Sin), Ash), "Vow/insufficient-debt");
-        require(vat.sikka(address(this)) == 0, "Vow/surplus-not-zero");
-        Ash = add(Ash, sump);
-        id = flopper.kick(address(this), dump, sump);
-    }
-    // Surplus auction or send surplus to multisig
-    function flap() external returns (uint id) {
-        if (lever != 0) {
-            require(vat.sikka(address(this)) >= add(add(vat.sin(address(this)), bump), hump), "Vow/insufficient-surplus");
-            require(sub(sub(vat.sin(address(this)), Sin), Ash) == 0, "Vow/debt-not-zero");
-            id = flapper.kick(bump, 0);
-        } else { 
-            require(vat.sikka(address(this)) >= add(vat.sin(address(this)), hump), "Vow/insufficient-surplus");
-            require(sub(vat.sin(address(this)), Sin) == 0, "Vow/debt-not-zero");
-            uint rad = sub(vat.sikka(address(this)), add(vat.sin(address(this)), hump));
-            vat.move(address(this), multisig, rad);
-        }
-    }
-
     function cage() external auth {
         require(live == 1, "Vow/not-live");
         live = 0;
         Sin = 0;
         Ash = 0;
-        flapper.cage(vat.sikka(address(flapper)));
-        flopper.cage();
         vat.heal(min(vat.sikka(address(this)), vat.sin(address(this))));
     }
 }

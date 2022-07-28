@@ -55,7 +55,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    EnumerableSet.AddressSet private usersInDebt;
+    // EnumerableSet.AddressSet private usersInDebt;
 
     mapping(address => address) public sikkaProviders; // e.g. Auction purchase from ceamaticc to amaticc
 
@@ -109,12 +109,14 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         address token,
         address gemJoin,
         bytes32 ilk,
-        address clip
+        address clip,
+        uint256 mat
     ) external auth {
         require(collaterals[token].live == 0, "Interaction/token-already-init");
         vat.init(ilk);
         jug.init(ilk);
         jug.file(ilk, "duty", 0);
+        spotter.file(ilk, "mat", mat);
         collaterals[token] = CollateralType(GemJoinLike(gemJoin), ilk, 1, clip);
         IERC20Upgradeable(token).safeApprove(gemJoin, type(uint256).max);
         vat.rely(gemJoin);
@@ -126,7 +128,8 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     }
 
     function removeCollateralType(address token) external auth {
-        collaterals[token].live = 0;
+        require(collaterals[token].live != 0, "Interaction/token-not-init");
+        collaterals[token].live = 2; //STOPPED
         address gemJoin = address(collaterals[token].gem);
         vat.deny(gemJoin);
         IERC20Upgradeable(token).safeApprove(gemJoin, 0);
@@ -150,11 +153,12 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         uint256 dink
     ) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
-        // _checkIsLive(collateralType.live); Checking in the `drip` function
+        require(collateralType.live == 1, "Interaction/inactive-collateral");
+
         if (sikkaProviders[token] != address(0)) {
             require(
                 msg.sender == sikkaProviders[token],
-                "Interaction/only ikka provider can deposit for this token"
+                "Interaction/only sikka provider can deposit for this token"
             );
         }
         require(dink <= uint256(type(int256).max), "Interaction/too-much-requested");
@@ -190,32 +194,27 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
     }
     }
 
-    function borrow(address token, uint256 sikkaAmount) external returns (uint256) {
+    function borrow(address token, uint256 hayAmount) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
-        // _checkIsLive(collateralType.live); Checking in the `drip` function
+        require(collateralType.live == 1, "Interaction/inactive-collateral");
 
         drip(token);
         dropRewards(token, msg.sender);
 
         (, uint256 rate, , ,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(FullMath.mulDiv(sikkaAmount, 10 ** 27, rate));
+        int256 dart = int256(hayAmount * 10 ** 27 / rate);
         require(dart >= 0, "Interaction/too-much-requested");
 
-        if (uint256(dart) * rate < sikkaAmount * (10 ** 27)) {
+        if (uint256(dart) * rate < hayAmount * (10 ** 27)) {
             dart += 1; //ceiling
         }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, dart);
-        vat.move(msg.sender, address(this), sikkaAmount * RAY);
-        sikkaJoin.exit(msg.sender, sikkaAmount);
-
-        if (!EnumerableSet.contains(usersInDebt, msg.sender)) {
-            EnumerableSet.add(usersInDebt, msg.sender);
-        }
+        vat.move(msg.sender, address(this), hayAmount * RAY);
+        sikkaJoin.exit(msg.sender, hayAmount);
 
         (uint256 ink, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, art);
-
-        emit Borrow(msg.sender, token, sikkaAmount, liqPrice);
+        emit Borrow(msg.sender, token, hayAmount, liqPrice);
         return uint256(dart);
     }
 
@@ -225,18 +224,17 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
     // Burn user's SIKKA.
     // N.B. User collateral stays the same.
-    function payback(address token, uint256 sikkaAmount) external returns (int256) {
+    function payback(address token, uint256 hayAmount) external returns (int256) {
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
 
-        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), sikkaAmount);
-        sikkaJoin.join(msg.sender, sikkaAmount);
+        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), hayAmount);
+        sikkaJoin.join(msg.sender, hayAmount);
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
-        (, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
-        int256 dart = int256(FullMath.mulDiv(sikkaAmount, 10 ** 27, rate));
+        int256 dart = int256(FullMath.mulDiv(hayAmount, 10 ** 27, rate));
         require(dart >= 0, "Interaction/too-much-requested");
 
-        if (uint256(dart) * rate < sikkaAmount * (10 ** 27) &&
+        if (uint256(dart) * rate < hayAmount * (10 ** 27) &&
             uint256(dart + 1) * rate <= vat.sikka(msg.sender)
         ) {
             dart += 1;
@@ -247,12 +245,10 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
         drip(token);
 
-        tryRemoveFromDebtList(collateralType.ilk, msg.sender);
-
         (uint256 ink, uint256 userDebt) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, userDebt);
 
-        emit Payback(msg.sender, token, sikkaAmount, userDebt, liqPrice);
+        emit Payback(msg.sender, token, hayAmount, userDebt, liqPrice);
         return dart;
     }
 
@@ -267,7 +263,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         if (sikkaProviders[token] != address(0)) {
             require(
                 msg.sender == sikkaProviders[token],
-                "Interaction/Only ikka provider can call this function for this token"
+                "Interaction/Only sikka provider can call this function for this token"
             );
         } else {
             require(
@@ -298,21 +294,15 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         jug.drip(collateralType.ilk);
     }
 
-    function setRewards(address rewards) external auth {
-        ikkaRewards = IRewards(rewards);
-    }
-
     function poke(address token) public {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
+
         spotter.poke(collateralType.ilk);
     }
 
-    function tryRemoveFromDebtList(bytes32 ilk, address usr) internal {
-        (, uint256 art) = vat.urns(ilk, usr);
-        if (art == 0) {
-            EnumerableSet.remove(usersInDebt, usr);
-        }
+    function setRewards(address rewards) external auth {
+        ikkaRewards = IRewards(rewards);
     }
 
     //    /////////////////////////////////
@@ -507,6 +497,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
             provider,
             collateral
         );
+
         emit AuctionStarted(token, user, ink, collateralPrice(token));
         return auctionAmount;
     }
@@ -534,7 +525,6 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
         address urn = ClipperLike(collateral.clip).sales(auctionId).usr; // Liquidated address
         dropRewards(address(sikka), urn);
-        tryRemoveFromDebtList(collateral.ilk, urn);
 
         emit Liquidation(urn, token, collateralAmount, leftover);
     }
@@ -553,10 +543,6 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
     function resetAuction(address token, uint256 auctionId, address keeper) external {
         AuctionProxy.resetAuction(auctionId, keeper, sikka, sikkaJoin, vat, collaterals[token]);
-    }
-
-    function getUsersInDebt() external view returns (address[] memory) {
-        return EnumerableSet.values(usersInDebt);
     }
 
     function totalPegLiquidity() external view returns (uint256) {
