@@ -79,6 +79,8 @@ interface ICerosRouter {
 
     function getProfitFor(address account) external view returns (uint256);
 
+    function getYieldFor(address account) external view returns(uint256);
+
     /**
      * Withdrawal
      */

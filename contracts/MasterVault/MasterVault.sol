@@ -165,7 +165,6 @@ ReentrancyGuardUpgradeable
     }
 
     function withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn) {
-        // TODO withdraw partial amount from multiple strategies if requried
         for(uint8 i = 0; i < strategies.length; i++) {
            if(strategyParams[strategies[i]].active && 
               strategyParams[strategies[i]].debt >= amount) {
@@ -187,11 +186,13 @@ ReentrancyGuardUpgradeable
         uint256 amount = totalAssetInVault();
         _depositToStrategy(strategy, amount);
         IBaseStrategy(strategy).deposit(amount);
+        emit DepositedToStrategy(strategy, amount);
     }
 
     function depositToStrategy(address strategy, uint256 amount) public onlyManager {
         _depositToStrategy(strategy, amount);
         IBaseStrategy(strategy).deposit(amount);
+        emit DepositedToStrategy(strategy, amount);
     }
 
     function withdrawFromStrategy(address strategy, uint256 amount) public onlyManager {
@@ -199,15 +200,18 @@ ReentrancyGuardUpgradeable
     }
 
     function withdrawAllFromStrategy(address strategy) external onlyManager {
-        _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
+        _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
     }
 
     function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256) {
         require(amount > 0, "invalid withdrawal amount");
         require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
         uint256 value = IBaseStrategy(strategy).withdraw(amount);
-        totalDebt -= value;
-        strategyParams[strategy].debt -= value;
+        if(value > 0) {
+            totalDebt -= amount;
+            strategyParams[strategy].debt -= amount;
+            emit WithdrawnFromStrategy(strategy, amount);
+        }
         return value;
     }
 
@@ -231,9 +235,12 @@ ReentrancyGuardUpgradeable
     }
 
     function retireStrat(address strategy) external onlyManager {
-        require(strategyParams[strategy].active, "strategy is not active");
-        strategyParams[strategy].active = false;
-        _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
+        // require(strategyParams[strategy].active, "strategy is not active");
+        _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
+        if (strategyParams[strategy].debt <= 10) {
+            strategyParams[strategy].active = false;
+            strategyParams[strategy].debt = 0;
+        }
     }
 
     function allocate() external onlyManager {
@@ -277,20 +284,23 @@ ReentrancyGuardUpgradeable
         uint256 oldStrategyDebt = strategyParams[oldStrategy].debt;
         
         if(oldStrategyDebt > 0) {
-            _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt);
+            _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt - 10);
         }
         StrategyParams memory params = StrategyParams({
             active: true,
             allocation: newAllocation,
             debt: 0
         });
-        
-        strategyParams[newStrategy] = params;
+
         for(uint256 i = 0; i < strategies.length; i++) {
             if(strategies[i] == oldStrategy) {
                 strategies[i] = newStrategy;
+                strategyParams[newStrategy] = params;
+            } else {
+                revert("invalid oldStrategy address");
             }
         }
+        approve(oldStrategy, 0);
         approve(newStrategy, type(uint256).max);
         emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
     }
@@ -388,6 +398,6 @@ ReentrancyGuardUpgradeable
     function changeStrategyAllocation(address strategy, uint256 allocation) external onlyOwner {
         require(strategy != address(0));        
         strategyParams[strategy].allocation = allocation;
-        emit StrategyAllocationChanged(strategy,allocation);
+        emit StrategyAllocationChanged(strategy, allocation);
     }
 }

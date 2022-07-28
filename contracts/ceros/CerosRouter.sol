@@ -191,6 +191,9 @@ ReentrancyGuardUpgradeable
     function getProfitFor(address account) external view returns (uint256) {
         return _profits[account];
     }
+    function getYieldFor(address account) external view returns(uint256) {
+        return _vault.getYieldFor(account);
+    } 
     function changeVault(address vault) external onlyOwner {
         // update allowances
         _certToken.approve(address(_vault), 0);

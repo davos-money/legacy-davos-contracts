@@ -15,7 +15,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     IMasterVault public vault;
 
     address private _swapPool;
-    address public _rewardsPool;
+    // address public _rewardsPool;
 
     event SwapPoolChanged(address swapPool);
     event CeRouterChanged(address ceRouter);
@@ -27,17 +27,18 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         address ceRouter,
         address certToekn,
         address masterVault,
-        address rewardsPool,
+        // address rewardsPool,
         address swapPool
     ) public initializer {
         __BaseStrategy_init(destination, feeRecipient, underlyingToken);
         _ceRouter = ICerosRouter(ceRouter);
         _certToken = ICertToken(certToekn);
         _swapPool = swapPool;
-        _rewardsPool = rewardsPool;
+        // _rewardsPool = rewardsPool;
         vault = IMasterVault(masterVault);
         underlying.approve(address(_ceRouter), type(uint256).max);
         underlying.approve(address(vault), type(uint256).max);
+        _certToken.approve(_swapPool, type(uint256).max);
     }
 
     /**
@@ -102,29 +103,35 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     }
 
     function harvest() external onlyStrategist {
-        _harvestTo(_rewardsPool);
+        _harvestTo(feeRecipient);
     }
 
     function harvestAndSwap() external onlyStrategist {
-        uint256 yeild = _harvestTo(address(this));
-        (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, yeild, true);
+        uint256 yield = _harvestTo(address(this));
+        (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, yield, true);
         if (enoughLiquidity && amountOut > 0) {
-            ISwapPool(_swapPool).swap(false, yeild, address(this));
+            amountOut = ISwapPool(_swapPool).swap(false, yield, address(this));
+            underlying.transfer(feeRecipient, amountOut);
         }
     }
 
-    function _harvestTo(address to) private returns(uint256 yeild) {
-        yeild = _ceRouter.claim(to);
+    function _harvestTo(address to) private returns(uint256 yield) {
+        yield = _ceRouter.getYieldFor(address(this));
+        if(yield > 0) {
+            yield = _ceRouter.claim(to);  // TODO: handle: reverts if no yield
+        }
         uint256 profit = _ceRouter.getProfitFor(address(this));
         if(profit > 0) {
-            yeild += profit;
+            yield += profit;
             _ceRouter.claimProfit(to);
         }
     }
 
     function changeSwapPool(address swapPool) external onlyOwner {
         require(swapPool != address(0));
+        _certToken.approve(_swapPool, 0);
         _swapPool = swapPool;
+        _certToken.approve(_swapPool, type(uint256).max);
         emit SwapPoolChanged(swapPool);
     }
 
