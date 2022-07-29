@@ -78,7 +78,10 @@ contract SwapPool is Ownable, ReentrancyGuard {
   bool public providerLockEnabled;
 
   FeeAmounts public ownerFeeCollected;
+
   FeeAmounts public managerFeeCollected;
+  FeeAmounts private _accFeePerManager;
+  FeeAmounts private _alreadyUpdatedFees;
 
   mapping(address => FeeAmounts) public managerRewardDebt;
 
@@ -391,6 +394,28 @@ contract SwapPool is Ownable, ReentrancyGuard {
     }
   }
 
+  function getRemainingManagerFee(address managerAddress)
+    external
+    view
+    returns (FeeAmounts memory feeRewards)
+  {
+    if (managers_.contains(managerAddress)) {
+      uint256 managersLength = managers_.length();
+      FeeAmounts memory currentManagerRewardDebt = managerRewardDebt[managerAddress];
+      FeeAmounts memory accFee;
+      accFee.nativeFee =
+        _accFeePerManager.nativeFee +
+        (managerFeeCollected.nativeFee - _alreadyUpdatedFees.nativeFee) /
+        uint128(managersLength);
+      accFee.cerosFee =
+        _accFeePerManager.cerosFee +
+        (managerFeeCollected.cerosFee - _alreadyUpdatedFees.cerosFee) /
+        uint128(managersLength);
+      feeRewards.nativeFee = accFee.nativeFee - currentManagerRewardDebt.nativeFee;
+      feeRewards.cerosFee = accFee.cerosFee - currentManagerRewardDebt.cerosFee;
+    }
+  }
+
   function withdrawManagerFee() external onlyManager {
     _withdrawManagerFee(msg.sender, false);
   }
@@ -401,17 +426,10 @@ contract SwapPool is Ownable, ReentrancyGuard {
 
   function _withdrawManagerFee(address managerAddress, bool useNative) internal {
     FeeAmounts memory feeRewards;
-    uint256 managersLength = managers_.length();
-    require(managersLength > 0, "No managers");
     FeeAmounts storage currentManagerRewardDebt = managerRewardDebt[managerAddress];
-    feeRewards.nativeFee =
-      managerFeeCollected.nativeFee /
-      uint128(managersLength) -
-      currentManagerRewardDebt.nativeFee;
-    feeRewards.cerosFee =
-      managerFeeCollected.cerosFee /
-      uint128(managersLength) -
-      currentManagerRewardDebt.cerosFee;
+    _updateManagerFees();
+    feeRewards.nativeFee = _accFeePerManager.nativeFee - currentManagerRewardDebt.nativeFee;
+    feeRewards.cerosFee = _accFeePerManager.cerosFee - currentManagerRewardDebt.cerosFee;
     if (feeRewards.nativeFee > 0) {
       currentManagerRewardDebt.nativeFee += feeRewards.nativeFee;
       if (useNative) {
@@ -425,6 +443,45 @@ contract SwapPool is Ownable, ReentrancyGuard {
       currentManagerRewardDebt.cerosFee += feeRewards.cerosFee;
       cerosToken.transfer(managerAddress, feeRewards.cerosFee);
     }
+  }
+
+  function _updateManagerFees() private {
+    uint256 managersLength = managers_.length();
+    _accFeePerManager.nativeFee +=
+      (managerFeeCollected.nativeFee - _alreadyUpdatedFees.nativeFee) /
+      uint128(managersLength);
+    _accFeePerManager.cerosFee +=
+      (managerFeeCollected.cerosFee - _alreadyUpdatedFees.cerosFee) /
+      uint128(managersLength);
+    _alreadyUpdatedFees.nativeFee = managerFeeCollected.nativeFee;
+    _alreadyUpdatedFees.cerosFee = managerFeeCollected.cerosFee;
+  }
+
+  function add(address value, UserType utype) public returns (bool) {
+    require(value != address(0), "cannot add address(0)");
+    bool success = false;
+    if (utype == UserType.MANAGER) {
+      require(msg.sender == owner(), "Only owner can add manager");
+      if (!managers_.contains(value)) {
+        uint256 managersLength = managers_.length();
+        if (managersLength != 0) {
+          _updateManagerFees();
+          managerRewardDebt[value].nativeFee = _accFeePerManager.nativeFee;
+          managerRewardDebt[value].cerosFee = _accFeePerManager.cerosFee;
+        }
+        success = managers_.add(value);
+      }
+    } else if (utype == UserType.LIQUIDITY_PROVIDER) {
+      require(managers_.contains(msg.sender), "Only manager can add liquidity provider");
+      success = liquidityProviders_.add(value);
+    } else {
+      require(managers_.contains(msg.sender), "Only manager can add integrator");
+      success = integrators_.add(value);
+    }
+    if (success) {
+      emit UserTypeChanged(value, utype, true);
+    }
+    return success;
   }
 
   function setFee(uint24 newFee, FeeType feeType) external onlyOwnerOrManager {
@@ -466,43 +523,13 @@ contract SwapPool is Ownable, ReentrancyGuard {
     emit ExcludedFromFee(value, exclude);
   }
 
-  function add(address value, UserType utype) public returns (bool) {
-    require(value != address(0), "cannot add address(0)");
-    bool success = false;
-    if (utype == UserType.MANAGER) {
-      require(msg.sender == owner(), "Only owner can add manager");
-      if (!managers_.contains(value)) {
-        uint256 managersLength = managers_.length();
-        if (managersLength != 0) {
-          managerRewardDebt[value].nativeFee =
-            managerFeeCollected.nativeFee /
-            uint128(managersLength);
-          managerRewardDebt[value].cerosFee =
-            managerFeeCollected.cerosFee /
-            uint128(managersLength);
-        }
-        success = managers_.add(value);
-      }
-    } else if (utype == UserType.LIQUIDITY_PROVIDER) {
-      require(managers_.contains(msg.sender), "Only manager can add liquidity provider");
-      success = liquidityProviders_.add(value);
-    } else {
-      require(managers_.contains(msg.sender), "Only manager can add integrator");
-      success = integrators_.add(value);
-    }
-    if (success) {
-      emit UserTypeChanged(value, utype, true);
-    }
-    return success;
-  }
-
   function remove(address value, UserType utype) public returns (bool) {
     require(value != address(0), "cannot remove address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
       require(msg.sender == owner(), "Only owner can remove manager");
       if (managers_.contains(value)) {
-        _withdrawManagerFee(value, true);
+        _withdrawManagerFee(value, false);
         delete managerRewardDebt[value];
         success = managers_.remove(value);
       }
