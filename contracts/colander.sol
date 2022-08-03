@@ -24,70 +24,14 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-interface IInteraction {
-    function buyFromAuction(address token, uint256 auctionId, uint256 collateralAmount, uint256 maxPrice, address receiverAddress) external;
-    function collaterals(address) external returns(CollateralType memory);
-}
-interface IClipper {
-    function sales(uint256 auctionId) external view returns (Sale memory);
-    function getStatus(uint256 id) external view returns (bool needsRedo, uint256 price, uint256 lot, uint256 tab);
-}
-interface ISpotter {
-    function par() external returns (uint256);
-    function ilks(bytes32) external returns (IPip, uint256);
-}
-interface IDex {
-    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
-}
-interface IRewards {
-    function reflect(address _depositor, uint256 _exitAmount) external;
-    function replenish(uint256 _amount) external;
-    function cage() external;
-}
-interface IPip {
-    function peek() external returns (bytes32, bool);
-}
-
-interface IStabilityPool {
-    function totalSupply() external view returns(uint256);
-    function balanceOf(address _depositor) external view returns(uint256);
-}
-
-struct CollateralType {
-    address gem;
-    bytes32 ilk;
-    uint32 live;
-    address clip;
-}
-struct Sale {
-    uint256 pos;  // Index in active array
-    uint256 tab;  // Usb to raise           [rad]
-    uint256 lot;  // collateral to sell     [wad]
-    address usr;  // Liquidated CDP
-    uint96  tic;  // Auction start time
-    uint256 top;  // Starting price         [ray]
-}
-struct ExactInputSingleParams {
-    address tokenIn;
-    address tokenOut;
-    uint24 fee;
-    address recipient;
-    uint256 deadline;
-    uint256 amountIn;
-    uint256 amountOutMinimum;
-    uint160 sqrtPriceLimitX96;
-}
-
-error Unauthorized(address _caller);
-error NotLive(address _contract);
-error InsufficientSurplus(uint256 _surplus);
-error BufZone();
-error AbsurdPrice();
-error SinZone();
-error AbsurdThreshold();
-error InactiveZone();
-error InvalidPrice();
-error ZeroSpread();
+import "./ceros/interfaces/IDao.sol";
+import "./interfaces/GemJoinLike.sol";
+import "./interfaces/ClipperLike.sol";
+import "./interfaces/SpotLike.sol";
+import "./interfaces/DexV3Like.sol";
+import "./interfaces/IColanderRewards.sol";
+import "./interfaces/PipLike.sol";
+import "./interfaces/IStabilityPool.sol";
 
 /*
    "Donate StableCoins to the pool and earn rewards".
@@ -96,7 +40,7 @@ error ZeroSpread();
    timeline. The pool is used to do loseless purchases
    from auctions.
 */
-contract Colander is ReentrancyGuardUpgradeable {
+contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
     // --- Wrapper ---
     using SafeERC20Upgradeable for IERC20Upgradeable;
     
@@ -110,15 +54,15 @@ contract Colander is ReentrancyGuardUpgradeable {
     string public name;
     string public symbol;
     uint8 public decimals;
-    uint256 public totalSupply;
-    mapping(address => uint) public balanceOf;
+    uint256 public override totalSupply;
+    mapping(address => uint) public override balanceOf;
 
     // --- State Vars ---
     IERC20Upgradeable public stablecoin;
-    IInteraction public interaction;
-    ISpotter public spotter;
-    IDex public dex;
-    IRewards public rewards;
+    IDao public interaction;
+    SpotLike public spotter;
+    DexV3Like public dex;
+    IColanderRewards public rewards;
 
     uint256 public profitRange;  // Minimum profit for surge in %  [ray]
     uint256 public priceImpact;  // Acceptable swap price in %     [wad]
@@ -145,10 +89,10 @@ contract Colander is ReentrancyGuardUpgradeable {
         name = _name;
         symbol = _symbol;
         stablecoin = IERC20Upgradeable(_stablecoin);
-        interaction = IInteraction(_interaction);
-        spotter = ISpotter(_spotter);
-        dex = IDex(_dex);
-        rewards = IRewards(_rewards);
+        interaction = IDao(_interaction);
+        spotter = SpotLike(_spotter);
+        dex = DexV3Like(_dex);
+        rewards = IColanderRewards(_rewards);
 
         decimals = 18;
 
@@ -176,7 +120,7 @@ contract Colander is ReentrancyGuardUpgradeable {
 
         if (live != 1) revert NotLive(address(this));
 
-        rewards = IRewards(_rewards);
+        rewards = IColanderRewards(_rewards);
 
         emit Rewards(_rewards);
     }
@@ -247,29 +191,33 @@ contract Colander is ReentrancyGuardUpgradeable {
         uint256 tab;          // Auction debt        [rad]
         uint256 lot;          // Auction collateral  [wad]
         {
-            CollateralType memory collateral = IInteraction(interaction).collaterals(_collateral);
-            (,abacusPrice,,) = IClipper(collateral.clip).getStatus(_auction_id);
-            feedPrice = _getFeedPrice(collateral.ilk);  // [ray]
+            (, bytes32 ilk,, address clip) = IDao(interaction).collaterals(_collateral);
+            // CollateralType memory collateral = IDao(interaction).collaterals(_collateral);
+            (,abacusPrice,,) = ClipperLike(clip).getStatus(_auction_id);
+            feedPrice = _getFeedPrice(ilk);  // [ray]
 
-            if (abacusPrice >= feedPrice) revert BufZone();
+            if (abacusPrice >= feedPrice) revert IStabilityPool.BufZone();
             // require(abacusPrice < feedPrice, "Colander/buf-zone");
 
-            tab = IClipper(collateral.clip).sales(_auction_id).tab;
-            lot = IClipper(collateral.clip).sales(_auction_id).lot;
+            tab = ClipperLike(clip).sales(_auction_id).tab;
+            lot = ClipperLike(clip).sales(_auction_id).lot;
+
+            if (tab == 0 || lot == 0) revert IStabilityPool.InvalidAuction();
+            // require(tab > 0 && lot > 0, "Colander/invalid-auction");
 
             // Calculate debt per collateral
             uint256 auctionPrice = tab / lot;  // [ray]
 
-            if (auctionPrice >= feedPrice) revert AbsurdPrice();
-            else if (auctionPrice >= abacusPrice) revert SinZone();
+            if (auctionPrice >= feedPrice) revert IStabilityPool.AbsurdPrice();
+            else if (auctionPrice >= abacusPrice) revert IStabilityPool.SinZone();
             // require(auctionPrice < feedPrice, "Colander/absurd-price");
             // require(auctionPrice < abacusPrice, "Colander/sin-zone");
 
             uint256 y = (feedPrice * profitRange) / RAY;
             uint256 threshold = feedPrice - y;
 
-            if (auctionPrice > threshold) revert AbsurdThreshold();
-            else if (abacusPrice > threshold) revert InactiveZone();
+            if (auctionPrice > threshold) revert IStabilityPool.AbsurdThreshold();
+            else if (abacusPrice > threshold) revert IStabilityPool.InactiveZone();
             // require(auctionPrice <= threshold, "Colander/absurd-threshold");
             // require(abacusPrice <= threshold, "Colander/inactive-zone");
         }
@@ -297,7 +245,7 @@ contract Colander is ReentrancyGuardUpgradeable {
     }
     function _getFeedPrice(bytes32 _ilk) private returns(uint256 _feedPrice) {
 
-        (IPip pip, ) = spotter.ilks(_ilk);
+        (PipLike pip, ) = spotter.ilks(_ilk);
         (bytes32 val, bool has) = pip.peek();
         if (!has) revert InvalidPrice();
         // require(has, "Colander/invalid-price");
@@ -308,7 +256,7 @@ contract Colander is ReentrancyGuardUpgradeable {
         uint24 fee = 3000;
         uint160 sqrtPriceLimitX96 = 0;
         
-        ExactInputSingleParams memory params = ExactInputSingleParams(
+        DexV3Like.ExactInputSingleParams memory params = DexV3Like.ExactInputSingleParams(
             _tokenIn,             // tokenIn
             address(stablecoin),  // tokenOut
             fee,                  // fee
@@ -356,7 +304,7 @@ contract ColanderRewards is Initializable {
     mapping (address => uint) public wards;
     function rely(address _guy) external auth { wards[_guy] = 1; }
     function deny(address _guy) external auth { wards[_guy] = 0; }
-    modifier auth { if(wards[msg.sender] != 1) revert Unauthorized(msg.sender); _; }
+    modifier auth { if(wards[msg.sender] != 1) revert IStabilityPool.Unauthorized(msg.sender); _; }
 
     // --- Reward Data ---
     uint public spread;         // Distribution time       [sec]
@@ -460,7 +408,7 @@ contract ColanderRewards is Initializable {
     }
     function replenish(uint _wad) external update(address(0)) {
 
-        if (live != 1) revert NotLive(address(this));
+        if (live != 1) revert IStabilityPool.NotLive(address(this));
 
         if (block.timestamp >= endTime) {
             rate = _wad / spread;
@@ -478,7 +426,7 @@ contract ColanderRewards is Initializable {
     }
     function redeemBatch(address[] memory accounts) external {
 
-        if (live != 1) revert NotLive(address(this));
+        if (live != 1) revert IStabilityPool.NotLive(address(this));
 
         for (uint i = 0; i < accounts.length; i++) {
             if (block.timestamp < unstakeTime[accounts[i]] && unstakeTime[accounts[i]] != 0)
@@ -496,7 +444,7 @@ contract ColanderRewards is Initializable {
     }
     function setSpread(uint _spread) external auth {
 
-        if (_spread <= 0) revert ZeroSpread();
+        if (_spread <= 0) revert IStabilityPool.ZeroSpread();
         // require(_spread > 0, "Jar/duration-non-zero");
         spread = _spread;
 

@@ -55,11 +55,10 @@ contract Vow {
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address vat_, address flapper_, address flopper_, address multisig_) {
+    constructor(address vat_, address multisig_) {
         wards[msg.sender] = 1;
         vat     = VatLike(vat_);
         multisig = multisig_;
-        vat.hope(flapper_);
         live = 1;
     }
 

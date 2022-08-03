@@ -11,7 +11,6 @@ import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ISikkaProvider.sol";
 import "./interfaces/ICertToken.sol";
 import "../MasterVault/interfaces/IMasterVault.sol";
-
 contract SikkaProvider is
 ISikkaProvider,
 OwnableUpgradeable,
@@ -93,6 +92,7 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 realAmount)
     {
+        require(recipient != address(0));
         _withdrawCollateral(msg.sender, amount);
         realAmount = _masterVault.withdrawETH(recipient, amount);
         emit Withdrawal(msg.sender, recipient, amount);
@@ -107,6 +107,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
+        require(recipient != address(0));
         _masterVault.withdrawETH(recipient, amount);
     }
     function daoBurn(address account, uint256 value)
@@ -115,6 +116,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
+        require(account != address(0));
         _collateralToken.burn(account, value);
     }
     function daoMint(address account, uint256 value)
@@ -123,6 +125,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
+        require(account != address(0));
         _collateralToken.mint(account, value);
     }
     function _provideCollateral(address account, uint256 amount) internal {

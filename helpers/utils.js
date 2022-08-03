@@ -1,7 +1,7 @@
-import { BigNumber } from "ethers";
-import hre, { ethers, network } from "hardhat";
+const { BigNumber } = require("ethers");
+const { ethers, network, hre } = require("hardhat");
 
-export const verifyContract = async (
+const verifyContract = async (
   contractAddress,
   constructorArguments
 ) => {
@@ -24,54 +24,66 @@ export const verifyContract = async (
   console.log("contract", contractAddress, "verified successfully");
 };
 
-export const advanceTime = async (seconds) => {
+const advanceTime = async (seconds) => {
   await network.provider.send("evm_increaseTime", [seconds]);
   await network.provider.send("evm_mine");
 };
 
-export const advanceBlock = async (blockCount) => {
+const advanceBlock = async (blockCount) => {
   for (let i = 0; i < blockCount; i++) {
     await network.provider.send("evm_mine");
   }
 };
 
-export const advanceBlockAndTime = async (blockCount, seconds) => {
+const advanceBlockAndTime = async (blockCount, seconds) => {
   const secondPerBlock = Math.floor(seconds / blockCount);
   for (let i = 0; i < blockCount; i++) {
     await advanceTime(secondPerBlock);
   }
 };
 
-export const setTimestamp = async (seconds) => {
+const setTimestamp = async (seconds) => {
   await network.provider.send("evm_setNextBlockTimestamp", [seconds]);
   await network.provider.send("evm_mine");
 };
 
-export const getTimestamp = async () => {
+const getTimestamp = async () => {
   const blockNumber = await ethers.provider.getBlockNumber();
   const block = await ethers.provider.getBlock(blockNumber);
   return block.timestamp;
 };
 
-export const daysToSeconds = (days) => {
+const daysToSeconds = (days) => {
   return hoursToSeconds(days.mul(24));
 };
 
-export const hoursToSeconds = (hours) => {
+const hoursToSeconds = (hours) => {
   return minutesToSeconds(hours.mul(60));
 };
 
-export const minutesToSeconds = (minutes) => {
+const minutesToSeconds = (minutes) => {
   return minutes.mul(60);
 };
 
-export const getNextTimestampDivisibleBy = async (num) => {
+const getNextTimestampDivisibleBy = async (num) => {
   const blockTimestamp = await getTimestamp();
   const numCount = BigNumber.from(blockTimestamp).div(num);
   return numCount.add(1).mul(num);
 };
 
-export default {
+const toWad = (num) => {
+  return ethers.utils.parseUnits(num, 18);
+};
+
+const toRay = (num) => {
+  return ethers.utils.parseUnits(num, 27);
+};
+
+const toRad = (num) => {
+  return ethers.utils.parseUnits(num, 45);
+};
+
+module.exports = {
   verifyContract,
   advanceTime,
   advanceBlock,
@@ -82,4 +94,7 @@ export default {
   hoursToSeconds,
   minutesToSeconds,
   getNextTimestampDivisibleBy,
+  toWad,
+  toRay,
+  toRad,
 };

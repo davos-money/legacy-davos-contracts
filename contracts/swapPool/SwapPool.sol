@@ -239,6 +239,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
     uint256 amountIn,
     address receiver
   ) external payable onlyIntegrator nonReentrant returns (uint256 amountOut) {
+    require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
 
@@ -259,7 +260,7 @@ contract SwapPool is Ownable, ReentrancyGuard {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
       if (useEth) {
-        nativeToken.deposit{ value: msg.value }();
+        nativeToken.deposit{ value: amountIn }();
       } else {
         nativeToken.transferFrom(msg.sender, address(this), amountIn);
       }

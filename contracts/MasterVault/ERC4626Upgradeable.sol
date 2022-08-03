@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.0;
-
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import "./interfaces/IERC4626Upgradeable.sol";
-
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 /**
  * @dev Implementation of the ERC4626 "Tokenized Vault Standard" as defined in
  * https://eips.ethereum.org/EIPS/eip-4626[EIP-4626].
@@ -25,90 +22,72 @@ import "./interfaces/IERC4626Upgradeable.sol";
  */
 abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC4626Upgradeable {
     using MathUpgradeable for uint256;
-
     IERC20MetadataUpgradeable private _asset;
-
     /**
      * @dev Set the underlying asset contract. This must be an ERC20-compatible contract (ERC20 or ERC777).
      */
     function __ERC4626_init(IERC20MetadataUpgradeable asset_) internal onlyInitializing {
         __ERC4626_init_unchained(asset_);
     }
-
     function __ERC4626_init_unchained(IERC20MetadataUpgradeable asset_) internal onlyInitializing {
         _asset = asset_;
     }
-
     /** @dev See {IERC4262-asset} */
     function asset() public view virtual override returns (address) {
         return address(_asset);
     }
-
     /** @dev See {IERC4262-totalAssets} */
     function totalAssets() public view virtual override returns (uint256) {
         return _asset.balanceOf(address(this));
     }
-
     /** @dev See {IERC4262-convertToShares} */
     function convertToShares(uint256 assets) public view virtual override returns (uint256 shares) {
         return _convertToShares(assets, MathUpgradeable.Rounding.Down);
     }
-
     /** @dev See {IERC4262-convertToAssets} */
     function convertToAssets(uint256 shares) public view virtual override returns (uint256 assets) {
         return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
     }
-
     /** @dev See {IERC4262-maxDeposit} */
     function maxDeposit(address) public view virtual override returns (uint256) {
         return _isVaultCollateralized() ? type(uint256).max : 0;
     }
-
     /** @dev See {IERC4262-maxMint} */
     function maxMint(address) public view virtual override returns (uint256) {
         return type(uint256).max;
     }
-
     /** @dev See {IERC4262-maxWithdraw} */
     function maxWithdraw(address owner) public view virtual override returns (uint256) {
         return _convertToAssets(balanceOf(owner), MathUpgradeable.Rounding.Down);
     }
-
     /** @dev See {IERC4262-maxRedeem} */
     function maxRedeem(address owner) public view virtual override returns (uint256) {
         return balanceOf(owner);
     }
-
     /** @dev See {IERC4262-previewDeposit} */
     function previewDeposit(uint256 assets) public view virtual override returns (uint256) {
         return _convertToShares(assets, MathUpgradeable.Rounding.Down);
     }
-
     /** @dev See {IERC4262-previewMint} */
     function previewMint(uint256 shares) public view virtual override returns (uint256) {
         return _convertToAssets(shares, MathUpgradeable.Rounding.Up);
     }
-
     /** @dev See {IERC4262-previewWithdraw} */
     function previewWithdraw(uint256 assets) public view virtual override returns (uint256) {
         return _convertToShares(assets, MathUpgradeable.Rounding.Up);
     }
-
     /** @dev See {IERC4262-previewRedeem} */
     function previewRedeem(uint256 shares) public view virtual override returns (uint256) {
         return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
     }
-
     /** @dev See {IERC4262-deposit} */
     function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
     }
-
     /** @dev See {IERC4262-mint} */
     function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
     }
-
     /** @dev See {IERC4262-withdraw} */
     function withdraw(
         uint256 assets,
@@ -117,7 +96,6 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
     ) public virtual override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
     }
-
     /** @dev See {IERC4262-redeem} */
     function redeem(
         uint256 shares,
@@ -126,7 +104,6 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
     ) public virtual override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
     }
-
     /**
      * @dev Internal convertion function (from assets to shares) with support for rounding direction
      *
@@ -140,7 +117,6 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
                 ? assets.mulDiv(10**decimals(), 10**_asset.decimals(), rounding)
                 : assets.mulDiv(supply, totalAssets(), rounding);
     }
-
     /**
      * @dev Internal convertion function (from shares to assets) with support for rounding direction
      */
@@ -151,7 +127,6 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
                 ? shares.mulDiv(10**_asset.decimals(), 10**decimals(), rounding)
                 : shares.mulDiv(totalAssets(), supply, rounding);
     }
-
     /**
      * @dev Deposit/mint common workflow
      */
@@ -170,10 +145,8 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
         // slither-disable-next-line reentrancy-no-eth
         SafeERC20Upgradeable.safeTransferFrom(_asset, caller, address(this), assets);
         _mint(receiver, shares);
-
         emit Deposit(caller, receiver, assets, shares);
     }
-
     /**
      * @dev Withdraw/redeem common workflow
      */
@@ -187,7 +160,6 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
-
         // If _asset is ERC777, `transfer` can trigger trigger a reentrancy AFTER the transfer happens through the
         // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
         // calls the vault, which is assumed not malicious.
@@ -196,14 +168,11 @@ abstract contract ERC4626Upgradeable is Initializable, ERC20Upgradeable, IERC462
         // shares are burned and after the assets are transfered, which is a valid state.
         _burn(owner, shares);
         SafeERC20Upgradeable.safeTransfer(_asset, receiver, assets);
-
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
-
     function _isVaultCollateralized() private view returns (bool) {
         return totalAssets() > 0 || totalSupply() == 0;
     }
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.

@@ -9,4 +9,6 @@ interface SpotLike {
     function poke(bytes32) external;
 
     function file(bytes32 ilk, bytes32 what, uint data) external;
+
+    function par() external returns (uint256);
 }

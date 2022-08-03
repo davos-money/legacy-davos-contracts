@@ -34,4 +34,6 @@ interface IDao {
     ) external returns (uint256);
 
     function dropRewards(address token, address usr) external;
+    function buyFromAuction(address token, uint256 auctionId, uint256 collateralAmount, uint256 maxPrice, address receiverAddress) external;
+    function collaterals(address) external view returns(GemJoinLike gem, bytes32 ilk, uint32 live, address clip);
 }

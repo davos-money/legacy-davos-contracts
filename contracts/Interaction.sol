@@ -508,7 +508,7 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
         uint256 collateralAmount,
         uint256 maxPrice,
         address receiverAddress
-    ) external {
+    ) external override(IAuctionProxy, IDao) {
         CollateralType memory collateral = collaterals[token];
         ISikkaProvider sikkaProvider = ISikkaProvider(sikkaProviders[token]);
         uint256 leftover = AuctionProxy.buyFromAuction(
