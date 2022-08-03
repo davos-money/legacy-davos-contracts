@@ -75,6 +75,7 @@ contract WaitingPool is Initializable {
             _index < index && 
             people[_index]._address == msg.sender,
             "already settled");
+            people[_index]._settled = true;
         payable(msg.sender).transfer(people[_index]._debt);
     }
 }
