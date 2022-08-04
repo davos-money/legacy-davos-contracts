@@ -3,12 +3,12 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "../ceros/interfaces/ICerosRouter.sol";
 import "../ceros/interfaces/ISikkaProvider.sol";
 import "../ceros/interfaces/ICertToken.sol";
 import "../ceros/interfaces/IDao.sol";
 import "../ceros/interfaces/IPriceGetter.sol";
-import "./ERC4626Upgradeable.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IMasterVault.sol";
 import "./interfaces/IWaitingPool.sol";
@@ -317,6 +317,10 @@ ReentrancyGuardUpgradeable
         waitingPool = IWaitingPool(_waitingPool);
         emit WaitingPoolChanged(_waitingPool);
     }
+    function setWaitingPoolCap(uint256 _cap) external onlyOwner {
+        waitingPool.setCapLimit(_cap);
+        emit WaitingPoolCapChanged(_cap);
+    }
     function addManager(address newManager) external onlyOwner {
         require(newManager != address(0));
         manager[newManager] = true;
@@ -346,5 +350,17 @@ ReentrancyGuardUpgradeable
         require(strategy != address(0));        
         strategyParams[strategy].allocation = allocation;
         emit StrategyAllocationChanged(strategy, allocation);
+    }
+    function deposit(uint256 assets, address receiver) public override returns (uint256) {
+        // Kept only for the sake of ERC4626 standard
+    }
+    function mint(uint256 shares, address receiver) public override returns (uint256) {
+        // Kept only for the sake of ERC4626 standard
+    }
+    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
+        // Kept only for the sake of ERC4626 standard
+    }
+    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
+        // Kept only for the sake of ERC4626 standard
     }
 }

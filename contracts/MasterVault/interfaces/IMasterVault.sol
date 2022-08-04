@@ -15,6 +15,7 @@ interface IMasterVault {
     event ManagerRemoved(address manager);
     event FeeReceiverChanged(address feeReceiver);
     event WaitingPoolChanged(address waitingPool);
+    event WaitingPoolCapChanged(uint256 cap);
     event StrategyAllocationChanged(address strategy, uint256 allocation);
     event SwapPoolChanged(address swapPool);
     event StrategyAdded(address strategy, uint256 allocation);

@@ -47,8 +47,8 @@ contract WaitingPool is Initializable {
                 if(success) {
                     people[index]._settled = true;
                 }
+                cap++;
                 index++;
-                
             } else {
                 return;
             }
@@ -77,5 +77,11 @@ contract WaitingPool is Initializable {
             "already settled");
             people[_index]._settled = true;
         payable(msg.sender).transfer(people[_index]._debt);
+    }
+    function setCapLimit(uint256 _capLimit) external onlyMasterVault {
+        require(
+            _capLimit != 0, 
+            "invalid cap");
+        capLimit = _capLimit;
     }
 }
