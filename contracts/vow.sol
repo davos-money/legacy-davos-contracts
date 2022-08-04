@@ -50,8 +50,6 @@ contract Vow {
     uint256 public bump;  // Flap fixed lot size    [rad]
     uint256 public hump;  // Surplus buffer         [rad]
 
-    uint256 public lever; // 0-Multisig, 1-Flapper
-
     uint256 public live;  // Active Flag
 
     // --- Init ---
@@ -84,7 +82,6 @@ contract Vow {
         else if (what == "sump") sump = data;
         else if (what == "dump") dump = data;
         else if (what == "hump") hump = data;
-        else if (what == "lever") lever = data;
         else revert("Vow/file-unrecognized-param");
     }
 
@@ -116,6 +113,14 @@ contract Vow {
         require(rad <= vat.sikka(address(this)), "Vow/insufficient-surplus");
         Ash = sub(Ash, rad);
         vat.heal(rad);
+    }
+
+    // Send surplus to multisig
+    function flap() external {
+        require(vat.sikka(address(this)) >= add(vat.sin(address(this)), hump), "Vow/insufficient-surplus");
+        require(sub(vat.sin(address(this)), Sin) == 0, "Vow/debt-not-zero");
+        uint rad = sub(vat.sikka(address(this)), add(vat.sin(address(this)), hump));
+        vat.move(address(this), multisig, rad);
     }
 
     function cage() external auth {
