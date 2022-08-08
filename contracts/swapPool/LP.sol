@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract LP is ERC20 {
+contract LP is ERC20Upgradeable {
   address public swapPool;
 
   modifier onlySwapPool() {
@@ -11,8 +11,13 @@ contract LP is ERC20 {
     _;
   }
 
-  // solhint-disable-next-line no-empty-blocks
-  constructor() ERC20("aMATICcLP", "aMATICcLP") {}
+  // constructor() ERC20("aMATICcLP", "aMATICcLP") {}
+  function initialize(string calldata _name, string calldata _symbol)
+    external
+    initializer
+  {
+    __ERC20_init_unchained(_name, _symbol);
+  }
 
   function setSwapPool(address _swapPool) external {
     require(swapPool == address(0), "swap pool can be set only once");

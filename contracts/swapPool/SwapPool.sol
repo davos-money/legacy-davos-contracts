@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ILP } from "./interfaces/ILP.sol";
 import { ICerosToken } from "./interfaces/ICerosToken.sol";
 import { INativeERC20 } from "./interfaces/INativeERC20.sol";
@@ -30,8 +31,12 @@ struct FeeAmounts {
 }
 
 // solhint-disable max-states-count
-contract SwapPool is Ownable, ReentrancyGuard {
-  using EnumerableSet for EnumerableSet.AddressSet;
+contract SwapPool is 
+OwnableUpgradeable,
+PausableUpgradeable,
+ReentrancyGuardUpgradeable
+{
+  using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
   event UserTypeChanged(address indexed user, UserType indexed utype, bool indexed added);
   event FeeChanged(FeeType indexed utype, uint24 oldFee, uint24 newFee);
@@ -56,9 +61,9 @@ contract SwapPool is Ownable, ReentrancyGuard {
 
   uint24 public constant FEE_MAX = 100000;
 
-  EnumerableSet.AddressSet private managers_;
-  EnumerableSet.AddressSet private integrators_;
-  EnumerableSet.AddressSet private liquidityProviders_;
+  EnumerableSetUpgradeable.AddressSet private managers_;
+  EnumerableSetUpgradeable.AddressSet private integrators_;
+  EnumerableSetUpgradeable.AddressSet private liquidityProviders_;
 
   INativeERC20 public nativeToken;
   ICerosToken public cerosToken;
@@ -117,13 +122,16 @@ contract SwapPool is Ownable, ReentrancyGuard {
     _;
   }
 
-  constructor(
+  function initialize(
     address _nativeToken,
     address _cerosToken,
     address _lpToken,
     bool _integratorLockEnabled,
     bool _providerLockEnabled
-  ) {
+  ) public initializer {
+    __Ownable_init();
+    __Pausable_init();
+    __ReentrancyGuard_init();
     nativeToken = INativeERC20(_nativeToken);
     cerosToken = ICerosToken(_cerosToken);
     lpToken = ILP(_lpToken);

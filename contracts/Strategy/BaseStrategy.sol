@@ -5,8 +5,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "../MasterVault/interfaces/IWETH.sol";
+import "./IBaseStrategy.sol";
 
-contract BaseStrategy is
+abstract contract BaseStrategy is
+IBaseStrategy,
 OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable {
@@ -43,6 +45,9 @@ ReentrancyGuardUpgradeable {
     modifier onlyStrategist() {
         require(msg.sender == strategist);
         _;
+    }
+
+    function _beforeDeposit(uint256 amount) internal virtual returns (bool) {
     }
 
     function balanceOfWant() public view returns(uint256) {

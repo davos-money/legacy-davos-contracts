@@ -49,9 +49,6 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         _;
     }
 
-    function beforeDeposit(uint256 amount) internal {
-    }
-
     function deposit(uint256 amount) external onlyVault returns(uint256 value) {
         require(amount <= underlying.balanceOf(address(this)), "insufficient balance");
         return _deposit(amount);
@@ -65,7 +62,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     function _deposit(uint256 amount) internal returns (uint256 value) {
         require(!depositPaused, "deposits are paused");
         require(amount > 0, "invalid amount");
-        beforeDeposit(amount);
+        _beforeDeposit(amount);
         (, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false); // (amount * ratio) / 1e18
         if (enoughLiquidity) {
             return _ceRouter.depositWMatic(amount);
