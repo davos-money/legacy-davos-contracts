@@ -37,7 +37,12 @@ contract WaitingPool is Initializable {
         uint256 cap = 0;
         for(uint256 i = index; i < people.length; i++) {
             balance = address(this).balance;
-            if(balance >= people[index]._debt && people[index]._debt != 0 && cap < capLimit) {
+            if(
+                balance >= people[index]._debt && 
+                people[index]._debt != 0 &&
+                !people[index]._settled && 
+                cap < capLimit
+            ) {
                 uint256 amount = _assessFee(people[index]._debt, masterVault.withdrawalFee());
                 totalDebt -= people[index]._debt;
                 // we can get stuck if caller is a contract that doesn't accept matic
@@ -74,9 +79,12 @@ contract WaitingPool is Initializable {
             !people[_index]._settled && 
             _index < index && 
             people[_index]._address == msg.sender,
-            "already settled");
-            people[_index]._settled = true;
-        payable(msg.sender).transfer(people[_index]._debt);
+            "already settled"
+        );
+        
+        people[_index]._settled = true;
+        uint256 amount = _assessFee(people[index]._debt, masterVault.withdrawalFee());
+        payable(msg.sender).transfer(amount);
     }
     function setCapLimit(uint256 _capLimit) external onlyMasterVault {
         require(

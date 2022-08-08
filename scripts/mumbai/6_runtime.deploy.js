@@ -150,7 +150,7 @@ async function main() {
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("calc"), abacus.address);
 
     console.log("Interaction...");
-    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address);
+    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, mat);
 
     console.log("DEPLOYMENT LIVE");
 }

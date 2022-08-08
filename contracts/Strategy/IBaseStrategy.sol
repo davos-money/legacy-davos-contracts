@@ -9,18 +9,10 @@ function deposit(uint256 amount) external returns(uint256);
 function depositAll() external returns(uint256);
 
 // to withdraw funds from the destination contract
-function withdraw() external returns(uint256);
-
 function withdraw(uint256 amount) external returns(uint256);
-
-// actions to do before depositing the funds
-function beforeDeposit() external returns (bool);
 
 // claim or collect rewards functions
 function harvest() external;
-
-// to be triggered by the owner in the emergency case to send all available funds back to the MasterVault
-function retireStrat() external;
 
 // withdraw all funds from the destination contract
 function panic() external returns (uint256);
@@ -39,9 +31,6 @@ function balanceOfWant() external view returns(uint256);
 
 // calculate the total amount of tokens in the destination contract
 function balanceOfPool() external view returns(uint256);
-
-// set amount of fee to be collected from the total amount of tokens received from the harvest
-function setHarvestFeeBP(uint256 newHarvestFee) external;
 
 // set the recipient address of the collected fee
 function setFeeRecipient(address newFeeRecipient) external;
