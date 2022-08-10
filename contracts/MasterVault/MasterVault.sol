@@ -263,14 +263,17 @@ ReentrancyGuardUpgradeable
             allocation: newAllocation,
             debt: 0
         });
+        bool isValidStrategy;
         for(uint256 i = 0; i < strategies.length; i++) {
             if(strategies[i] == oldStrategy) {
+                isValidStrategy = true;
                 strategies[i] = newStrategy;
                 strategyParams[newStrategy] = params;
-            } else {
-                revert("invalid oldStrategy address");
+                
+                break;
             }
         }
+        require(isValidStrategy, "invalid oldStrategy address");
         approve(oldStrategy, 0);
         approve(newStrategy, type(uint256).max);
         emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
