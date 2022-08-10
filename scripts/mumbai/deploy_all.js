@@ -1,6 +1,7 @@
 let hre = require("hardhat");
 let {ethers, upgrades} = require("hardhat");
 const {BN, ether} = require("@openzeppelin/test-helpers");
+const fs = require("fs");
 
 async function main() {
 
@@ -19,6 +20,8 @@ async function main() {
         _maxDepositFee = 500000, 
         _maxWithdrawalFee = 500000,
         _maxStrategies = 10,
+        _waitingPoolCap = 10,
+        _mat = "1333333333333333333333333333",
         _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
     
     // Contracts Fetching
@@ -32,27 +35,27 @@ async function main() {
     // Contracts deployment and initialization
     ceaMATICc = await upgrades.deployProxy(this.CeaMATICc, ["CEROS aMATICc Vault Token", "ceaMATICc"], {initializer: "initialize"});
     await ceaMATICc.deployed();
-    ceaMATICcImplementation = await upgrades.erc1967.getImplementationAddress(ceaMATICc.address);
+    ceaMATICcImp = await upgrades.erc1967.getImplementationAddress(ceaMATICc.address);
     console.log("ceaMATICc  : " + ceaMATICc.address);
-    console.log("imp        : " + ceaMATICcImplementation);
+    console.log("imp        : " + ceaMATICcImp);
 
     ceVault = await upgrades.deployProxy(this.CeVault, ["CEROS aMATICc Vault", ceaMATICc.address, _aMATICc], {initializer: "initialize"});
     await ceVault.deployed();
-    ceVaultImplementation = await upgrades.erc1967.getImplementationAddress(ceVault.address);
+    ceVaultImp = await upgrades.erc1967.getImplementationAddress(ceVault.address);
     console.log("ceVault    : " + ceVault.address);
-    console.log("imp        : " + ceVaultImplementation);
+    console.log("imp        : " + ceVaultImp);
 
     sMatic = await upgrades.deployProxy(this.SMatic, [], {initializer: "initialize"});
     await sMatic.deployed();
-    sMaticImplementation = await upgrades.erc1967.getImplementationAddress(sMatic.address);
+    sMaticImp = await upgrades.erc1967.getImplementationAddress(sMatic.address);
     console.log("sMatic     : " + sMatic.address);
-    console.log("imp        : " + sMaticImplementation);
+    console.log("imp        : " + sMaticImp);
 
     cerosRouter = await upgrades.deployProxy(this.CerosRouter, [_aMATICc, _wMatic, ceaMATICc.address, ceVault.address, _dex, _dexPairFee, _swapPool, _priceGetter], {initializer: "initialize"}, {gasLimit: 2000000});
     await cerosRouter.deployed();
-    cerosRouterImplementation = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
+    cerosRouterImp = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
     console.log("cerosRouter: " + cerosRouter.address);
-    console.log("imp        : " + cerosRouterImplementation);
+    console.log("imp        : " + cerosRouterImp);
 
     await ceaMATICc.changeVault(ceVault.address);
     await ceVault.changeRouter(cerosRouter.address);
@@ -61,15 +64,15 @@ async function main() {
     this.WaitingPool = await hre.ethers.getContractFactory("WaitingPool");
     masterVault = await upgrades.deployProxy(this.MasterVault, ["CEROS MATIC Vault Token", "ceMATIC", _maxDepositFee, _maxWithdrawalFee, _wMatic, _maxStrategies, _swapPool], {initializer: "initialize"});
     await masterVault.deployed();
-    masterVaultImplementation = await upgrades.erc1967.getImplementationAddress(masterVault.address);
+    masterVaultImp = await upgrades.erc1967.getImplementationAddress(masterVault.address);
     console.log("masterVault    : " + masterVault.address);
-    console.log("imp        : " + masterVaultImplementation);
+    console.log("imp        : " + masterVaultImp);
 
-    waitingPool = await upgrades.deployProxy(this.WaitingPool, [masterVault.address], {initializer: "initialize"});
+    waitingPool = await upgrades.deployProxy(this.WaitingPool, [masterVault.address, _waitingPoolCap], {initializer: "initialize"});
     await waitingPool.deployed();
-    waitingPoolImplementation = await upgrades.erc1967.getImplementationAddress(waitingPool.address);
+    waitingPoolImp = await upgrades.erc1967.getImplementationAddress(waitingPool.address);
     console.log("waitingPool    : " + waitingPool.address);
-    console.log("imp        : " + waitingPoolImplementation);
+    console.log("imp        : " + waitingPoolImp);
 
     await masterVault.setWaitingPool(waitingPool.address)
 
@@ -84,7 +87,7 @@ async function main() {
     this.CerosYieldConverterStrategy = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     
-    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [_destination, _feeRecipient, _underlyingToken, cerosRouter.address, _certToekn, masterVault.address, _rewardsPool, _swapPool], {initializer: "initialize"});
+    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [_destination, _feeRecipient, _underlyingToken, cerosRouter.address, _certToekn, masterVault.address, _swapPool], {initializer: "initialize"});
     await cerosYieldConverterStrategy.deployed();
     cerosYieldConverterStrategyImp = await upgrades.erc1967.getImplementationAddress(cerosYieldConverterStrategy.address);
     console.log("cerosYieldConverterStrategy    : " + cerosYieldConverterStrategy.address);
@@ -109,49 +112,67 @@ async function main() {
     // Contracts deployment
     let vat = await upgrades.deployProxy(this.Vat, [], {initializer: "initialize"});
     await vat.deployed();
-    vatImplementation = await upgrades.erc1967.getImplementationAddress(vat.address);
+    vatImp = await upgrades.erc1967.getImplementationAddress(vat.address);
     console.log("Vat            :", vat.address);
-    console.log("VatImp         :", vatImplementation)
+    console.log("VatImp         :", vatImp);
 
-    let spot = await this.Spot.deploy(vat.address);
+    let spot = await upgrades.deployProxy(this.Spot, [vat.address], {initializer: "initialize"});
     await spot.deployed();
+    spotImp = await upgrades.erc1967.getImplementationAddress(spot.address);
     console.log("Spot           :", spot.address);
+    console.log("SpotImp         :", spotImp)
 
-    let sikka = await this.Sikka.deploy(80001, "SIKKA");
+    let sikka = await upgrades.deployProxy(this.Sikka, [80001, "SIKKA"], {initializer: "initialize"});
     await sikka.deployed();
-    console.log("Sikka          :", sikka.address);
+    sikkaImp = await upgrades.erc1967.getImplementationAddress(sikka.address);
+    console.log("sikka           :", sikka.address);
+    console.log("sikkaImp         :", sikkaImp);
 
-    let sikkaJoin = await this.SikkaJoin.deploy(vat.address, sikka.address);
+    let sikkaJoin = await upgrades.deployProxy(this.SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
     await sikkaJoin.deployed();
+    sikkaJoinImp = await upgrades.erc1967.getImplementationAddress(sikkaJoin.address);
     console.log("SikkaJoin      :", sikkaJoin.address);
+    console.log("SikkaJoinImp         :", sikkaJoinImp)
 
-    let ceaMATICcJoin = await this.GemJoin.deploy(vat.address, _ilkCeMatic, masterVault.address);
+    let ceaMATICcJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, masterVault.address], {initializer: "initialize"});
     await ceaMATICcJoin.deployed();
-    console.log("ceaMATICcJoin  :", ceaMATICcJoin.address);
+    ceaMATICcJoinImp = await upgrades.erc1967.getImplementationAddress(ceaMATICcJoin.address);
+    console.log("GemJoin            :", ceaMATICcJoin.address);
+    console.log("GemJoinImp         :", ceaMATICcJoinImp);
 
-    let jug = await this.Jug.deploy(vat.address);
+    let jug = await upgrades.deployProxy(this.Jug, [vat.address], {initializer: "initialize"});
     await jug.deployed();
+    jugImp = await upgrades.erc1967.getImplementationAddress(jug.address);
     console.log("Jug            :", jug.address);
+    console.log("JugImp         :", jugImp);
 
-    let vow = await this.Vow.deploy(vat.address, ethers.constants.AddressZero, ethers.constants.AddressZero, deployer.address);
+    let vow = await upgrades.deployProxy(this.Vow, [vat.address, deployer.address], {initializer: "initialize"});
     await vow.deployed();
+    vowImp = await upgrades.erc1967.getImplementationAddress(vow.address);
     console.log("Vow            :", vow.address);
+    console.log("VowImp         :", vowImp);
 
-    let dog = await this.Dog.deploy(vat.address);
+    let dog = await upgrades.deployProxy(this.Dog, [vat.address], {initializer: "initialize"});
     await dog.deployed();
+    dogImpl = await upgrades.erc1967.getImplementationAddress(dog.address);
     console.log("Dog            :", dog.address);
+    console.log("DogImp         :", dogImpl);
 
-    let clip = await this.Clip.deploy(vat.address, spot.address, dog.address, _ilkCeMatic);
+    let clip = await upgrades.deployProxy(this.Clip, [vat.address, spot.address, dog.address, _ilkCeMatic], {initializer: "initialize"});
     await clip.deployed();
+    clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
     console.log("Clip           :", clip.address);
+    console.log("ClipImp         :", clipImp);
 
     let oracle = await this.Oracle.deploy();
     await oracle.deployed();
     console.log("Oracle         :", oracle.address);
 
-    let abacus = await this.Abacus.deploy();
+    let abacus = await upgrades.deployProxy(this.Abacus, [], {initializer: "initialize"});
     await abacus.deployed();
+    abacusImp = await upgrades.erc1967.getImplementationAddress(abacus.address);
     console.log("Abacus         :", abacus.address);
+    console.log("AbacusImp         :", abacusImp);
 
     console.log("Verifying Sikka...");
 
@@ -163,13 +184,15 @@ async function main() {
     // Contracts deployment
     let rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether("100000000").toString()], {initializer: "initialize"});
     await rewards.deployed();
-    rewardsImplementation = await upgrades.erc1967.getImplementationAddress(rewards.address);
+    rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
     console.log("Rewards             :", rewards.address);
-    console.log("Imp                 :", rewardsImplementation);
+    console.log("Imp                 :", rewardsImp);
 
-    let ikkaToken = await this.IkkaToken.deploy(ether("100000000").toString(), rewards.address);
+    let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether("100000000").toString(), rewards.address], {initializer: "initialize"});
     await ikkaToken.deployed();
+    ikkaTokenImp = await upgrades.erc1967.getImplementationAddress(ikkaToken.address);
     console.log("ikkaToken           :", ikkaToken.address);
+    console.log("Imp                 :", ikkaTokenImp);
     
     let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, ["100000000000000000"], {initializer: "initialize"}); // 0.1
     await ikkaOracle.deployed();
@@ -222,6 +245,7 @@ async function main() {
     vat = this.Vat.attach(_vat);
     await vat.rely(interaction.address);
     await rewards.rely(interaction.address);
+    await spot.rely(interaction.address);
 
     interactionImplAddress = await upgrades.erc1967.getImplementationAddress(interaction.address);
     console.log("Interaction implementation: ", interactionImplAddress);
@@ -241,7 +265,55 @@ async function main() {
     masterVault = this.MasterVault.attach(masterVault.address);
     sMatic = await this.SMatic.attach(sMatic.address);
     await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address)
+    await masterVault.changeProvider(sikkaProvider.address);
+
+    // Store deployed addresses
+    const addresses = {
+        ceaMATICc      : ceaMATICc.address,
+        ceaMATICcImp   : ceaMATICcImp,
+        ceVault        : ceVault.address,
+        ceVaultImp     : ceVaultImp,
+        sMatic         : sMatic.address,
+        sMaticImp      : sMaticImp,
+        cerosRouter    : cerosRouter.address,
+        cerosRouterImp : cerosRouterImp,
+        masterVault    : masterVault.address,
+        masterVaultImp : masterVaultImp,
+        waitingPool    : waitingPool.address,
+        waitingPoolImp : waitingPoolImp,
+        cerosYieldStr  : cerosYieldConverterStrategy.address,
+        cerosYieldConverterStrategyImp  : cerosYieldConverterStrategyImp,
+        vat            : vat.address,
+        vatImp         : vatImp,
+        spot           : spot.address,
+        spotImp        : spotImp,
+        sikka          : sikka.address,
+        sikkaImp       : sikkaImp,
+        sikkaJoin      : sikkaJoin.address,
+        sikkaJoinImp   : sikkaJoinImp,
+        gemJoin        : ceaMATICcJoin.address,
+        gemJoinImp     : ceaMATICcJoinImp,
+        jug            : jug.address,
+        jugImp         : jugImp,
+        vow            : vow.address,
+        vowImp         : vowImp,
+        dog            : dog.address,
+        dogImp         : dogImpl,
+        clip           : clip.address,
+        clipImp        : clipImp,
+        oracle         : oracle.address,
+        abacus         : abacus.address,
+        abacusImp      : abacusImp,
+        rewards        : rewards.address,
+        rewardsImp     : rewardsImp,
+        ikkaToken      : ikkaToken.address,
+        ikkaTokenImp   : ikkaTokenImp,
+        auctionProxy   : auctionProxy.address
+    }
+
+    const json_addresses = JSON.stringify(addresses);
+    fs.writeFileSync(`./scripts/${network.name}_addresses.json`, json_addresses);
+    console.log("Addresses Recorded to: " + `./scripts/${network.name}_addresses.json`);
 
     let wad = "000000000000000000", // 18 Decimals
         ray = "000000000000000000000000000", // 27 Decimals
@@ -295,7 +367,7 @@ async function main() {
     await vat.rely(_sikkaJoin);
     await vat.rely(_jug);
     await vat.rely(_dog);
-    await vat.rely(interaction.address);
+    // await vat.rely(interaction.address);
     await vat.rely(clip.address);
     await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), "500000000" + rad);
     await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), "50000000" + rad);
@@ -305,7 +377,7 @@ async function main() {
     await vow.rely(_dog);
 
     console.log("All init...");
-    await rewards.rely(interaction.address);
+    // await rewards.rely(interaction.address);
     await gemJoin.rely(interaction.address);
     await sikkaJoin.rely(interaction.address);
     await dog.rely(interaction.address);
@@ -318,7 +390,7 @@ async function main() {
     console.log("Spot/Oracle...");
     await oracle.setPrice("2" + wad); // 2$
     await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
-    await spot["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("mat"), "1333333333333333333333333333"); // Liquidation Ratio 75%
+    // await spot["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("mat"), _mat); // Liquidation Ratio 75%
     await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), "1" + ray); // It means pegged to 1$
     await spot.poke(_ilkCeMatic, {gasLimit: 200000});
 
@@ -353,7 +425,7 @@ async function main() {
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("calc"), abacus.address);
 
     console.log("Interaction...");
-    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address);
+    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat);
 
     console.log("DEPLOYMENT LIVE");
 }

@@ -20,6 +20,7 @@
 pragma solidity ^0.8.10;
 
 import "./interfaces/DogLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface ClipperLike {
     function ilk() external view returns (bytes32);
@@ -52,7 +53,7 @@ interface VowLike {
     function fess(uint256) external;
 }
 
-contract Dog is DogLike {
+contract Dog is Initializable, DogLike {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
@@ -70,7 +71,7 @@ contract Dog is DogLike {
         uint256 dirt;  // Amt SIKKA needed to cover debt+fees of active auctions per ilk [rad]
     }
 
-    VatLike immutable public vat;  // CDP Engine
+    VatLike public vat;  // CDP Engine
 
     mapping (bytes32 => Ilk) public ilks;
 
@@ -101,7 +102,7 @@ contract Dog is DogLike {
     event Cage();
 
     // --- Init ---
-    constructor(address vat_) {
+    function initialize(address vat_) public {
         vat = VatLike(vat_);
         live = 1;
         wards[msg.sender] = 1;

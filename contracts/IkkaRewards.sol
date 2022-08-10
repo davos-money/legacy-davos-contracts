@@ -13,7 +13,7 @@ import "./interfaces/IRewards.sol";
 import "./interfaces/PipLike.sol";
 
 
-contract IkkaRewards is IRewards, Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract IkkaRewards is IRewards, OwnableUpgradeable {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { require(live == 1, "Rewards/not-live"); wards[usr] = 1; }
@@ -68,8 +68,6 @@ contract IkkaRewards is IRewards, Initializable, UUPSUpgradeable, OwnableUpgrade
         vat = VatLike(vat_);
         poolLimit = poolLimit_;
     }
-
-    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function stop() public auth {
         live = 0;

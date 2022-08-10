@@ -17,10 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 pragma solidity ^0.8.10;
 
 import "./interfaces/ClipperLike.sol";
 import "./interfaces/VatLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface PipLike {
     function peek() external returns (bytes32, bool);
@@ -44,7 +46,7 @@ interface AbacusLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
-contract Clipper is ClipperLike {
+contract Clipper is Initializable, ClipperLike {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
@@ -55,8 +57,8 @@ contract Clipper is ClipperLike {
     }
 
     // --- Data ---
-    bytes32  immutable public ilk;   // Collateral type of this Clipper
-    VatLike  immutable public vat;   // Core CDP Engine
+    bytes32 public ilk;   // Collateral type of this Clipper
+    VatLike public vat;   // Core CDP Engine
 
     DogLike     public dog;      // Liquidation module
     address     public vow;      // Recipient of sikka raised in auctions
@@ -82,7 +84,7 @@ contract Clipper is ClipperLike {
     // 1: no new kick()
     // 2: no new kick() or redo()
     // 3: no new kick(), redo(), or take()
-    uint256 public stopped = 0;
+    uint256 public stopped;
 
     // --- Events ---
     event Rely(address indexed usr);
@@ -122,7 +124,7 @@ contract Clipper is ClipperLike {
     event Yank(uint256 id);
 
     // --- Init ---
-    constructor(address vat_, address spotter_, address dog_, bytes32 ilk_) {
+    function initialize(address vat_, address spotter_, address dog_, bytes32 ilk_) public initializer {
         vat     = VatLike(vat_);
         spotter = SpotterLike(spotter_);
         dog     = DogLike(dog_);

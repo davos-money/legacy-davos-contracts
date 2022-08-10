@@ -29,7 +29,7 @@ uint256 constant WAD = 10 ** 18;
 uint256 constant RAD = 10 ** 45;
 uint256 constant YEAR = 31556952; //seconds in year (365.2425 * 24 * 3600)
 
-contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao, IAuctionProxy {
+contract Interaction is OwnableUpgradeable, IDao, IAuctionProxy {
 
     mapping(address => uint) public wards;
 
@@ -59,7 +59,8 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
     mapping(address => address) public sikkaProviders; // e.g. Auction purchase from ceamaticc to amaticc
 
-    function initialize(address vat_,
+    function initialize(
+        address vat_,
         address spot_,
         address sikka_,
         address sikkaJoin_,
@@ -83,8 +84,6 @@ contract Interaction is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDao
 
         sikka.approve(sikkaJoin_, type(uint256).max);
     }
-
-    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function setCores(address vat_, address spot_, address sikkaJoin_,
         address jug_) public auth {

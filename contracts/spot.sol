@@ -19,11 +19,12 @@ pragma solidity ^0.8.10;
 
 import "./interfaces/SpotLike.sol";
 import "./interfaces/VatLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract Spotter is SpotLike {
+contract Spotter is Initializable, SpotLike {
     // --- Auth ---
     mapping (address => uint) public wards;
-    function rely(address guy) external auth { wards[guy] = 1;  }
+    function rely(address guy) external auth { wards[guy] = 1; }
     function deny(address guy) external auth { wards[guy] = 0; }
     modifier auth {
         require(wards[msg.sender] == 1, "Spotter/not-authorized");
@@ -51,7 +52,7 @@ contract Spotter is SpotLike {
     );
 
     // --- Init ---
-    constructor(address vat_) {
+    function initialize(address vat_) public initializer {
         wards[msg.sender] = 1;
         vat = VatLike(vat_);
         par = ONE;

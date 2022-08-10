@@ -53,7 +53,7 @@ module.exports = {
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
         mumbai: {
-            url: `https://polygon-mumbai.g.alchemy.com/v2/1GHcSgGKjwi41E-mWkC_WaVood0AsXFV`,
+            url: `https://rpc-mumbai.matic.today`,
             chainId: 80001,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },

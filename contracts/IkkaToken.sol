@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract IkkaToken is ERC20 {
+contract IkkaToken is ERC20Upgradeable {
 
     event Start(address user);
     event Stop(address user);
@@ -33,7 +33,9 @@ contract IkkaToken is ERC20 {
         _;
     }
 
-    constructor(uint256 rewardsSupply_, address rewards_) ERC20("Ikka Reward token", "IKKA"){
+    // --- Init ---
+    function initialize(uint256 rewardsSupply_, address rewards_) public initializer {
+        __ERC20_init_unchained("Ikka Reward token", "IKKA");
         wards[msg.sender] = 1;
         rewards = rewards_;
         _mint(rewards, rewardsSupply_);

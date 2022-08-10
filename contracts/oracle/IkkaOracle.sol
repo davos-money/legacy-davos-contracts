@@ -2,13 +2,11 @@
 
 pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "../interfaces/PipLike.sol";
 
-contract IkkaOracle is PipLike, Initializable, UUPSUpgradeable, OwnableUpgradeable  {
+contract IkkaOracle is PipLike, OwnableUpgradeable  {
 
     event PriceChanged(uint256 newPrice);
 
@@ -21,8 +19,6 @@ contract IkkaOracle is PipLike, Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         price = initialPrice;
     }
-
-    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /**
      * Returns the latest price
