@@ -26,8 +26,10 @@ pragma solidity ^0.8.10;
 import "./sMath.sol";
 import "./interfaces/JugLike.sol";
 import "./interfaces/VatLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract Jug is JugLike {
+
+contract Jug is Initializable, JugLike {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
@@ -49,7 +51,7 @@ contract Jug is JugLike {
     uint256                  public base;  // Global, per-second stability fee contribution [ray]
 
     // --- Init ---
-    constructor(address vat_) {
+    function initialize(address vat_) public initializer {
         wards[msg.sender] = 1;
         vat = VatLike(vat_);
     }

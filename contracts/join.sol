@@ -22,6 +22,7 @@ pragma solidity ^0.8.10;
 import "./interfaces/GemJoinLike.sol";
 import "./interfaces/SikkaJoinLike.sol";
 import "./interfaces/GemLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -54,7 +55,7 @@ interface VatLike {
       - `exit`: remove collateral from the system
 */
 
-contract GemJoin is GemJoinLike {
+contract GemJoin is Initializable, GemJoinLike {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth {
@@ -83,7 +84,8 @@ contract GemJoin is GemJoinLike {
     event Exit(address indexed usr, uint256 wad);
     event Cage();
 
-    constructor(address vat_, bytes32 ilk_, address gem_) {
+    // --- Init ---
+    function initialize(address vat_, bytes32 ilk_, address gem_) public initializer {
         wards[msg.sender] = 1;
         live = 1;
         vat = VatLike(vat_);
@@ -111,7 +113,7 @@ contract GemJoin is GemJoinLike {
     }
 }
 
-contract SikkaJoin is SikkaJoinLike {
+contract SikkaJoin is Initializable, SikkaJoinLike {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth {
@@ -138,7 +140,8 @@ contract SikkaJoin is SikkaJoinLike {
     event Exit(address indexed usr, uint256 wad);
     event Cage();
 
-    constructor(address vat_, address sikka_) {
+    // --- Init ---
+    function initialize(address vat_, address sikka_) public initializer {
         wards[msg.sender] = 1;
         live = 1;
         vat = VatLike(vat_);

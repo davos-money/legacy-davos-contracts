@@ -21,6 +21,7 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /*
    "Put rewards in the jar and close it".
@@ -30,7 +31,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
    after exit delay.
 */
 
-contract Jar {
+contract Jar is Initializable{
     // --- Wrapper ---
     using SafeERC20 for IERC20;
 
@@ -77,7 +78,7 @@ contract Jar {
     event Cage();
 
     // --- Init ---
-    constructor(string memory _name, string memory _symbol) {
+    function initialize(string memory _name, string memory _symbol) public initializer {
         wards[msg.sender] = 1;
         live = 1;
         name = _name;

@@ -24,8 +24,9 @@ pragma solidity ^0.8.10;
 // New deployments of this contract will need to include custom events (TO DO).
 
 import "./interfaces/VatLike.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract Vow {
+contract Vow is Initializable{
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { require(live == 1, "Vow/not-live"); wards[usr] = 1; }
@@ -53,7 +54,7 @@ contract Vow {
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address vat_, address multisig_) {
+    function initialize(address vat_, address multisig_) public initializer {
         wards[msg.sender] = 1;
         vat     = VatLike(vat_);
         multisig = multisig_;
