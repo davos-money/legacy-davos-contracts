@@ -106,7 +106,7 @@ async function main() {
     this.Vow = await hre.ethers.getContractFactory("Vow");
     this.Dog = await hre.ethers.getContractFactory("Dog");
     this.Clip = await hre.ethers.getContractFactory("Clipper");
-    this.Oracle = await hre.ethers.getContractFactory("Oracle"); // Mock Oracle
+    this.Oracle = await hre.ethers.getContractFactory("MaticOracle"); // Matic Oracle
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
 
     // Contracts deployment
@@ -164,9 +164,18 @@ async function main() {
     console.log("Clip           :", clip.address);
     console.log("ClipImp         :", clipImp);
 
-    let oracle = await this.Oracle.deploy();
+    let aggregatorAddress;
+    if (hre.network.name == "polygon") {
+      aggregatorAddress = "0x97371dF4492605486e23Da797fA68e55Fc38a13f";
+    } else if (hre.network.name == "mumbai") {
+      aggregatorAddress = "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada";
+    }
+  
+    let oracle = await upgrades.deployProxy(this.Oracle, [aggregatorAddress], {initializer: "initialize"});
     await oracle.deployed();
-    console.log("Oracle         :", oracle.address);
+    let oracleImplementation = await upgrades.erc1967.getImplementationAddress(oracle.address);
+    console.log("Deployed: oracle     : " + oracle.address);
+    console.log("Imp                  : " + oracleImplementation);
 
     let abacus = await upgrades.deployProxy(this.Abacus, [], {initializer: "initialize"});
     await abacus.deployed();
@@ -341,7 +350,7 @@ async function main() {
     this.Vow = await hre.ethers.getContractFactory("Vow");
     this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
-    this.Oracle = await hre.ethers.getContractFactory("Oracle");
+    this.Oracle = await hre.ethers.getContractFactory("MaticOracle");
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
 
     vat = await this.Vat.attach(_vat);
@@ -388,7 +397,7 @@ async function main() {
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,
     // 2.000000000000000000000000000 / 1.600000000000000000000000000 = 1.250000000000000000000000000 = mat
     console.log("Spot/Oracle...");
-    await oracle.setPrice("2" + wad); // 2$
+    // await oracle.setPrice("2" + wad); // 2$
     await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
     // await spot["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("mat"), _mat); // Liquidation Ratio 75%
     await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), "1" + ray); // It means pegged to 1$
