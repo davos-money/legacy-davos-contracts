@@ -19,12 +19,11 @@
 
 pragma solidity ^0.8.10;
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "./interfaces/VatLike.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "./interfaces/SikkaJoinLike.sol";
 
 contract Vow is Initializable{
     // --- Auth ---
@@ -48,80 +47,74 @@ contract Vow is Initializable{
     uint256 public dump;  // Flop initial lot size  [wad]
     uint256 public sump;  // Flop fixed bid size    [rad]
 
-    uint256 public bump;  // Flap fixed lot size    [rad]
-    uint256 public hump;  // Surplus buffer         [rad]
+    address public sikkaJoin; // Stablecoin address
+    uint256 public hump;    // Surplus buffer      [rad]
 
     uint256 public live;  // Active Flag
 
+    address public sikka;  // Sikka token
+
     // --- Init ---
-    function initialize(address vat_, address multisig_) public initializer {
+    function initialize(address vat_, address _sikkaJoin, address multisig_) external initializer {
         wards[msg.sender] = 1;
-        vat     = VatLike(vat_);
+        vat = VatLike(vat_);
+        sikkaJoin = _sikkaJoin;
         multisig = multisig_;
+        vat.hope(sikkaJoin);
         live = 1;
     }
 
     // --- Math ---
-    function add(uint x, uint y) internal pure returns (uint z) {
-        unchecked {
-            require((z = x + y) >= x);
-        }
-    }
-    function sub(uint x, uint y) internal pure returns (uint z) {
-        unchecked {
-            require((z = x - y) <= x);
-        }
-    }
     function min(uint x, uint y) internal pure returns (uint z) {
         return x <= y ? x : y;
     }
 
     // --- Administration ---
     function file(bytes32 what, uint data) external auth {
-        if (what == "wait") wait = data;
-        else if (what == "bump") bump = data;
-        else if (what == "sump") sump = data;
-        else if (what == "dump") dump = data;
-        else if (what == "hump") hump = data;
+        if (what == "hump") hump = data;
         else revert("Vow/file-unrecognized-param");
     }
-
     function file(bytes32 what, address data) external auth {
         if (what == "multisig") multisig = data;
+        else if (what == "sikkajoin") { 
+            vat.nope(sikkaJoin);
+            sikkaJoin = data;
+            vat.hope(sikkaJoin);
+        }
+        else if (what == "sikka") sikka = data;
+        else if (what == "vat") vat = VatLike(data);
         else revert("Vow/file-unrecognized-param");
     }
 
     // Push to debt-queue
     function fess(uint tab) external auth {
-        sin[block.timestamp] = add(sin[block.timestamp], tab);
-        Sin = add(Sin, tab);
     }
     // Pop from debt-queue
     function flog(uint era) external {
-        require(add(era, wait) <= block.timestamp, "Vow/wait-not-finished");
-        Sin = sub(Sin, sin[era]);
-        sin[era] = 0;
     }
 
     // Debt settlement
     function heal(uint rad) external {
         require(rad <= vat.sikka(address(this)), "Vow/insufficient-surplus");
-        require(rad <= sub(sub(vat.sin(address(this)), Sin), Ash), "Vow/insufficient-debt");
-        vat.heal(rad);
-    }
-    function kiss(uint rad) external {
-        require(rad <= Ash, "Vow/not-enough-ash");
-        require(rad <= vat.sikka(address(this)), "Vow/insufficient-surplus");
-        Ash = sub(Ash, rad);
+        require(rad <= vat.sin(address(this)), "Vow/insufficient-debt");
         vat.heal(rad);
     }
 
+    function kiss(uint rad) external {
+    }
+
+    // Feed stablecoin to vow
+    function feed(uint wad) external {
+        IERC20Upgradeable(sikka).transferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(sikka).approve(sikkaJoin, wad);
+        SikkaJoinLike(sikkaJoin).join(address(this), wad);
+    }
     // Send surplus to multisig
     function flap() external {
-        require(vat.sikka(address(this)) >= add(vat.sin(address(this)), hump), "Vow/insufficient-surplus");
-        require(sub(vat.sin(address(this)), Sin) == 0, "Vow/debt-not-zero");
-        uint rad = sub(vat.sikka(address(this)), add(vat.sin(address(this)), hump));
-        vat.move(address(this), multisig, rad);
+        require(vat.sikka(address(this)) >= vat.sin(address(this)) + hump, "Vow/insufficient-surplus");
+        uint rad = vat.sikka(address(this)) - (vat.sin(address(this)) + hump);
+        uint wad = rad / 1e27;
+        SikkaJoinLike(sikkaJoin).exit(multisig, wad);
     }
 
     function cage() external auth {
