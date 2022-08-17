@@ -162,7 +162,7 @@ ReentrancyGuardUpgradeable
         uint256 dexAmount = getAmountOut(address(_certToken), _wMaticAddress, realAmount);
         uint256 amountOut;
         if(dexAmount > outAmount) {
-            amountOut = swapV3(address(_certToken), _wMaticAddress, realAmount, amount, recipient);
+            amountOut = swapV3(address(_certToken), _wMaticAddress, realAmount, outAmount, recipient);
         } else {
             amountOut = _pool.swap(false, realAmount, recipient);
         }

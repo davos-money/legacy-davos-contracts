@@ -126,10 +126,11 @@ ReentrancyGuardUpgradeable
             shares = withdrawFromActiveStrategies(amount - wethBalance);
             if(shares == 0) {
                 // submit to waiting pool
-                waitingPool.addToQueue(account, amount);
+                shares = _assessSwapFee(amount);
+                shares = _assessFee(shares, withdrawalFee);
+                waitingPool.addToQueue(account, shares);
                 if(wethBalance > 0) {
                     IWETH(asset()).withdraw(wethBalance);
-                    shares = _assessSwapFee(amount);
                     payable(address(waitingPool)).transfer(wethBalance);
                 }
                 emit Withdraw(src, src, src, amount, amount);
@@ -144,6 +145,7 @@ ReentrancyGuardUpgradeable
         payable(account).transfer(shares);
         
         emit Withdraw(src, src, src, amount, shares);
+        return amount;
     }
     function payDebt() public {
         waitingPool.tryRemove();
@@ -199,6 +201,13 @@ ReentrancyGuardUpgradeable
         external onlyOwner {
         require(strategy != address(0));
         require(strategies.length < MAX_STRATEGIES, "max strategies exceeded");
+
+        for(uint256 i = 0; i < strategies.length; i++) {
+            if(strategies[i] == strategy) {
+                revert("strategy already exists");
+            }
+        }
+
         StrategyParams memory params = StrategyParams({
             active: true,
             allocation: allocation,
@@ -207,7 +216,6 @@ ReentrancyGuardUpgradeable
         
         strategyParams[strategy] = params;
         strategies.push(strategy);
-        approve(strategy, type(uint256).max);
         emit StrategyAdded(strategy, allocation);
     }
     function retireStrat(address strategy) external onlyManager {
@@ -226,7 +234,7 @@ ReentrancyGuardUpgradeable
                 uint256 allocation = strategy.allocation;
                 if(allocation > 0) {
                     uint256 totalAssets = totalAssetInVault() + totalDebt;
-                    uint256 strategyRatio = (strategy.debt / totalAssets) * 1e6;     // TODO check
+                    uint256 strategyRatio = (strategy.debt * 1e6) / totalAssets;
                     if(strategyRatio < allocation) {
                         uint256 depositAmount = ((totalAssets * allocation) / 1e6) - strategy.debt;
                         if(totalAssetInVault() > depositAmount) {
@@ -234,7 +242,11 @@ ReentrancyGuardUpgradeable
                             IBaseStrategy(strategies[i]).depositAll();
                         }
                     } else {
-                        _withdrawFromStrategy(strategies[i], strategy.debt - (totalAssets * allocation) / 1e6);
+                        uint256 withdrawAmount = strategy.debt - (totalAssets * allocation) / 1e6;
+                        if(withdrawAmount > 0) {
+                            _withdrawFromStrategy(strategies[i], withdrawAmount);
+                        }
+                            
                     }
                 }
             }
@@ -274,8 +286,6 @@ ReentrancyGuardUpgradeable
             }
         }
         require(isValidStrategy, "invalid oldStrategy address");
-        approve(oldStrategy, 0);
-        approve(newStrategy, type(uint256).max);
         emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
     }
     function _assessFee(uint256 amount, uint256 fees) private returns(uint256 value) {
