@@ -146,7 +146,7 @@ async function main() {
     console.log("Jug            :", jug.address);
     console.log("JugImp         :", jugImp);
 
-    let vow = await upgrades.deployProxy(this.Vow, [vat.address, deployer.address], {initializer: "initialize"});
+    let vow = await upgrades.deployProxy(this.Vow, [vat.address, sikkaJoin.address, deployer.address], {initializer: "initialize"});
     await vow.deployed();
     vowImp = await upgrades.erc1967.getImplementationAddress(vow.address);
     console.log("Vow            :", vow.address);

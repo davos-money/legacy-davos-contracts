@@ -3,8 +3,6 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./sMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
@@ -13,7 +11,7 @@ import "./interfaces/IRewards.sol";
 import "./interfaces/PipLike.sol";
 
 
-contract IkkaRewards is IRewards, OwnableUpgradeable {
+contract IkkaRewards is IRewards, Initializable {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { require(live == 1, "Rewards/not-live"); wards[usr] = 1; }
@@ -59,10 +57,7 @@ contract IkkaRewards is IRewards, OwnableUpgradeable {
     uint256 public rewardsPool;
     uint256 public poolLimit;
 
-    function initialize(address vat_,
-                        uint256 poolLimit_ ) public initializer {
-        __Ownable_init();
-
+    function initialize(address vat_, uint256 poolLimit_) public initializer {
         live = 1;
         wards[msg.sender] = 1;
         vat = VatLike(vat_);

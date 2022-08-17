@@ -19,7 +19,7 @@
 
 pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./interfaces/VatLike.sol";
 
@@ -27,7 +27,7 @@ import "./interfaces/VatLike.sol";
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Vat is VatLike, OwnableUpgradeable {
+contract Vat is VatLike, Initializable {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { require(live == 1, "Vat/not-live"); wards[usr] = 1; }
@@ -72,8 +72,6 @@ contract Vat is VatLike, OwnableUpgradeable {
 
     // --- Init ---
     function initialize() public initializer {
-        __Ownable_init();
-
         wards[msg.sender] = 1;
         live = 1;
     }
