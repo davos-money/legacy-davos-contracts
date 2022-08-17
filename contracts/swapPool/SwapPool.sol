@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import { EnumerableSetUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ILP } from "./interfaces/ILP.sol";
+import { IMaticPool } from "./interfaces/IMaticPool.sol";
 import { ICerosToken } from "./interfaces/ICerosToken.sol";
 import { INativeERC20 } from "./interfaces/INativeERC20.sol";
 
@@ -31,11 +31,7 @@ struct FeeAmounts {
 }
 
 // solhint-disable max-states-count
-contract SwapPool is 
-OwnableUpgradeable,
-PausableUpgradeable,
-ReentrancyGuardUpgradeable
-{
+contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
   using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
   event UserTypeChanged(address indexed user, UserType indexed utype, bool indexed added);
@@ -61,9 +57,9 @@ ReentrancyGuardUpgradeable
 
   uint24 public constant FEE_MAX = 100000;
 
-  EnumerableSetUpgradeable.AddressSet private managers_;
-  EnumerableSetUpgradeable.AddressSet private integrators_;
-  EnumerableSetUpgradeable.AddressSet private liquidityProviders_;
+  EnumerableSetUpgradeable.AddressSet internal managers_;
+  EnumerableSetUpgradeable.AddressSet internal integrators_;
+  EnumerableSetUpgradeable.AddressSet internal liquidityProviders_;
 
   INativeERC20 public nativeToken;
   ICerosToken public cerosToken;
@@ -85,12 +81,14 @@ ReentrancyGuardUpgradeable
   FeeAmounts public ownerFeeCollected;
 
   FeeAmounts public managerFeeCollected;
-  FeeAmounts private _accFeePerManager;
-  FeeAmounts private _alreadyUpdatedFees;
+  FeeAmounts internal _accFeePerManager;
+  FeeAmounts internal _alreadyUpdatedFees;
+  FeeAmounts internal _claimedManagerFees;
 
   mapping(address => FeeAmounts) public managerRewardDebt;
-
   mapping(address => bool) public excludedFromFee;
+
+  IMaticPool public maticPool;
 
   modifier onlyOwnerOrManager() {
     require(
@@ -139,11 +137,11 @@ ReentrancyGuardUpgradeable
     providerLockEnabled = _providerLockEnabled;
   }
 
-  function addLiquidityEth(uint256 amount1) external payable onlyProvider nonReentrant {
+  function addLiquidityEth(uint256 amount1) external virtual payable onlyProvider nonReentrant {
     _addLiquidity(msg.value, amount1, true);
   }
 
-  function addLiquidity(uint256 amount0, uint256 amount1) external onlyProvider nonReentrant {
+  function addLiquidity(uint256 amount0, uint256 amount1) virtual external onlyProvider nonReentrant {
     _addLiquidity(amount0, amount1, false);
   }
 
@@ -151,7 +149,7 @@ ReentrancyGuardUpgradeable
     uint256 amount0,
     uint256 amount1,
     bool useEth
-  ) internal {
+  ) virtual internal {
     uint256 ratio = cerosToken.ratio();
     uint256 value = (amount0 * ratio) / 1e18;
     if (amount1 < value) {
@@ -182,30 +180,30 @@ ReentrancyGuardUpgradeable
     emit LiquidityChange(msg.sender, amount0, amount1, nativeTokenAmount, cerosTokenAmount, true);
   }
 
-  function removeLiquidity(uint256 lpAmount) external nonReentrant {
+  function removeLiquidity(uint256 lpAmount) virtual external nonReentrant {
     _removeLiquidityLp(lpAmount, false);
   }
 
-  function removeLiquidityEth(uint256 lpAmount) external nonReentrant {
+  function removeLiquidityEth(uint256 lpAmount) virtual external nonReentrant {
     _removeLiquidityLp(lpAmount, true);
   }
 
-  function removeLiquidityPercent(uint256 percent) external nonReentrant {
+  function removeLiquidityPercent(uint256 percent) virtual external nonReentrant {
     _removeLiquidityPercent(percent, false);
   }
 
-  function removeLiquidityPercentEth(uint256 percent) external nonReentrant {
+  function removeLiquidityPercentEth(uint256 percent) virtual external nonReentrant {
     _removeLiquidityPercent(percent, true);
   }
 
-  function _removeLiquidityPercent(uint256 percent, bool useEth) internal {
+  function _removeLiquidityPercent(uint256 percent, bool useEth) virtual internal {
     require(percent > 0 && percent <= 1e18, "percent should be more than 0 and less than 1e18"); // max percnet(100%) is -> 10 ** 18
     uint256 balance = lpToken.balanceOf(msg.sender);
     uint256 removedLp = (balance * percent) / 1e18;
     _removeLiquidity(removedLp, useEth);
   }
 
-  function _removeLiquidityLp(uint256 removedLp, bool useEth) internal {
+  function _removeLiquidityLp(uint256 removedLp, bool useEth) virtual internal {
     uint256 balance = lpToken.balanceOf(msg.sender);
     if (removedLp == type(uint256).max) {
       removedLp = balance;
@@ -216,7 +214,7 @@ ReentrancyGuardUpgradeable
     _removeLiquidity(removedLp, useEth);
   }
 
-  function _removeLiquidity(uint256 removedLp, bool useEth) internal {
+  function _removeLiquidity(uint256 removedLp, bool useEth) virtual internal {
     uint256 totalSupply = lpToken.totalSupply();
     lpToken.burn(msg.sender, removedLp);
     uint256 amount0Removed = (removedLp * nativeTokenAmount) / totalSupply;
@@ -246,7 +244,7 @@ ReentrancyGuardUpgradeable
     bool nativeToCeros,
     uint256 amountIn,
     address receiver
-  ) external payable onlyIntegrator nonReentrant returns (uint256 amountOut) {
+  ) virtual external payable onlyIntegrator nonReentrant returns (uint256 amountOut) {
     require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
@@ -255,7 +253,7 @@ ReentrancyGuardUpgradeable
     bool nativeToCeros,
     uint256 amountIn,
     address receiver
-  ) external onlyIntegrator nonReentrant returns (uint256 amountOut) {
+  ) virtual external onlyIntegrator nonReentrant returns (uint256 amountOut) {
     return _swap(nativeToCeros, amountIn, receiver, false);
   }
 
@@ -264,7 +262,7 @@ ReentrancyGuardUpgradeable
     uint256 amountIn,
     address receiver,
     bool useEth
-  ) internal returns (uint256 amountOut) {
+  ) virtual internal returns (uint256 amountOut) {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
       if (useEth) {
@@ -338,7 +336,7 @@ ReentrancyGuardUpgradeable
     bool nativeToCeros,
     uint256 amountIn,
     bool isExcludedFromFee
-  ) external view returns (uint256 amountOut, bool enoughLiquidity) {
+  ) virtual external view returns (uint256 amountOut, bool enoughLiquidity) {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
       if (!isExcludedFromFee) {
@@ -357,17 +355,17 @@ ReentrancyGuardUpgradeable
     }
   }
 
-  function _sendValue(address receiver, uint256 amount) private {
+  function _sendValue(address receiver, uint256 amount) virtual internal {
     // solhint-disable-next-line avoid-low-level-calls
     (bool success, ) = payable(receiver).call{ value: amount }("");
     require(success, "unable to send value, recipient may have reverted");
   }
 
-  function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1) external onlyOwner {
+  function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1) virtual external onlyOwner {
     _withdrawOwnerFee(amount0, amount1, true);
   }
 
-  function withdrawOwnerFee(uint256 amount0, uint256 amount1) external onlyOwner {
+  function withdrawOwnerFee(uint256 amount0, uint256 amount1) virtual external onlyOwner {
     _withdrawOwnerFee(amount0, amount1, false);
   }
 
@@ -375,7 +373,7 @@ ReentrancyGuardUpgradeable
     uint256 amount0Raw,
     uint256 amount1Raw,
     bool useEth
-  ) internal {
+  ) virtual internal {
     uint128 amount0;
     uint128 amount1;
     if (amount0Raw == type(uint256).max) {
@@ -384,7 +382,7 @@ ReentrancyGuardUpgradeable
       amount0 = uint128(amount0Raw);
     }
     if (amount1Raw == type(uint256).max) {
-      amount1 = ownerFeeCollected.cerosFee;
+      amount1 = ownerFeeCollected.nativeFee;
     } else {
       amount1 = uint128(amount1Raw);
     }
@@ -404,7 +402,7 @@ ReentrancyGuardUpgradeable
   }
 
   function getRemainingManagerFee(address managerAddress)
-    external
+    virtual external
     view
     returns (FeeAmounts memory feeRewards)
   {
@@ -425,15 +423,15 @@ ReentrancyGuardUpgradeable
     }
   }
 
-  function withdrawManagerFee() external onlyManager {
+  function withdrawManagerFee() virtual external onlyManager {
     _withdrawManagerFee(msg.sender, false);
   }
 
-  function withdrawManagerFeeEth() external onlyManager {
+  function withdrawManagerFeeEth() virtual external onlyManager {
     _withdrawManagerFee(msg.sender, true);
   }
 
-  function _withdrawManagerFee(address managerAddress, bool useNative) internal {
+  function _withdrawManagerFee(address managerAddress, bool useNative) virtual internal {
     FeeAmounts memory feeRewards;
     FeeAmounts storage currentManagerRewardDebt = managerRewardDebt[managerAddress];
     _updateManagerFees();
@@ -441,6 +439,7 @@ ReentrancyGuardUpgradeable
     feeRewards.cerosFee = _accFeePerManager.cerosFee - currentManagerRewardDebt.cerosFee;
     if (feeRewards.nativeFee > 0) {
       currentManagerRewardDebt.nativeFee += feeRewards.nativeFee;
+      _claimedManagerFees.nativeFee += feeRewards.nativeFee;
       if (useNative) {
         nativeToken.withdraw(feeRewards.nativeFee);
         _sendValue(managerAddress, feeRewards.nativeFee);
@@ -450,11 +449,12 @@ ReentrancyGuardUpgradeable
     }
     if (feeRewards.cerosFee > 0) {
       currentManagerRewardDebt.cerosFee += feeRewards.cerosFee;
+      _claimedManagerFees.cerosFee += feeRewards.cerosFee;
       cerosToken.transfer(managerAddress, feeRewards.cerosFee);
     }
   }
 
-  function _updateManagerFees() private {
+  function _updateManagerFees() virtual internal {
     uint256 managersLength = managers_.length();
     _accFeePerManager.nativeFee +=
       (managerFeeCollected.nativeFee - _alreadyUpdatedFees.nativeFee) /
@@ -466,7 +466,7 @@ ReentrancyGuardUpgradeable
     _alreadyUpdatedFees.cerosFee = managerFeeCollected.cerosFee;
   }
 
-  function add(address value, UserType utype) public returns (bool) {
+  function add(address value, UserType utype) virtual public returns (bool) {
     require(value != address(0), "cannot add address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
@@ -493,7 +493,7 @@ ReentrancyGuardUpgradeable
     return success;
   }
 
-  function setFee(uint24 newFee, FeeType feeType) external onlyOwnerOrManager {
+  function setFee(uint24 newFee, FeeType feeType) virtual external onlyOwnerOrManager {
     require(newFee < FEE_MAX, "Unsupported size of fee!");
     if (feeType == FeeType.OWNER) {
       require(msg.sender == owner(), "only owner can call this function");
@@ -517,22 +517,88 @@ ReentrancyGuardUpgradeable
     }
   }
 
-  function enableIntegratorLock(bool enable) external onlyOwnerOrManager {
+  function setThreshold(uint24 newThreshold) virtual external onlyManager {
+    require(newThreshold < FEE_MAX / 2, "threshold shuold be less than 50%");
+    threshold = newThreshold;
+  }
+
+  function setMaticPool(address newMaticPool) virtual external onlyOwner {
+    maticPool = IMaticPool(newMaticPool);
+  }
+
+  function enableIntegratorLock(bool enable) virtual external onlyOwnerOrManager {
     integratorLockEnabled = enable;
     emit IntegratorLockEnabled(enable);
   }
 
-  function enableProviderLock(bool enable) external onlyOwnerOrManager {
+  function enableProviderLock(bool enable) virtual external onlyOwnerOrManager {
     providerLockEnabled = enable;
     emit ProviderLockEnabled(enable);
   }
 
-  function excludeFromFee(address value, bool exclude) external onlyOwnerOrManager {
+  function excludeFromFee(address value, bool exclude) virtual external onlyOwnerOrManager {
     excludedFromFee[value] = exclude;
     emit ExcludedFromFee(value, exclude);
   }
 
-  function remove(address value, UserType utype) public returns (bool) {
+  function triggerRebalanceAnkr() virtual external nonReentrant onlyManager {
+    skim();
+    uint256 ratio = cerosToken.ratio();
+    uint256 amountAInNative = nativeTokenAmount;
+    uint256 amountBInNative = (cerosTokenAmount * 1e18) / ratio;
+    uint256 wholeAmount = amountAInNative + amountBInNative;
+    bool isStake = amountAInNative > amountBInNative;
+    if (!isStake) {
+      uint256 temp = amountAInNative;
+      amountAInNative = amountBInNative;
+      amountBInNative = temp;
+    }
+    require(
+      (amountBInNative * FEE_MAX) / wholeAmount < threshold,
+      "the proportions are not less than threshold"
+    );
+    uint256 amount = (amountAInNative - amountBInNative) / 2;
+    if (isStake) {
+      nativeTokenAmount -= amount;
+      nativeToken.withdraw(amount);
+      maticPool.stake{ value: amount }(false);
+    } else {
+      uint256 cerosAmt = (amount * ratio) / 1e18;
+      uint256 commision = maticPool.unstakeCommision();
+      cerosTokenAmount -= cerosAmt;
+      nativeTokenAmount -= commision;
+      nativeToken.withdraw(commision);
+      maticPool.unstake{ value: commision }(cerosAmt, false);
+    }
+  }
+
+  function approveToMaticPool() virtual external {
+    cerosToken.approve(address(maticPool), type(uint256).max);
+  }
+
+  function skim() virtual public {
+    uint256 contractBal = address(this).balance;
+    uint256 contractWNativeBal = nativeToken.balanceOf(address(this)) -
+      ownerFeeCollected.nativeFee -
+      (managerFeeCollected.nativeFee - _claimedManagerFees.nativeFee);
+    uint256 contractCerosBal = cerosToken.balanceOf(address(this)) -
+      ownerFeeCollected.cerosFee -
+      (managerFeeCollected.cerosFee - _claimedManagerFees.cerosFee);
+
+    if (contractWNativeBal > nativeTokenAmount) {
+      nativeTokenAmount = contractWNativeBal;
+    }
+    if (contractCerosBal > cerosTokenAmount) {
+      cerosTokenAmount = contractCerosBal;
+    }
+
+    if (contractBal > nativeTokenAmount) {
+      nativeToken.deposit{ value: contractBal }();
+      nativeTokenAmount += contractBal;
+    }
+  }
+
+  function remove(address value, UserType utype) virtual public returns (bool) {
     require(value != address(0), "cannot remove address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
@@ -555,7 +621,7 @@ ReentrancyGuardUpgradeable
     return success;
   }
 
-  function contains(address value, UserType utype) external view returns (bool) {
+  function contains(address value, UserType utype) virtual external view returns (bool) {
     if (utype == UserType.MANAGER) {
       return managers_.contains(value);
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -565,7 +631,7 @@ ReentrancyGuardUpgradeable
     }
   }
 
-  function length(UserType utype) external view returns (uint256) {
+  function length(UserType utype) virtual external view returns (uint256) {
     if (utype == UserType.MANAGER) {
       return managers_.length();
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -575,7 +641,7 @@ ReentrancyGuardUpgradeable
     }
   }
 
-  function at(uint256 index, UserType utype) external view returns (address) {
+  function at(uint256 index, UserType utype)virtual  external view returns (address) {
     if (utype == UserType.MANAGER) {
       return managers_.at(index);
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -586,5 +652,5 @@ ReentrancyGuardUpgradeable
   }
 
   // solhint-disable-next-line no-empty-blocks
-  receive() external payable {}
+  receive() virtual external payable {}
 }
