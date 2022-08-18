@@ -137,11 +137,16 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     providerLockEnabled = _providerLockEnabled;
   }
 
-  function addLiquidityEth(uint256 amount1) external virtual payable onlyProvider nonReentrant {
+  function addLiquidityEth(uint256 amount1) external payable virtual onlyProvider nonReentrant {
     _addLiquidity(msg.value, amount1, true);
   }
 
-  function addLiquidity(uint256 amount0, uint256 amount1) virtual external onlyProvider nonReentrant {
+  function addLiquidity(uint256 amount0, uint256 amount1)
+    external
+    virtual
+    onlyProvider
+    nonReentrant
+  {
     _addLiquidity(amount0, amount1, false);
   }
 
@@ -149,7 +154,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     uint256 amount0,
     uint256 amount1,
     bool useEth
-  ) virtual internal {
+  ) internal virtual {
     uint256 ratio = cerosToken.ratio();
     uint256 value = (amount0 * ratio) / 1e18;
     if (amount1 < value) {
@@ -159,6 +164,10 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
     if (useEth) {
       nativeToken.deposit{ value: amount0 }();
+      uint256 diff = msg.value - amount0;
+      if (diff != 0) {
+        _sendValue(msg.sender, diff);
+      }
     } else {
       nativeToken.transferFrom(msg.sender, address(this), amount0);
     }
@@ -180,30 +189,30 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     emit LiquidityChange(msg.sender, amount0, amount1, nativeTokenAmount, cerosTokenAmount, true);
   }
 
-  function removeLiquidity(uint256 lpAmount) virtual external nonReentrant {
+  function removeLiquidity(uint256 lpAmount) external virtual nonReentrant {
     _removeLiquidityLp(lpAmount, false);
   }
 
-  function removeLiquidityEth(uint256 lpAmount) virtual external nonReentrant {
+  function removeLiquidityEth(uint256 lpAmount) external virtual nonReentrant {
     _removeLiquidityLp(lpAmount, true);
   }
 
-  function removeLiquidityPercent(uint256 percent) virtual external nonReentrant {
+  function removeLiquidityPercent(uint256 percent) external virtual nonReentrant {
     _removeLiquidityPercent(percent, false);
   }
 
-  function removeLiquidityPercentEth(uint256 percent) virtual external nonReentrant {
+  function removeLiquidityPercentEth(uint256 percent) external virtual nonReentrant {
     _removeLiquidityPercent(percent, true);
   }
 
-  function _removeLiquidityPercent(uint256 percent, bool useEth) virtual internal {
+  function _removeLiquidityPercent(uint256 percent, bool useEth) internal virtual {
     require(percent > 0 && percent <= 1e18, "percent should be more than 0 and less than 1e18"); // max percnet(100%) is -> 10 ** 18
     uint256 balance = lpToken.balanceOf(msg.sender);
     uint256 removedLp = (balance * percent) / 1e18;
     _removeLiquidity(removedLp, useEth);
   }
 
-  function _removeLiquidityLp(uint256 removedLp, bool useEth) virtual internal {
+  function _removeLiquidityLp(uint256 removedLp, bool useEth) internal virtual {
     uint256 balance = lpToken.balanceOf(msg.sender);
     if (removedLp == type(uint256).max) {
       removedLp = balance;
@@ -214,7 +223,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _removeLiquidity(removedLp, useEth);
   }
 
-  function _removeLiquidity(uint256 removedLp, bool useEth) virtual internal {
+  function _removeLiquidity(uint256 removedLp, bool useEth) internal virtual {
     uint256 totalSupply = lpToken.totalSupply();
     lpToken.burn(msg.sender, removedLp);
     uint256 amount0Removed = (removedLp * nativeTokenAmount) / totalSupply;
@@ -244,7 +253,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     bool nativeToCeros,
     uint256 amountIn,
     address receiver
-  ) virtual external payable onlyIntegrator nonReentrant returns (uint256 amountOut) {
+  ) external payable virtual onlyIntegrator nonReentrant returns (uint256 amountOut) {
     require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
@@ -253,7 +262,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     bool nativeToCeros,
     uint256 amountIn,
     address receiver
-  ) virtual external onlyIntegrator nonReentrant returns (uint256 amountOut) {
+  ) external virtual onlyIntegrator nonReentrant returns (uint256 amountOut) {
     return _swap(nativeToCeros, amountIn, receiver, false);
   }
 
@@ -262,7 +271,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     uint256 amountIn,
     address receiver,
     bool useEth
-  ) virtual internal returns (uint256 amountOut) {
+  ) internal virtual returns (uint256 amountOut) {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
       if (useEth) {
@@ -336,7 +345,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     bool nativeToCeros,
     uint256 amountIn,
     bool isExcludedFromFee
-  ) virtual external view returns (uint256 amountOut, bool enoughLiquidity) {
+  ) external view virtual returns (uint256 amountOut, bool enoughLiquidity) {
     uint256 ratio = cerosToken.ratio();
     if (nativeToCeros) {
       if (!isExcludedFromFee) {
@@ -355,17 +364,27 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function _sendValue(address receiver, uint256 amount) virtual internal {
+  function _sendValue(address receiver, uint256 amount) internal virtual {
     // solhint-disable-next-line avoid-low-level-calls
     (bool success, ) = payable(receiver).call{ value: amount }("");
     require(success, "unable to send value, recipient may have reverted");
   }
 
-  function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1) virtual external onlyOwner {
+  function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1)
+    external
+    virtual
+    onlyOwner
+    nonReentrant
+  {
     _withdrawOwnerFee(amount0, amount1, true);
   }
 
-  function withdrawOwnerFee(uint256 amount0, uint256 amount1) virtual external onlyOwner {
+  function withdrawOwnerFee(uint256 amount0, uint256 amount1)
+    external
+    virtual
+    onlyOwner
+    nonReentrant
+  {
     _withdrawOwnerFee(amount0, amount1, false);
   }
 
@@ -373,7 +392,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     uint256 amount0Raw,
     uint256 amount1Raw,
     bool useEth
-  ) virtual internal {
+  ) internal virtual {
     uint128 amount0;
     uint128 amount1;
     if (amount0Raw == type(uint256).max) {
@@ -402,8 +421,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
   }
 
   function getRemainingManagerFee(address managerAddress)
-    virtual external
+    external
     view
+    virtual
     returns (FeeAmounts memory feeRewards)
   {
     if (managers_.contains(managerAddress)) {
@@ -423,15 +443,15 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function withdrawManagerFee() virtual external onlyManager {
+  function withdrawManagerFee() external virtual onlyManager nonReentrant {
     _withdrawManagerFee(msg.sender, false);
   }
 
-  function withdrawManagerFeeEth() virtual external onlyManager {
+  function withdrawManagerFeeEth() external virtual onlyManager nonReentrant {
     _withdrawManagerFee(msg.sender, true);
   }
 
-  function _withdrawManagerFee(address managerAddress, bool useNative) virtual internal {
+  function _withdrawManagerFee(address managerAddress, bool useNative) internal virtual {
     FeeAmounts memory feeRewards;
     FeeAmounts storage currentManagerRewardDebt = managerRewardDebt[managerAddress];
     _updateManagerFees();
@@ -454,7 +474,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function _updateManagerFees() virtual internal {
+  function _updateManagerFees() internal virtual {
     uint256 managersLength = managers_.length();
     _accFeePerManager.nativeFee +=
       (managerFeeCollected.nativeFee - _alreadyUpdatedFees.nativeFee) /
@@ -466,7 +486,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _alreadyUpdatedFees.cerosFee = managerFeeCollected.cerosFee;
   }
 
-  function add(address value, UserType utype) virtual public returns (bool) {
+  function add(address value, UserType utype) public virtual returns (bool) {
     require(value != address(0), "cannot add address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
@@ -493,7 +513,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     return success;
   }
 
-  function setFee(uint24 newFee, FeeType feeType) virtual external onlyOwnerOrManager {
+  function setFee(uint24 newFee, FeeType feeType) external virtual onlyOwnerOrManager {
     require(newFee < FEE_MAX, "Unsupported size of fee!");
     if (feeType == FeeType.OWNER) {
       require(msg.sender == owner(), "only owner can call this function");
@@ -517,31 +537,31 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function setThreshold(uint24 newThreshold) virtual external onlyManager {
+  function setThreshold(uint24 newThreshold) external virtual onlyManager {
     require(newThreshold < FEE_MAX / 2, "threshold shuold be less than 50%");
     threshold = newThreshold;
   }
 
-  function setMaticPool(address newMaticPool) virtual external onlyOwner {
+  function setMaticPool(address newMaticPool) external virtual onlyOwner {
     maticPool = IMaticPool(newMaticPool);
   }
 
-  function enableIntegratorLock(bool enable) virtual external onlyOwnerOrManager {
+  function enableIntegratorLock(bool enable) external virtual onlyOwnerOrManager {
     integratorLockEnabled = enable;
     emit IntegratorLockEnabled(enable);
   }
 
-  function enableProviderLock(bool enable) virtual external onlyOwnerOrManager {
+  function enableProviderLock(bool enable) external virtual onlyOwnerOrManager {
     providerLockEnabled = enable;
     emit ProviderLockEnabled(enable);
   }
 
-  function excludeFromFee(address value, bool exclude) virtual external onlyOwnerOrManager {
+  function excludeFromFee(address value, bool exclude) external virtual onlyOwnerOrManager {
     excludedFromFee[value] = exclude;
     emit ExcludedFromFee(value, exclude);
   }
 
-  function triggerRebalanceAnkr() virtual external nonReentrant onlyManager {
+  function triggerRebalanceAnkr() external virtual nonReentrant onlyManager {
     skim();
     uint256 ratio = cerosToken.ratio();
     uint256 amountAInNative = nativeTokenAmount;
@@ -572,11 +592,11 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function approveToMaticPool() virtual external {
+  function approveToMaticPool() external virtual {
     cerosToken.approve(address(maticPool), type(uint256).max);
   }
 
-  function skim() virtual public {
+  function skim() public virtual {
     uint256 contractBal = address(this).balance;
     uint256 contractWNativeBal = nativeToken.balanceOf(address(this)) -
       ownerFeeCollected.nativeFee -
@@ -598,7 +618,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function remove(address value, UserType utype) virtual public returns (bool) {
+  function remove(address value, UserType utype) public virtual nonReentrant returns (bool) {
     require(value != address(0), "cannot remove address(0)");
     bool success = false;
     if (utype == UserType.MANAGER) {
@@ -621,7 +641,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     return success;
   }
 
-  function contains(address value, UserType utype) virtual external view returns (bool) {
+  function contains(address value, UserType utype) external view virtual returns (bool) {
     if (utype == UserType.MANAGER) {
       return managers_.contains(value);
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -631,7 +651,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function length(UserType utype) virtual external view returns (uint256) {
+  function length(UserType utype) external view virtual returns (uint256) {
     if (utype == UserType.MANAGER) {
       return managers_.length();
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -641,7 +661,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
-  function at(uint256 index, UserType utype)virtual  external view returns (address) {
+  function at(uint256 index, UserType utype) external view virtual returns (address) {
     if (utype == UserType.MANAGER) {
       return managers_.at(index);
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
@@ -652,5 +672,5 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
   }
 
   // solhint-disable-next-line no-empty-blocks
-  receive() virtual external payable {}
+  receive() external payable virtual {}
 }

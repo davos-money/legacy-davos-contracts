@@ -86,62 +86,61 @@ describe("===Colander===", () => {
     positionManager = await ethers.getContractAt("multicalls", nonfungiblePositionManager);
     
     // Contracts Deployment
-    abacus = await LinearDecrease.connect(deployer).deploy();
-    await abacus.deployed();
+    abacus = await upgrades.deployProxy(LinearDecrease, [], 
+    { initializer: "initialize"});
 
-    vat = await Vat.connect(deployer).deploy();
-    await vat.deployed();
+    vat = await upgrades.deployProxy(Vat, [], 
+    { initializer: "initialize"});
 
-    spot = await Spot.connect(deployer).deploy(vat.address);
-    await spot.deployed();
+    spot = await upgrades.deployProxy(Spot, [vat.address], 
+    { initializer: "initialize"});
 
-    const rewards = await IkkaRewards.connect(deployer).deploy();
-    await rewards.deployed();
+    rewards = await upgrades.deployProxy(IkkaRewards, [vat.address, ether("100000000").toString()], 
+    { initializer: "initialize"});
 
-    const ikkaToken = await IkkaToken.connect(deployer).deploy(ether("100000000").toString(), rewards.address);
-    await ikkaToken.deployed();
+    ikkaToken = await upgrades.deployProxy(IkkaToken, [ether("100000000").toString(), rewards.address], 
+    { initializer: "initialize"});
 
-    sikka = await Sikka.connect(deployer).deploy(97, "SIKKA");
-    await sikka.deployed();
+    sikka = await upgrades.deployProxy(Sikka, [80001, "SIKKA"], 
+    { initializer: "initialize"});
 
-    sikkaJoin = await SikkaJoin.connect(deployer).deploy(vat.address, sikka.address);
-    await sikkaJoin.deployed();
+    sikkaJoin = await upgrades.deployProxy(SikkaJoin, [vat.address, sikka.address], 
+    { initializer: "initialize"});
 
-    amaticc = await AMATICC.connect(deployer).deploy();
+    amaticc = await AMATICC.deploy();
     await amaticc.deployed();
 
-    amaticcJoin = await GemJoin.connect(deployer).deploy(vat.address, collateral, amaticc.address);
-    await amaticcJoin.deployed();
+    amaticcJoin = await upgrades.deployProxy(GemJoin, [vat.address, collateral, amaticc.address], 
+    { initializer: "initialize"});
 
-    jug = await Jug.connect(deployer).deploy(vat.address);
-    await jug.deployed();
+    jug = await upgrades.deployProxy(Jug, [vat.address], 
+    { initializer: "initialize"});
 
-    oracle = await Oracle.connect(deployer).deploy();
+    oracle = await Oracle.deploy();
     await oracle.deployed();
 
-    ikkaRewardsOracle = await Oracle.connect(deployer).deploy();
+    ikkaRewardsOracle = await Oracle.deploy();
     await ikkaRewardsOracle.deployed();
 
-    dog = await Dog.connect(deployer).deploy(vat.address);
-    await dog.deployed();
+    dog = await upgrades.deployProxy(Dog, [vat.address], 
+    { initializer: "initialize"});
 
-    clip = await Clipper.connect(deployer).deploy(vat.address, spot.address, dog.address, collateral);
-    await clip.deployed();
+    clip = await upgrades.deployProxy(Clipper, [vat.address, spot.address, dog.address, collateral], 
+    { initializer: "initialize"});
 
-    vow = await Vow.connect(deployer).deploy(vat.address, multisig.address);
-    await vow.deployed();
+    vow = await upgrades.deployProxy(Vow, [vat.address, sikkaJoin.address, multisig.address], 
+    { initializer: "initialize"});
 
     interaction = await upgrades.deployProxy(Interaction, [vat.address, spot.address, sikka.address, sikkaJoin.address, jug.address, dog.address, rewards.address], 
-        { initializer: "initialize", unsafeAllowLinkedLibraries: true, });
+    { initializer: "initialize", unsafeAllowLinkedLibraries: true, });
 
-    colander = await Colander.connect(deployer).deploy();
-    await colander.deployed();
-
-    colanderRewards = await ColanderRewards.connect(deployer).deploy();
+    colanderRewards = await ColanderRewards.deploy();
     await colanderRewards.deployed();
-    
+
+    colander = await upgrades.deployProxy(Colander, ["Stability Pool Derivative", "stabilitySIKKA", sikka.address, interaction.address, spot.address, dex, colanderRewards.address, "10"], 
+    { initializer: "initialize"});
+
     // Initialization
-    await rewards.connect(deployer).initialize(vat.address, ether("100000000").toString());
     await rewards.connect(deployer).setIkkaToken(ikkaToken.address);
     await rewards.initPool(amaticc.address, collateral, "1000000001847694957439350500"); //6%
 
@@ -155,7 +154,6 @@ describe("===Colander===", () => {
 
     await ikkaRewardsOracle.connect(deployer).setPrice(toWad("1"));
 
-    await vat.connect(deployer).initialize();
     await vat.connect(deployer).rely(sikkaJoin.address);
     await vat.connect(deployer).rely(spot.address);
     await vat.connect(deployer).rely(jug.address);
@@ -210,7 +208,6 @@ describe("===Colander===", () => {
 
     await interaction.connect(deployer).setCollateralType(amaticc.address, amaticcJoin.address, collateral, clip.address, "1250000000000000000000000000");
 
-    await colander.connect(deployer).initialize("Stability Pool Derivative", "stabilitySIKKA", sikka.address, interaction.address, spot.address, dex, colanderRewards.address );
     await colander.connect(deployer).setProfitRange(toRay("0.05")); // 5% acceptable minimum profit range
     await colander.connect(deployer).setPriceImpact(toWad("0.02")); // 2% acceptable price impact from DEX
 
@@ -258,14 +255,14 @@ describe("===Colander===", () => {
     let multiCallParams = [
       // ===first call
       "0x13ead562" + // signature - createAndInitializePoolIfNecessary(address,address,uint24,uint160)
-      "000000000000000000000000" + amaticc.address.toLowerCase().substring(2) +
       "000000000000000000000000" + sikka.address.toLowerCase().substring(2) +
+      "000000000000000000000000" + amaticc.address.toLowerCase().substring(2) +
       "0000000000000000000000000000000000000000000000000000000000000bb8" + // fee
       "00000000000000000000000000000000000000010c173444a8cfa71077e23314",  // sqrtPriceX96
       // ===second call
       "0x88316456" + // signature - mint(address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256)
-      "000000000000000000000000" + amaticc.address.toLowerCase().substring(2) +
       "000000000000000000000000" + sikka.address.toLowerCase().substring(2) +
+      "000000000000000000000000" + amaticc.address.toLowerCase().substring(2) +
       "0000000000000000000000000000000000000000000000000000000000000bb8" + // fee
       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff880" + // tick lower
       "0000000000000000000000000000000000000000000000000000000000001338" + // tick upper

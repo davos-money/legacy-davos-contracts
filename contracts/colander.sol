@@ -35,6 +35,7 @@ import "./interfaces/IColanderRewards.sol";
    from auctions.
 */
 contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
+
     // --- Wrapper ---
     using SafeERC20Upgradeable for IERC20Upgradeable;
     
@@ -43,12 +44,14 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
     function rely(address _guy) external auth { wards[_guy] = 1; }
     function deny(address _guy) external auth { wards[_guy] = 0; }
     modifier auth { if(wards[msg.sender] != 1) revert Unauthorized(msg.sender); _; }
+
     // --- Derivative ---
     string public name;
     string public symbol;
     uint8 public decimals;
     uint256 public override totalSupply;
     mapping(address => uint) public override balanceOf;
+
     // --- State Vars ---
     IERC20Upgradeable public stablecoin;
     IDao public interaction;
@@ -61,13 +64,17 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
     mapping(address => uint) public entryTime;  // Anti flash loans     [sec]
     uint256 public flashDelay;                  // Exit function delay  [sec]
     uint256 public live;  // Active Flag
+
     // --- Mods ---
     modifier isLive {
-         if (live != 1) revert NotLive(address(this));
+
+        if (live != 1) revert NotLive(address(this));
         _;
     }
+
     // --- Init ---
-    function initialize(string memory _name, string memory _symbol, address _stablecoin, address _interaction, address _spotter, address _dex, address _rewards) public initializer {
+    function initialize(string memory _name, string memory _symbol, address _stablecoin, address _interaction, address _spotter, address _dex, address _rewards, uint256 _flashDelay) public initializer {
+        
         wards[msg.sender] = 1;
         live = 1;
         name = _name;
@@ -77,66 +84,88 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
         spotter = SpotLike(_spotter);
         dex = DexV3Like(_dex);
         rewards = IColanderRewards(_rewards);
+        flashDelay = _flashDelay;
+
         decimals = 18;
+
         __ReentrancyGuard_init_unchained();
         
         emit Initialize(msg.sender);
     }
     function setProfitRange(uint256 _ray) external isLive auth {
+
         profitRange = _ray;
         emit ProfitRange(msg.sender, _ray);
     }
     function setPriceImpact(uint256 _wad) external isLive auth {
+
         priceImpact = _wad;
         emit PriceImpact(msg.sender, _wad);
     }
     function setRewards(address _rewards) external isLive auth {
+
         rewards = IColanderRewards(_rewards);
         emit Rewards(_rewards);
     }
     function setFlashDelay(uint _flashDelay) external isLive auth {
+
         flashDelay = _flashDelay;
         emit FlashDelay(_flashDelay);
     }
+
     // --- Math ---
     uint256 constant BLN = 10 **  9;
     uint256 constant WAD = 10 ** 18;
     uint256 constant RAY = 10 ** 27;
     function rdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
+
         unchecked { z = (x * RAY) / y; }
     }
+
     // --- External ---
     function join(uint256 _wad) external isLive nonReentrant {
+
         // Set flash delay
         entryTime[msg.sender] = block.timestamp + flashDelay;
+
         // Update rewards
         rewards.reflect(msg.sender, 0);
+
         // State changes
         uint256 deposit = balanceOf[msg.sender];
         balanceOf[msg.sender] += _wad;
         totalSupply += _wad;
+
         // Method calls
         stablecoin.safeTransferFrom(msg.sender, address(this), _wad);
+
         // Events
         emit Join(msg.sender, deposit, balanceOf[msg.sender]);
     }
     function exit(uint256 _wad) external isLive nonReentrant {
+
         // Checks
-        if (block.timestamp < entryTime[msg.sender]) revert InFlashDelay();
+        if (block.timestamp <= entryTime[msg.sender]) revert InFlashDelay();
+
         // Update rewards
         uint256 deposit = balanceOf[msg.sender];
         uint256 amount = _wad > deposit ? deposit: _wad;
         rewards.reflect(msg.sender, amount);
+
         // State changes
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
+
         // Method calls
         stablecoin.safeTransfer(address(rewards), amount);
+
         // Events
         emit Exit(msg.sender, deposit, balanceOf[msg.sender]);
     }
+
     // --- Auction ---
     function surge(address _collateral, uint256 _auction_id) external isLive auth nonReentrant {
+
         // Measure the stablecoin expense
         uint256 abacusPrice;  // Decreasing price    [ray]
         uint256 feedPrice;    // Oracle price        [ray]
@@ -147,31 +176,40 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
             // CollateralType memory collateral = IDao(interaction).collaterals(_collateral);
             (,abacusPrice,,) = ClipperLike(clip).getStatus(_auction_id);
             feedPrice = _getFeedPrice(ilk);  // [ray]
+
             if (abacusPrice >= feedPrice) revert IStabilityPool.BufZone();
             // require(abacusPrice < feedPrice, "Colander/buf-zone");
+
             tab = ClipperLike(clip).sales(_auction_id).tab;
             lot = ClipperLike(clip).sales(_auction_id).lot;
+
             if (tab == 0 || lot == 0) revert IStabilityPool.InvalidAuction();
             // require(tab > 0 && lot > 0, "Colander/invalid-auction");
             // Calculate debt per collateral
+
             uint256 auctionPrice = tab / lot;  // [ray]
+
             if (auctionPrice >= feedPrice) revert IStabilityPool.AbsurdPrice();
             else if (auctionPrice >= abacusPrice) revert IStabilityPool.SinZone();
             // require(auctionPrice < feedPrice, "Colander/absurd-price");
             // require(auctionPrice < abacusPrice, "Colander/sin-zone");
+
             uint256 y = (feedPrice * profitRange) / RAY;
             uint256 threshold = feedPrice - y;
+
             if (auctionPrice > threshold) revert IStabilityPool.AbsurdThreshold();
             else if (abacusPrice > threshold) revert IStabilityPool.InactiveZone();
             // require(auctionPrice <= threshold, "Colander/absurd-threshold");
             // require(abacusPrice <= threshold, "Colander/inactive-zone");
         }
+
         // Calculate lot and buy
         uint256 lotAmount = (totalSupply * RAY) / abacusPrice;
         if (lotAmount > lot) lotAmount = lot;
         stablecoin.safeApprove(address(interaction), type(uint256).max);
         interaction.buyFromAuction(_collateral, _auction_id, lotAmount, abacusPrice, address(this));
         stablecoin.safeApprove(address(interaction), 0);
+
         // Swap on dex
         uint256 amount = IERC20Upgradeable(_collateral).balanceOf(address(this));
         uint256 z = (feedPrice * amount) / RAY;
@@ -182,10 +220,12 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
        
         // Recalculate surplus
         surplus = stablecoin.balanceOf(address(this)) - totalSupply;
+
         // Emit event
         emit Surge(amount, expectedAmount, amountOut);
     }
     function _getFeedPrice(bytes32 _ilk) private returns(uint256 _feedPrice) {
+
         (PipLike pip, ) = spotter.ilks(_ilk);
         (bytes32 val, bool has) = pip.peek();
         if (!has) revert InvalidPrice();
@@ -193,6 +233,7 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
         _feedPrice = rdiv((uint256(val) * BLN), spotter.par());
     }
     function _swap(address _tokenIn, uint256 _amountIn, uint256 _amountOutMin, uint256 _deadline) private returns(uint256) {
+
         uint24 fee = 3000;
         uint160 sqrtPriceLimitX96 = 0;
         
@@ -208,17 +249,26 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
         );
         return dex.exactInputSingle(params);
     }
+
     // --- Rewards ---
     function distribute(uint256 _wad) external isLive auth nonReentrant {
+
         if (surplus < _wad) revert InsufficientSurplus(surplus);
+
         surplus -= _wad;
+
         IERC20Upgradeable(stablecoin).approve(address(rewards), _wad);
+
         rewards.replenish(_wad);
+
         emit Distribute(msg.sender, _wad);
     }
     function cage() external auth {
+
         live = 0;
+        
         rewards.cage();
+
         emit Cage();
     }
     uint256[33] private __gap;
