@@ -6,24 +6,22 @@ const fs = require("fs");
 async function main() {
 
     [deployer] = await ethers.getSigners();
+    // External Addresses
+    let { _aMATICc, _wMatic, _dex, _dexPairFee, _swapPool, _priceGetter, _chainId, _maxDepositFee, 
+    _maxWithdrawalFee, _maxStrategies, _cerosStrategyAllocatoin, _waitingPoolCap, _mat, 
+    _ikkaRewardsPoolLimitInEth, _ikkaTokenRewardsSupplyinEth, _ikkaOracleInitialPriceInWei, 
+    _rewardsRate, _vat_Line, _vat_line, _vat_dust, _spot_par, _jug_base, _dog_Hole, _dog_hole,
+    _dog_chop, _abacus_tau, _clip_buf, _clip_tail, _clip_cusp, _clip_chip, _clip_tip, _clip_stopped } = require(`../${hre.network.name}_config.json`)
+    
+
+    console.log(_dog_chop, _abacus_tau, _clip_buf, _clip_tail, _clip_cusp, _clip_chip, _clip_tip, _clip_stopped)
+
+
+    let _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
     let ceaMATICc, 
         ceVault,  
         sMatic, 
         cerosRouter;
-    // External Addresses
-    let _aMATICc = "0xaC32206a73C8406D74eB21cF7bd060bf841e64aD", 
-        _wMatic = "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-        _dex = "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-        _dexPairFee = "3000";
-        _swapPool = "0xFCC0937847030e91567c78a147e6e36F719Dc46b",
-        _priceGetter = "0x081CCd6331b816584F42cBAa09c556798F41fef7",
-        _maxDepositFee = 500000, 
-        _maxWithdrawalFee = 500000,
-        _maxStrategies = 10,
-        _waitingPoolCap = 10,
-        _mat = "1333333333333333333333333333",
-        _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
-    
     // Contracts Fetching
     this.CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     this.CeVault = await hre.ethers.getContractFactory("CeVault");
@@ -80,9 +78,7 @@ async function main() {
     _feeRecipient = deployer.address,
     _underlyingToken = _wMatic,
     _certToekn = _aMATICc,
-    _rewardsPool = deployer.address,
-    _performanceFees = 0,
-    _cerosStrategyAllocatoin = 80 * 10000; // 80%
+    _rewardsPool = deployer.address
 
     this.CerosYieldConverterStrategy = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
@@ -122,7 +118,7 @@ async function main() {
     console.log("Spot           :", spot.address);
     console.log("SpotImp         :", spotImp)
 
-    let sikka = await upgrades.deployProxy(this.Sikka, [80001, "SIKKA"], {initializer: "initialize"});
+    let sikka = await upgrades.deployProxy(this.Sikka, [_chainId, "SIKKA"], {initializer: "initialize"});
     await sikka.deployed();
     sikkaImp = await upgrades.erc1967.getImplementationAddress(sikka.address);
     console.log("sikka           :", sikka.address);
@@ -191,19 +187,19 @@ async function main() {
     this.IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle");
 
     // Contracts deployment
-    let rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether("100000000").toString()], {initializer: "initialize"});
+    let rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
     await rewards.deployed();
     rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
     console.log("Rewards             :", rewards.address);
     console.log("Imp                 :", rewardsImp);
 
-    let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether("100000000").toString(), rewards.address], {initializer: "initialize"});
+    let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether(_ikkaTokenRewardsSupplyinEth).toString(), rewards.address], {initializer: "initialize"});
     await ikkaToken.deployed();
     ikkaTokenImp = await upgrades.erc1967.getImplementationAddress(ikkaToken.address);
     console.log("ikkaToken           :", ikkaToken.address);
     console.log("Imp                 :", ikkaTokenImp);
     
-    let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, ["100000000000000000"], {initializer: "initialize"}); // 0.1
+    let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, [_ikkaOracleInitialPriceInWei], {initializer: "initialize"}) // 0.1
     await ikkaOracle.deployed();
     ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
     console.log("ikkaOracle          :", ikkaOracle.address);
@@ -211,7 +207,7 @@ async function main() {
 
     await ikkaToken.rely(rewards.address);
     await rewards.setIkkaToken(ikkaToken.address);
-    await rewards.initPool(masterVault.address, _ilkCeMatic, "1000000001847694957439350500", {gasLimit: 2000000}); //6%
+    await rewards.initPool(masterVault.address, _ilkCeMatic, _rewardsRate, {gasLimit: 2000000}), //6%
     await rewards.setOracle(ikkaOracle.address);
 
     _vat = vat.address,
@@ -378,9 +374,9 @@ async function main() {
     await vat.rely(_dog);
     // await vat.rely(interaction.address);
     await vat.rely(clip.address);
-    await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), "500000000" + rad);
-    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), "50000000" + rad);
-    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), "1" + ray);
+    await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), _vat_Line + rad);
+    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad);
+    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + ray);
 
     console.log("Vow init...");
     await vow.rely(_dog);
@@ -400,11 +396,11 @@ async function main() {
     // await oracle.setPrice("2" + wad); // 2$
     await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
     // await spot["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("mat"), _mat); // Liquidation Ratio 75%
-    await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), "1" + ray); // It means pegged to 1$
+    await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), _spot_par + ray); // It means pegged to 1$
     await spot.poke(_ilkCeMatic, {gasLimit: 200000});
 
     console.log("Jug...");
-    BR = new BN("1000000003022266000000000000").toString(); // 10%
+    BR = new BN(_jug_base).toString(); // 10%
     await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR); // 10% Yearly
     await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
 
@@ -414,20 +410,20 @@ async function main() {
     console.log("Dog...");
     await dog.rely(clip.address);
     await dog["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
-    await dog["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Hole"), "500" + rad);
-    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("hole"), "250" + rad);
-    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("chop"), "1130000000000000000"); // 13%
+    await dog["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Hole"), _dog_Hole + rad);
+    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("hole"), _dog_hole + rad);
+    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("chop"), _dog_chop); // 13%
     await dog["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("clip"), clip.address);
 
     console.log("Clip/Abacus...");
-    await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), "3600"); // Price will reach 0 after this time
+    await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau); // Price will reach 0 after this time
     await clip.rely(dog.address);
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("buf"), "1020000000000000000000000000"); // 2%
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tail"), "1800"); // 30mins reset time
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("cusp"), "600000000000000000000000000"); // 60% reset ratio
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("chip"), "10000000000000000"); // 1% from vow incentive
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tip"), "10" + rad); // 10$ flat fee incentive
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("stopped"), "0");
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("buf"), _clip_buf); // 2%
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tail"), _clip_tail); // 30mins reset time
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("cusp"), _clip_cusp); // 60% reset ratio
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("chip"), _clip_chip); // 1% from vow incentive
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tip"), _clip_tip + rad); // 10$ flat fee incentive
+    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("stopped"), _clip_stopped);
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("spotter"), spot.address);
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("dog"), dog.address);
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
