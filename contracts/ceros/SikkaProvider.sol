@@ -20,24 +20,16 @@ ReentrancyGuardUpgradeable
     /**
      * Variables
      */
-    address private _operator;
     // Tokens
     // address private _certToken;
-    address private _ceToken;
-    ICertToken private _collateralToken; // (default sMATIC)
-    IMasterVault private _masterVault;
-    IDao private _dao;
-    address private _proxy;
+    address public _ceToken;
+    ICertToken public _collateralToken; // (default sMATIC)
+    IMasterVault public _masterVault;
+    IDao public _dao;
+    address public _proxy;
     /**
      * Modifiers
      */
-    modifier onlyOperator() {
-        require(
-            msg.sender == owner() || msg.sender == _operator,
-            "Operator: not allowed"
-        );
-        _;
-    }
     modifier onlyProxy() {
         require(
             msg.sender == owner() || msg.sender == _proxy,
@@ -54,7 +46,6 @@ ReentrancyGuardUpgradeable
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
-        _operator = msg.sender;
         _collateralToken = ICertToken(collateralToken);
         // _certToken = certToken;
         _ceToken = masterVault;

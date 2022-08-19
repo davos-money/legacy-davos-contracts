@@ -57,12 +57,12 @@ module.exports = {
             timeout: 10000000
         },
         polygon: {
-            url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_PROJECT_ID}/polygon/mainnet`,
+            url: `https://polygon-rpc.com`,
             chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
         mumbai: {
-            url: `https://rpc-mumbai.matic.today`,
+            url: `https://rpc-mumbai.maticvigil.com/`,
             chainId: 80001,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },

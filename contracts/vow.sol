@@ -39,14 +39,6 @@ contract Vow is Initializable{
     VatLike public vat;          // CDP Engine
     address public multisig;     // Surplus multisig 
 
-    mapping (uint256 => uint256) public sin;  // debt queue
-    uint256 public Sin;   // Queued debt            [rad]
-    uint256 public Ash;   // On-auction debt        [rad]
-
-    uint256 public wait;  // Flop delay             [seconds]
-    uint256 public dump;  // Flop initial lot size  [wad]
-    uint256 public sump;  // Flop fixed bid size    [rad]
-
     address public sikkaJoin; // Stablecoin address
     uint256 public hump;    // Surplus buffer      [rad]
 
@@ -110,8 +102,6 @@ contract Vow is Initializable{
     function cage() external auth {
         require(live == 1, "Vow/not-live");
         live = 0;
-        Sin = 0;
-        Ash = 0;
         vat.heal(min(vat.sikka(address(this)), vat.sin(address(this))));
     }
 }

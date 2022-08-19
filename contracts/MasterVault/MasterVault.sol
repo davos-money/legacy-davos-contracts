@@ -28,13 +28,8 @@ ReentrancyGuardUpgradeable
     uint256 public maxDepositFee;
     uint256 public withdrawalFee;
     uint256 public maxWithdrawalFee;
-    // Tokens
-    ICertToken private _certToken;
     
-    address private _provider;
-    address private _priceGetter;
-    ICerosRouter private _ceRouter;
-    IDao private _dao;
+    address public _provider;
     mapping(address => bool) public manager;
     struct StrategyParams {
         bool active;

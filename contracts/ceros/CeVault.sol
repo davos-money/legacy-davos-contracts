@@ -198,4 +198,13 @@ ReentrancyGuardUpgradeable
     function getName() external view returns (string memory) {
         return _name;
     }
+    function getCeToken() external view returns(address) {
+        return address(_ceToken);
+    }
+    function getAmaticcAddress() external view returns(address) {
+        return address(_aMATICc);
+    }
+    function getRouter() external view returns(address) {
+        return address(_router);
+    }
 }
