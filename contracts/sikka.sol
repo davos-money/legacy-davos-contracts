@@ -19,14 +19,14 @@
 
 pragma solidity ^0.8.10;
 
-import "./interfaces/SikkaLike.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Sikka is Initializable, SikkaLike {
+contract Sikka is Initializable, IERC20MetadataUpgradeable {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address guy) external auth { wards[guy] = 1; }
@@ -47,25 +47,16 @@ contract Sikka is Initializable, SikkaLike {
     mapping (address => mapping (address => uint)) public allowance;
     mapping (address => uint)                      public nonces;
 
-    // --- Math ---
-    function add(uint x, uint y) internal pure returns (uint z) {
-        unchecked {
-            require((z = x + y) >= x, "Sikka/add-overflow");
-        }
-    }
-    function sub(uint x, uint y) internal pure returns (uint z) {
-        unchecked {
-            require((z = x - y) <= x, "Sikka/sub-overflow");
-        }
-    }
+    uint256 public supplyCap;
+
+    event SupplyCapSet(uint256 oldCap, uint256 newCap);
 
     // --- EIP712 niceties ---
     bytes32 public DOMAIN_SEPARATOR;
     // bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address holder,address spender,uint256 nonce,uint256 expiry,bool allowed)");
     bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
 
-    // --- Init ---
-    function initialize(uint256 chainId_, string memory symbol_) public initializer {
+    function initialize(uint256 chainId_, string memory symbol_, uint256 supplyCap_) external initializer {
         wards[msg.sender] = 1;
         DOMAIN_SEPARATOR = keccak256(abi.encode(
             keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -75,38 +66,42 @@ contract Sikka is Initializable, SikkaLike {
             address(this)
         ));
         symbol = symbol_;
+        supplyCap = supplyCap_;
     }
 
     // --- Token ---
     function transfer(address dst, uint wad) external returns (bool) {
         return transferFrom(msg.sender, dst, wad);
     }
-    function transferFrom(address src, address dst, uint wad)
-        public returns (bool)
-    {
+    function transferFrom(address src, address dst, uint wad) public returns (bool) {
+        require(src != address(0), "Sikka/transfer-from-zero-address");
+        require(dst != address(0), "Sikka/transfer-to-zero-address");
         require(balanceOf[src] >= wad, "Sikka/insufficient-balance");
         if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
             require(allowance[src][msg.sender] >= wad, "Sikka/insufficient-allowance");
-            allowance[src][msg.sender] = sub(allowance[src][msg.sender], wad);
+            allowance[src][msg.sender] -= wad;
         }
-        balanceOf[src] = sub(balanceOf[src], wad);
-        balanceOf[dst] = add(balanceOf[dst], wad);
+        balanceOf[src] -= wad;
+        balanceOf[dst] += wad;
         emit Transfer(src, dst, wad);
         return true;
     }
     function mint(address usr, uint wad) external auth {
-        balanceOf[usr] = add(balanceOf[usr], wad);
-        totalSupply    = add(totalSupply, wad);
+        require(usr != address(0), "Sikka/mint-to-zero-address");
+        require(totalSupply + wad <= supplyCap, "Sikka/cap-reached");
+        balanceOf[usr] += wad;
+        totalSupply    += wad;
         emit Transfer(address(0), usr, wad);
     }
     function burn(address usr, uint wad) external {
+        require(usr != address(0), "Sikka/burn-from-zero-address");
         require(balanceOf[usr] >= wad, "Sikka/insufficient-balance");
         if (usr != msg.sender && allowance[usr][msg.sender] != type(uint256).max) {
             require(allowance[usr][msg.sender] >= wad, "Sikka/insufficient-allowance");
-            allowance[usr][msg.sender] = sub(allowance[usr][msg.sender], wad);
+            allowance[usr][msg.sender] -= wad;
         }
-        balanceOf[usr] = sub(balanceOf[usr], wad);
-        totalSupply    = sub(totalSupply, wad);
+        balanceOf[usr] -= wad;
+        totalSupply    -= wad;
         emit Transfer(usr, address(0), wad);
     }
     function approve(address usr, uint wad) external returns (bool) {
@@ -157,8 +152,8 @@ contract Sikka is Initializable, SikkaLike {
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), "Sikka/approve-from-zero-address");
+        require(spender != address(0), "Sikka/approve-to-zero-address");
 
         allowance[owner][spender] = amount;
         emit Approval(owner, spender, amount);
@@ -173,10 +168,17 @@ contract Sikka is Initializable, SikkaLike {
     function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         address owner = msg.sender;
         uint256 currentAllowance = allowance[owner][spender];
-        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        require(currentAllowance >= subtractedValue, "Sikka/decreased-allowance-below-zero");
         unchecked {
             _approve(owner, spender, currentAllowance - subtractedValue);
         }
         return true;
+    }
+
+    function setSupplyCap(uint256 wad) public auth {
+        require(wad >= totalSupply, "Sikka/more-supply-than-cap");
+        uint256 oldCap = supplyCap;
+        supplyCap = wad;
+        emit SupplyCapSet(oldCap, supplyCap);
     }
 }

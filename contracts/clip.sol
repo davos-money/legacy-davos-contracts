@@ -131,6 +131,7 @@ contract Clipper is Initializable, ClipperLike {
         ilk     = ilk_;
         buf     = RAY;
         wards[msg.sender] = 1;
+        stopped = 0;
         emit Rely(msg.sender);
     }
 

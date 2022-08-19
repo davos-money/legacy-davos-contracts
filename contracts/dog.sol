@@ -19,7 +19,6 @@
 
 pragma solidity ^0.8.10;
 
-import "./interfaces/DogLike.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface ClipperLike {
@@ -53,7 +52,7 @@ interface VowLike {
     function fess(uint256) external;
 }
 
-contract Dog is Initializable, DogLike {
+contract Dog is Initializable {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
@@ -226,7 +225,6 @@ contract Dog is Initializable, DogLike {
         );
 
         uint256 due = mul(dart, rate);
-        vow.fess(due);
 
         {   // Avoid stack too deep
             // This calcuation will overflow if dart*rate exceeds ~10^14
