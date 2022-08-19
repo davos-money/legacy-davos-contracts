@@ -2,7 +2,7 @@ const hre = require("hardhat");
 const {ethers} = require("hardhat");
 
 const main = async () => {
-    let { _aMATICc , _wMatic , _swapPoolManager , _swapPool_stakeFee, _swapPool_unstakeFee } = require(`./${hre.network.name}_config.json`);
+    let { _aMATICc , _wMatic , _swapPoolManager , _swapPool_stakeFee, _swapPool_unstakeFee , _maticPool } = require(`./${hre.network.name}_config.json`);
     let lp, swapPool;
     const SwapPool = await ethers.getContractFactory("SwapPool");
     const LP = await ethers.getContractFactory("LP");
@@ -22,22 +22,16 @@ const main = async () => {
     console.log("imp        : " + swapPoolImplementation);
 
     // configure lp
-    await lp.setSwapPool(swapPool.address);
-    await swapPool.add(_swapPoolManager, 0);
-    await swapPool.setFee(_swapPool_stakeFee ,3)
-    await swapPool.setFee(_swapPool_unstakeFee, 4)
+    await (await lp.setSwapPool(swapPool.address)).wait();
+    await (await swapPool.add(_swapPoolManager, 0)).wait();
+    await (await swapPool.setFee(_swapPool_stakeFee , 3)).wait();
+    await (await swapPool.setFee(_swapPool_unstakeFee, 4)).wait();
+    await (await swapPool.setMaticPool(_maticPool)).wait();
 
     console.log("Verifying SwapPool...");
     // Verify implementations
     await hre.run("verify:verify", {
         address: swapPoolImplementation,
-    });
-    // Verify proxies
-    await hre.run("verify:verify", {
-        address: swapPool.address,
-        constructorArguments: [
-            _wMatic, _aMATICc, lp.address, false, false
-        ],
     });
 }
 

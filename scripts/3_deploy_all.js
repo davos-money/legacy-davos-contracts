@@ -429,8 +429,8 @@ async function main() {
 
     console.log("Interaction...");
     await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000});
-    await interaction.poke(ceaBNBc.address, {gasLimit: 200000});
-    await interaction.drip(ceaBNBc.address, {gasLimit: 200000});
+    await interaction.poke(masterVault.address, {gasLimit: 200000});
+    await interaction.drip(masterVault.address, {gasLimit: 200000});
     await interaction.enableWhitelist(); // Deposits are limited to whitelist
     await interaction.setWhitelistOperator(whitelistOperatorAddress); // Whitelist manager
 

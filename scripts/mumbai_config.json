@@ -40,5 +40,6 @@
     
     "_swapPoolManager" : "0x57F9672bA603251C9C03B36cabdBBcA7Ca8Cfcf4",
     "_swapPool_stakeFee": 100,
-    "_swapPool_unstakeFee": 100
+    "_swapPool_unstakeFee": 100,
+    "_maticPool": "0x9EBA2c263e5d5C037157cEa00c9FddB878223AF2"
 }
