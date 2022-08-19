@@ -21,6 +21,8 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+import "./interfaces/DogLike.sol";
+
 interface ClipperLike {
     function ilk() external view returns (bytes32);
     function kick(
@@ -48,11 +50,7 @@ interface VatLike {
     function nope(address) external;
 }
 
-interface VowLike {
-    function fess(uint256) external;
-}
-
-contract Dog is Initializable {
+contract Dog is DogLike, Initializable {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
@@ -74,7 +72,7 @@ contract Dog is Initializable {
 
     mapping (bytes32 => Ilk) public ilks;
 
-    VowLike public vow;   // Debt Engine
+    address public vow;   // Debt Engine
     uint256 public live;  // Active Flag
     uint256 public Hole;  // Max SIKKA needed to cover debt+fees of active auctions [rad]
     uint256 public Dirt;  // Amt SIKKA needed to cover debt+fees of active auctions [rad]
@@ -101,7 +99,7 @@ contract Dog is Initializable {
     event Cage();
 
     // --- Init ---
-    function initialize(address vat_) public {
+    function initialize(address vat_) external initializer {
         vat = VatLike(vat_);
         live = 1;
         wards[msg.sender] = 1;
@@ -132,7 +130,7 @@ contract Dog is Initializable {
 
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
-        if (what == "vow") vow = VowLike(data);
+        if (what == "vow") vow = data;
         else revert("Dog/file-unrecognized-param");
         emit File(what, data);
     }
@@ -221,7 +219,7 @@ contract Dog is Initializable {
         require(dart <= 2**255 && dink <= 2**255, "Dog/overflow");
 
         vat.grab(
-            ilk, urn, milk.clip, address(vow), -int256(dink), -int256(dart)
+            ilk, urn, milk.clip, vow, -int256(dink), -int256(dart)
         );
 
         uint256 due = mul(dart, rate);
