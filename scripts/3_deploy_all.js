@@ -192,22 +192,22 @@ async function main() {
     console.log("Rewards             :", rewards.address);
     console.log("Imp                 :", rewardsImp);
 
-    let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether(_ikkaTokenRewardsSupplyinEth).toString(), rewards.address], {initializer: "initialize"});
-    await ikkaToken.deployed();
-    ikkaTokenImp = await upgrades.erc1967.getImplementationAddress(ikkaToken.address);
-    console.log("ikkaToken           :", ikkaToken.address);
-    console.log("Imp                 :", ikkaTokenImp);
+    // let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether(_ikkaTokenRewardsSupplyinEth).toString(), rewards.address], {initializer: "initialize"});
+    // await ikkaToken.deployed();
+    // ikkaTokenImp = await upgrades.erc1967.getImplementationAddress(ikkaToken.address);
+    // console.log("ikkaToken           :", ikkaToken.address);
+    // console.log("Imp                 :", ikkaTokenImp);
     
-    let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, [_ikkaOracleInitialPriceInWei], {initializer: "initialize"}) // 0.1
-    await ikkaOracle.deployed();
-    ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
-    console.log("ikkaOracle          :", ikkaOracle.address);
-    console.log("Imp                 :", ikkaOracleImplementation);
+    // let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, [_ikkaOracleInitialPriceInWei], {initializer: "initialize"}) // 0.1
+    // await ikkaOracle.deployed();
+    // ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
+    // console.log("ikkaOracle          :", ikkaOracle.address);
+    // console.log("Imp                 :", ikkaOracleImplementation);
 
-    await ikkaToken.rely(rewards.address);
-    await rewards.setIkkaToken(ikkaToken.address);
-    await rewards.initPool(masterVault.address, _ilkCeMatic, _rewardsRate, {gasLimit: 2000000}), //6%
-    await rewards.setOracle(ikkaOracle.address);
+    // await ikkaToken.rely(rewards.address);
+    // await rewards.setIkkaToken(ikkaToken.address);
+    // await rewards.initPool(masterVault.address, _ilkCeMatic, _rewardsRate, {gasLimit: 2000000}), //6%
+    // await rewards.setOracle(ikkaOracle.address);
 
     _vat = vat.address,
     _spot = spot.address,
@@ -306,12 +306,13 @@ async function main() {
         clip           : clip.address,
         clipImp        : clipImp,
         oracle         : oracle.address,
+        oracleImp      : oracleImplementation,
         abacus         : abacus.address,
         abacusImp      : abacusImp,
         rewards        : rewards.address,
         rewardsImp     : rewardsImp,
-        ikkaToken      : ikkaToken.address,
-        ikkaTokenImp   : ikkaTokenImp,
+        // ikkaToken      : ikkaToken.address,
+        // ikkaTokenImp   : ikkaTokenImp,
         auctionProxy   : auctionProxy.address
     }
 
@@ -374,11 +375,14 @@ async function main() {
 
     console.log("Vow init...");
     await vow.rely(_dog);
+    await vow.rely(_dog);
+    await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("sikka"), sikka.address);
 
     console.log("All init...");
     // await rewards.rely(interaction.address);
     await gemJoin.rely(interaction.address);
     await sikkaJoin.rely(interaction.address);
+    await sikkaJoin.rely(vow.address);
     await dog.rely(interaction.address);
     await jug.rely(interaction.address);
     await clip.rely(interaction.address);
@@ -424,7 +428,9 @@ async function main() {
     await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("calc"), abacus.address);
 
     console.log("Interaction...");
-    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat);
+    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000});
+    await interaction.poke(ceaBNBc.address, {gasLimit: 200000});
+    await interaction.drip(ceaBNBc.address, {gasLimit: 200000});
     await interaction.enableWhitelist(); // Deposits are limited to whitelist
     await interaction.setWhitelistOperator(whitelistOperatorAddress); // Whitelist manager
 
