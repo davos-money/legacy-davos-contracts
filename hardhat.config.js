@@ -62,7 +62,7 @@ module.exports = {
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
         mumbai: {
-            url: `https://rpc-mumbai.maticvigil.com/`,
+            url: `https://rpc.ankr.com/polygon_mumbai`,
             chainId: 80001,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },

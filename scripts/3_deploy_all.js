@@ -56,8 +56,8 @@ async function main() {
     console.log("cerosRouter: " + cerosRouter.address);
     console.log("imp        : " + cerosRouterImp);
 
-    await ceaMATICc.changeVault(ceVault.address);
-    await ceVault.changeRouter(cerosRouter.address);
+    await(await ceaMATICc.changeVault(ceVault.address)).wait();
+    await(await ceVault.changeRouter(cerosRouter.address)).wait();
 
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.WaitingPool = await hre.ethers.getContractFactory("WaitingPool");
@@ -73,7 +73,7 @@ async function main() {
     console.log("waitingPool    : " + waitingPool.address);
     console.log("imp        : " + waitingPoolImp);
 
-    await masterVault.setWaitingPool(waitingPool.address)
+    await(await masterVault.setWaitingPool(waitingPool.address)).wait();
 
     _destination = cerosRouter.address,
     _feeRecipient = deployer.address,
@@ -91,7 +91,7 @@ async function main() {
     console.log("imp        : " + cerosYieldConverterStrategyImp);
 
     masterVault = await this.MasterVault.attach(masterVault.address);
-    await masterVault.setStrategy(cerosYieldConverterStrategy.address, _cerosStrategyAllocatoin);
+    await(await masterVault.setStrategy(cerosYieldConverterStrategy.address, _cerosStrategyAllocatoin)).wait();
 
     // Contracts Fetching
     this.Vat = await hre.ethers.getContractFactory("Vat");
@@ -247,9 +247,9 @@ async function main() {
     
     this.Vat = await hre.ethers.getContractFactory("Vat");
     vat = this.Vat.attach(_vat);
-    await vat.rely(interaction.address);
-    await rewards.rely(interaction.address);
-    await spot.rely(interaction.address);
+    await(await vat.rely(interaction.address)).wait();
+    await(await rewards.rely(interaction.address)).wait();
+    await(await spot.rely(interaction.address)).wait();
 
     interactionImplAddress = await upgrades.erc1967.getImplementationAddress(interaction.address);
     console.log("Interaction implementation: ", interactionImplAddress);
@@ -268,8 +268,8 @@ async function main() {
 
     masterVault = this.MasterVault.attach(masterVault.address);
     sMatic = await this.SMatic.attach(sMatic.address);
-    await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address);
+    await(await sMatic.changeMinter(sikkaProvider.address)).wait();
+    await(await masterVault.changeProvider(sikkaProvider.address)).wait();
 
     // Store deployed addresses
     const addresses = {
@@ -362,78 +362,77 @@ async function main() {
 
     // Contracts initializing
     console.log("Vat init...");
-    await vat.rely(ceaMATICcJoin.address);
-    await vat.rely(_spot);
-    await vat.rely(_sikkaJoin);
-    await vat.rely(_jug);
-    await vat.rely(_dog);
+    await(await vat.rely(ceaMATICcJoin.address)).wait();
+    await(await vat.rely(_spot).wait());
+    await(await vat.rely(_sikkaJoin)).wait();
+    await(await vat.rely(_jug)).wait();
+    await(await vat.rely(_dog)).wait();
     // await vat.rely(interaction.address);
-    await vat.rely(clip.address);
-    await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), _vat_Line + rad);
-    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad);
-    await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + ray);
+    await(await vat.rely(clip.address)).wait();
+    await(await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), _vat_Line + rad)).wait();
+    await(await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad)).wait();
+    await(await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + ray)).wait();
 
     console.log("Vow init...");
-    await vow.rely(_dog);
-    await vow.rely(_dog);
-    await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("sikka"), sikka.address);
+    await(await vow.rely(_dog)).wait();
+    await(await vow.rely(_dog)).wait();
+    await(await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("sikka"), sikka.address)).wait();
 
     console.log("All init...");
     // await rewards.rely(interaction.address);
-    await gemJoin.rely(interaction.address);
-    await sikkaJoin.rely(interaction.address);
-    await sikkaJoin.rely(vow.address);
-    await dog.rely(interaction.address);
-    await jug.rely(interaction.address);
-    await clip.rely(interaction.address);
-    await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address);
+    await(await gemJoin.rely(interaction.address)).wait();
+    await(await sikkaJoin.rely(interaction.address)).wait();
+    await(await sikkaJoin.rely(vow.address)).wait();
+    await(await dog.rely(interaction.address)).wait();
+    await(await jug.rely(interaction.address)).wait();
+    await(await clip.rely(interaction.address)).wait();
+    await(await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address)).wait();
 
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,
     // 2.000000000000000000000000000 / 1.600000000000000000000000000 = 1.250000000000000000000000000 = mat
     console.log("Spot/Oracle...");
     // await oracle.setPrice("2" + wad); // 2$
-    await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
+    await(await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address)).wait();
     // await spot["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("mat"), _mat); // Liquidation Ratio 75%
-    await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), _spot_par + ray); // It means pegged to 1$
-    await spot.poke(_ilkCeMatic, {gasLimit: 200000});
+    await(await spot["file(bytes32,uint256)"](ethers.utils.formatBytes32String("par"), _spot_par + ray)).wait(); // It means pegged to 1$
+    await(await spot.poke(_ilkCeMatic, {gasLimit: 200000})).wait();
 
     console.log("Jug...");
     BR = new BN(_jug_base).toString(); // 10%
-    await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR); // 10% Yearly
-    await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
+    await(await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR)).wait(); // 10% Yearly
+    await(await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address)).wait();
 
     console.log("Sikka...");
-    await sikka.rely(sikkaJoin.address);
+    await(await sikka.rely(sikkaJoin.address)).wait();
 
     console.log("Dog...");
-    await dog.rely(clip.address);
-    await dog["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
-    await dog["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Hole"), _dog_Hole + rad);
-    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("hole"), _dog_hole + rad);
-    await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("chop"), _dog_chop); // 13%
-    await dog["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("clip"), clip.address);
+    await(await dog.rely(clip.address)).wait();
+    await(await dog["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address)).wait();
+    await(await dog["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Hole"), _dog_Hole + rad)).wait();
+    await(await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("hole"), _dog_hole + rad)).wait();
+    await(await dog["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("chop"), _dog_chop)).wait(); // 13%
+    await(await dog["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("clip"), clip.address)).wait();
 
     console.log("Clip/Abacus...");
-    await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau); // Price will reach 0 after this time
-    await clip.rely(dog.address);
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("buf"), _clip_buf); // 2%
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tail"), _clip_tail); // 30mins reset time
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("cusp"), _clip_cusp); // 60% reset ratio
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("chip"), _clip_chip); // 1% from vow incentive
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tip"), _clip_tip + rad); // 10$ flat fee incentive
-    await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("stopped"), _clip_stopped);
-    await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("spotter"), spot.address);
-    await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("dog"), dog.address);
-    await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
-    await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("calc"), abacus.address);
-
+    
+    await(await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau)).wait(); // Price will reach 0 after this time
+    await(await clip.rely(dog.address)).wait();
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("buf"), _clip_buf)).wait(); // 2%
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tail"), _clip_tail)).wait(); // 30mins reset time
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("cusp"), _clip_cusp)).wait(); // 60% reset ratio
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("chip"), _clip_chip)).wait(); // 1% from vow incentive
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tip"), _clip_tip + rad)).wait(); // 10$ flat fee incentive
+    await(await clip["file(bytes32,uint256)"](ethers.utils.formatBytes32String("stopped"), _clip_stopped)).wait();
+    await(await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("spotter"), spot.address)).wait();
+    await(await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("dog"), dog.address)).wait();
+    await(await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address)).wait();
+    await(await clip["file(bytes32,address)"](ethers.utils.formatBytes32String("calc"), abacus.address)).wait();
     console.log("Interaction...");
-    await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000});
-    await interaction.poke(masterVault.address, {gasLimit: 200000});
-    await interaction.drip(masterVault.address, {gasLimit: 200000});
-    await interaction.enableWhitelist(); // Deposits are limited to whitelist
-    await interaction.setWhitelistOperator(whitelistOperatorAddress); // Whitelist manager
-
+    await(await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000})).wait();
+    await(await interaction.poke(masterVault.address, {gasLimit: 200000})).wait();
+    await(await interaction.drip(masterVault.address, {gasLimit: 200000})).wait();
+    await(await interaction.enableWhitelist()).wait();                                 // Deposits are limited to whitelist
+    await(await interaction.setWhitelistOperator(whitelistOperatorAddress)).wait();    // Whitelist manager
     console.log("DEPLOYMENT LIVE");
 }
 
