@@ -92,15 +92,16 @@ ReentrancyGuardUpgradeable
     function _deposit(uint256 amount) internal returns (uint256 value) {
         require(amount > 0, "invalid deposit amount");
         uint256 dexAmount = getAmountOut(_wMaticAddress, address(_certToken), amount);
-        uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
+        // uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
+        (uint256 minAmount,) = _pool.getAmountOut(false, amount, false);
         uint256 realAmount;
         if(dexAmount > minAmount) {
-            realAmount = swapV3(_wMaticAddress, address(_certToken), amount, minAmount - 100, address(this));
+            realAmount = swapV3(_wMaticAddress, address(_certToken), amount, minAmount, address(this));
         } else {
             realAmount = _pool.swap(true, amount, address(this));
         }
 
-        require(realAmount > minAmount, "price too low");
+        require(realAmount >= minAmount, "price too low");
 
         require(
             _certToken.balanceOf(address(this)) >= realAmount,

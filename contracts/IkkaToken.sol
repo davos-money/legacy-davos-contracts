@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract IkkaToken is ERC20Upgradeable {
+contract IkkaToken is ERC20PausableUpgradeable {
 
-    event Start(address user);
-    event Stop(address user);
     event MintedRewardsSupply(address rewardsContract, uint256 amount);
 
-    bool public  stopped;
     address public rewards;
 
     // --- Auth ---
@@ -28,14 +25,9 @@ contract IkkaToken is ERC20Upgradeable {
         _;
     }
 
-    modifier stoppable {
-        require(!stopped, "ikka-is-stopped");
-        _;
-    }
-
-    // --- Init ---
     function initialize(uint256 rewardsSupply_, address rewards_) public initializer {
         __ERC20_init_unchained("Ikka Reward token", "IKKA");
+        __ERC20Pausable_init();
         wards[msg.sender] = 1;
         rewards = rewards_;
         _mint(rewards, rewardsSupply_);
@@ -43,24 +35,22 @@ contract IkkaToken is ERC20Upgradeable {
         emit MintedRewardsSupply(rewards, rewardsSupply_);
     }
 
-    function mint(address _to, uint256 _amount) external auth stoppable returns(bool) {
+    function mint(address _to, uint256 _amount) external auth returns(bool) {
         require(_to != rewards, "IkkaToken/rewards-oversupply");
         _mint(_to, _amount);
         return true;
     }
 
-    function burn(uint256 _amount) external stoppable returns(bool) {
+    function burn(uint256 _amount) external returns(bool) {
         _burn(msg.sender, _amount);
         return true;
     }
 
-    function stop() public auth {
-        stopped = true;
-        emit Stop(msg.sender);
+    function pause() external auth {
+        _pause();
     }
-
-    function start() public auth {
-        stopped = false;
-        emit Start(msg.sender);
+    
+    function unpause() external auth {
+        _unpause();
     }
 }
