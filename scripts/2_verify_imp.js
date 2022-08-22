@@ -70,7 +70,13 @@ async function main() {
     await hre.run("verify:verify", {address: oracle});
     await hre.run("verify:verify", {address: abacusImp});
     await hre.run("verify:verify", {address: rewardsImp});
-    await hre.run("verify:verify", {address: ikkaTokenImp});   
+    await hre.run("verify:verify", {address: interactionImp});
+    await hre.run("verify:verify", {address: auctionProxy});
+    await hre.run("verify:verify", {address: helioProviderImp});
+    await hre.run("verify:verify", {address: priceGetter});
+    await hre.run("verify:verify", {address: LPImp});
+    await hre.run("verify:verify", {address: swapPoolImplementation});
+    // await hre.run("verify:verify", {address: ikkaTokenImp});   
 }
 
 main()

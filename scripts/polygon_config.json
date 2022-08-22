@@ -4,9 +4,6 @@
     "_dex" : "0xE592427A0AEce92De3Edee1F18E0157C05861564",
     "_dexFactory": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
     "_dexPairFee" : "500",
-    "_swapPool" : "",
-    "_priceGetter" : "",
-
     "_chainId": 137,
     
     "_maxDepositFee" : 500000, 
@@ -36,10 +33,12 @@
     "_clip_tip": "10",
     "_clip_stopped": "0",
 
-    "_whitelistOperator" : "0x57F9672bA603251C9C03B36cabdBBcA7Ca8Cfcf4",
-    
-    "_swapPoolManager" : "0x57F9672bA603251C9C03B36cabdBBcA7Ca8Cfcf4",
+    "_multisig": "",
+    "_whitelistOperator" : "",
+
+    "_swapPoolManager" : "",
     "_swapPool_stakeFee": 100,
     "_swapPool_unstakeFee": 100,
+
     "_maticPool": ""
 }
