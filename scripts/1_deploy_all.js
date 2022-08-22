@@ -271,6 +271,7 @@ async function main() {
     await(await ceaMATICc.changeVault(ceVault.address)).wait();
     await(await ceVault.changeRouter(cerosRouter.address)).wait();
     await(await sMatic.changeMinter(sikkaProvider.address)).wait();
+    await(await sikkaProvider.changeProxy(interaction.address)).wait();
 
     console.log("MasterVault init...");
     await(await masterVault.setWaitingPool(waitingPool.address)).wait();
@@ -401,10 +402,10 @@ async function main() {
         rewards        : rewards.address,
         rewardsImp     : rewardsImp,
         interaction    : interaction.address,
-        interactionImp : interactionImp,
+        interactionImp : interactionImplAddress,
         auctionProxy   : auctionProxy.address,
-        helioProvider  : helioProvider.address,
-        helioProviderImp: helioProviderImp,
+        sikkaProvider  : sikkaProvider.address,
+        sikkaProviderImp: sikkaProviderImplementation,
         priceGetter     : priceGetter.address,
         LP              : lp.address,
         LPImp           : lpImplementation,
