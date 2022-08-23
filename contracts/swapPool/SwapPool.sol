@@ -256,6 +256,8 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
   ) external payable virtual onlyIntegrator nonReentrant returns (uint256 amountOut) {
     if (nativeToCeros) {
       require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
+    } else {
+      require(msg.value == 0, "no need to send value if swapping ceros to Native");
     }
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
@@ -586,11 +588,11 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
       maticPool.stake{ value: amount }(false);
     } else {
       uint256 cerosAmt = (amount * ratio) / 1e18;
-      uint256 commision = maticPool.unstakeCommision();
+      uint256 commission = maticPool.unstakeCommission();
       cerosTokenAmount -= cerosAmt;
-      nativeTokenAmount -= commision;
-      nativeToken.withdraw(commision);
-      maticPool.unstake{ value: commision }(cerosAmt, false);
+      nativeTokenAmount -= commission;
+      nativeToken.withdraw(commission);
+      maticPool.unstake{ value: commission }(cerosAmt, false);
     }
   }
 

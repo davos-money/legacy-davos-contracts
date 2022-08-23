@@ -6,7 +6,7 @@ interface IMaticPool {
 
   function unstake(uint256 amount, bool isRebasing) external payable;
 
-  function stakeCommision() external view returns (uint256);
+  function stakeCommission() external view returns (uint256);
 
-  function unstakeCommision() external view returns (uint256);
+  function unstakeCommission() external view returns (uint256);
 }
