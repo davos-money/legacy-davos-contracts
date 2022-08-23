@@ -40,11 +40,8 @@ ReentrancyGuardUpgradeable
         address certToken,
         address wMaticToken,
         address ceToken,
-        // address bondToken,
         address vault,
         address dexAddress,
-        // address masterVault,
-        // address pool,
         uint24 pairFee,
         address swapPool,
         address priceGetter
@@ -93,7 +90,7 @@ ReentrancyGuardUpgradeable
         require(amount > 0, "invalid deposit amount");
         uint256 dexAmount = getAmountOut(_wMaticAddress, address(_certToken), amount);
         // uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
-        (uint256 minAmount,) = _pool.getAmountOut(false, amount, false);
+        (uint256 minAmount,) = _pool.getAmountOut(true, amount, false);
         uint256 realAmount;
         if(dexAmount > minAmount) {
             realAmount = swapV3(_wMaticAddress, address(_certToken), amount, minAmount, address(this));

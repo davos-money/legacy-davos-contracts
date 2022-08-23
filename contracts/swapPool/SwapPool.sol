@@ -254,7 +254,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     uint256 amountIn,
     address receiver
   ) external payable virtual onlyIntegrator nonReentrant returns (uint256 amountOut) {
-    require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
+    if (nativeToCeros) {
+      require(msg.value == amountIn, "You should send the amountIn coin to the cointract");
+    }
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
 

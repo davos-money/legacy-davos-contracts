@@ -15,7 +15,6 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     IMasterVault public vault;
 
     address private _swapPool;
-    // address public _rewardsPool;
 
     event SwapPoolChanged(address swapPool);
     event CeRouterChanged(address ceRouter);
@@ -27,14 +26,12 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         address ceRouter,
         address certToekn,
         address masterVault,
-        // address rewardsPool,
         address swapPool
     ) public initializer {
         __BaseStrategy_init(destination, feeRecipient, underlyingToken);
         _ceRouter = ICerosRouter(ceRouter);
         _certToken = ICertToken(certToekn);
         _swapPool = swapPool;
-        // _rewardsPool = rewardsPool;
         vault = IMasterVault(masterVault);
         underlying.approve(address(_ceRouter), type(uint256).max);
         underlying.approve(address(vault), type(uint256).max);
@@ -73,7 +70,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         return _withdraw(amount);
     }
 
-    function panic() external onlyVault returns (uint256 value) {
+    function panic() external onlyStrategist returns (uint256 value) {
         (,, uint256 debt) = vault.strategyParams(address(this));
         return _withdraw(debt);
     }
