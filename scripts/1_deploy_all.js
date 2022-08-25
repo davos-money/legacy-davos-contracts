@@ -135,7 +135,7 @@ async function main() {
     console.log("waitingPool     : " + waitingPool.address);
     console.log("imp             : " + waitingPoolImp);
 
-    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [cerosRouter.address, deployer.address, _wMatic, cerosRouter.address, _aMATICc, masterVault.address, swapPool.address], {initializer: "initialize"});
+    cerosYieldConverterStrategy = await upgrades.deployProxy(this.CerosYieldConverterStrategy, [cerosRouter.address, deployer.address, _wMatic, _aMATICc, masterVault.address, swapPool.address], {initializer: "initialize"});
     await cerosYieldConverterStrategy.deployed();
     cerosYieldConverterStrategyImp = await upgrades.erc1967.getImplementationAddress(cerosYieldConverterStrategy.address);
     console.log("cerosStrategy   : " + cerosYieldConverterStrategy.address);

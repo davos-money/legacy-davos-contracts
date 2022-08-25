@@ -17,10 +17,20 @@ contract WaitingPool is Initializable {
         require(msg.sender == address(masterVault));
         _;
     }
+
+    /// @dev initialize function - Constructor for Upgradable contract, can be only called once during deployment
+    /// @param _masterVault name of the vault token
+    /// @param _capLimit symbol of the vault token
     function initialize(address _masterVault, uint256 _capLimit) external initializer {
+        require(_capLimit > 0, "invalid cap limit");
         masterVault = IMasterVault(_masterVault);
         capLimit = _capLimit;
     }
+
+    /// @dev Only masterVault can call to submit a new withdrawal request
+    /// @param _person address of the withdrawer
+    /// @param _debt amount that needs to be paid to _person
+    /// NOTE: withdrawal and swap fees are already deducted in masterVault
     function addToQueue(address _person, uint256 _debt) external onlyMasterVault {
         if(_debt != 0) {
             Person memory p = Person({
@@ -32,6 +42,9 @@ contract WaitingPool is Initializable {
             people.push(p);
         }
     }
+
+    /// @dev Only masterVault can trigger this function to pay outstanding debt of users 
+    ///      and set the settled flag on successful withdrawal.
     function tryRemove() external onlyMasterVault {
         uint256 balance;
         uint256 cap = 0;
@@ -58,18 +71,13 @@ contract WaitingPool is Initializable {
     
     receive() external payable {
     }
-    function _assessFee(uint256 amount, uint256 fees) internal returns(uint256 value) {
-        if(fees > 0) {
-            uint256 fee = (amount * fees) / 1e6;
-            value = amount - fee;
-            payable(masterVault.feeReceiver()).transfer(fee);
-        } else {
-            return amount;
-        }
-    }
+
+    /// @dev returns the balance of this contract
     function getPoolBalance() public view returns(uint256) {
         return address(this).balance;
     }
+
+    /// @dev users can withdraw their funds if they were transferred in tryRemove()
     function withdrawUnsettled(uint256 _index) external {
         require(
             !people[_index]._settled && 
@@ -77,10 +85,13 @@ contract WaitingPool is Initializable {
             people[_index]._address == msg.sender,
             "already settled"
         );
-        totalDebt -= people[index]._debt;
+        totalDebt -= people[_index]._debt;
         people[_index]._settled = true;
-        payable(msg.sender).transfer(people[index]._debt);
+        payable(msg.sender).transfer(people[_index]._debt);
     }
+
+    /// @dev only MasterVault can set new cap limit
+    /// @param _capLimit new cap limit
     function setCapLimit(uint256 _capLimit) external onlyMasterVault {
         require(
             _capLimit != 0, 
