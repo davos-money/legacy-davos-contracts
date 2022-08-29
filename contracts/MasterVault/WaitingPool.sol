@@ -13,6 +13,10 @@ contract WaitingPool is Initializable {
     uint256 public index;
     uint256 public totalDebt;
     uint256 public capLimit;
+
+    event WithdrawPending(address user, uint256 amount);
+    event WithdrawCompleted(address user, uint256 amount);
+
     modifier onlyMasterVault() {
         require(msg.sender == address(masterVault));
         _;
@@ -40,6 +44,7 @@ contract WaitingPool is Initializable {
             });
             totalDebt += _debt;
             people.push(p);
+            emit WithdrawPending(_person, _debt);
         }
     }
 
@@ -50,19 +55,22 @@ contract WaitingPool is Initializable {
         uint256 cap = 0;
         for(uint256 i = index; i < people.length; i++) {
             balance = address(this).balance;
+            uint256 userDebt = people[index]._debt;
+            address userAddr = people[index]._address;
             if(
-                balance >= people[index]._debt && 
-                people[index]._debt != 0 &&
+                balance >= userDebt && 
+                userDebt != 0 &&
                 !people[index]._settled && 
                 cap < capLimit
             ) {
-                bool success = payable(people[index]._address).send(people[index]._debt);
-                if(success) {
-                    totalDebt -= people[index]._debt;
-                    people[index]._settled = true;
-                }
+                bool success = payable(userAddr).send(userDebt);
                 cap++;
                 index++;
+                if(success) {
+                    totalDebt -= userDebt;
+                    people[index]._settled = true;
+                    emit WithdrawCompleted(userAddr, userDebt);
+                }
             } else {
                 return;
             }
@@ -77,17 +85,20 @@ contract WaitingPool is Initializable {
         return address(this).balance;
     }
 
-    /// @dev users can withdraw their funds if they were transferred in tryRemove()
+    /// @dev users can withdraw their funds if they were not transferred in tryRemove()
     function withdrawUnsettled(uint256 _index) external {
+        address src = msg.sender;
         require(
             !people[_index]._settled && 
             _index < index && 
-            people[_index]._address == msg.sender,
+            people[_index]._address == src,
             "already settled"
         );
-        totalDebt -= people[_index]._debt;
+        uint256 withdrawAmount = people[_index]._debt;
+        totalDebt -= withdrawAmount;
         people[_index]._settled = true;
-        payable(msg.sender).transfer(people[_index]._debt);
+        payable(src).transfer(withdrawAmount);
+        emit WithdrawCompleted(src, withdrawAmount);
     }
 
     /// @dev only MasterVault can set new cap limit

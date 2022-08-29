@@ -81,8 +81,8 @@ ReentrancyGuardUpgradeable
         uint8 maxStrategies,
         address swapPoolAddr
     ) public initializer {
-        require(maxDepositFees > 0 && maxDepositFees < 500000);
-        require(maxWithdrawalFees > 0 && maxDepositFees < 500000);
+        require(maxDepositFees > 0 && maxDepositFees < 1e6, "invalid maxDepositFee");
+        require(maxWithdrawalFees > 0 && maxDepositFees < 1e6, "invalid maxWithdrawalFees");
 
         __Ownable_init();
         __Pausable_init();
@@ -153,7 +153,7 @@ ReentrancyGuardUpgradeable
                     IWETH(asset()).withdraw(wethBalance);
                     payable(address(waitingPool)).transfer(wethBalance);
                 }
-                emit Withdraw(src, src, src, amount, amount);
+                emit Withdraw(src, src, src, amount, shares);
                 return amount;
             }
             // assess swapFee only on the assests which were already in the contract.
@@ -268,7 +268,7 @@ ReentrancyGuardUpgradeable
             }
         }
 
-        require(totalAllocations < 1e6, "allocations cannot be more than 100%");
+        require(totalAllocations + allocation < 1e6, "allocations cannot be more than 100%");
 
         StrategyParams memory params = StrategyParams({
             active: true,
@@ -327,7 +327,6 @@ ReentrancyGuardUpgradeable
                         if(withdrawAmount > 0) {
                             _withdrawFromStrategy(strategies[i], withdrawAmount);
                         }
-                            
                     }
                 }
             }

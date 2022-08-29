@@ -104,10 +104,13 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, ((amount - wethBalance) * _certToken.ratio()) / 1e18, false); // (amount * ratio) / 1e18
         if (enoughLiquidity) {
             value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
-            if (amount < wethBalance + value) {
-                underlying.transfer(feeRecipient, (wethBalance + value) - amount);
+            require(value >= amountOut, "invalid out amount");
+            uint256 withdrawAmount = wethBalance + value;
+            if (amount < withdrawAmount) {
+                // transfer extra funds to feeRecipient 
+                underlying.transfer(feeRecipient, withdrawAmount - amount);
             } else {
-                amount = wethBalance + value;
+                amount = withdrawAmount;
             }
             underlying.transfer(address(vault), amount);
             return amount;
@@ -133,7 +136,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
     }
 
-    /// @dev internal function to claim yeild from ceros in aMATICc and transfers to feeRecipient
+    /// @dev internal function to claim yeild from ceros in aMATICc and transfers to desired address
     function _harvestTo(address to) private returns(uint256 yield) {
         yield = _ceRouter.getYieldFor(address(this));
         if(yield > 0) {
@@ -161,6 +164,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     function changeCeRouter(address ceRouter) external onlyOwner {
         require(ceRouter != address(0));
         underlying.approve(address(_ceRouter), 0);
+        destination = ceRouter;
         _ceRouter = ICerosRouter(ceRouter);
         underlying.approve(address(_ceRouter), type(uint256).max);
         emit CeRouterChanged(ceRouter);
