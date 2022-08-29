@@ -62,6 +62,16 @@ ReentrancyGuardUpgradeable
         );
         _;
     }
+
+    /// @dev initialize function - Constructor for Upgradable contract, can be only called once during deployment
+    /// @dev Deploys the contract and sets msg.sender as owner
+    /// @param name name of the vault token
+    /// @param symbol symbol of the vault token
+    /// @param maxDepositFees Fees charged in parts per million; 1% = 10000ppm
+    /// @param maxWithdrawalFees Fees charged in parts per million; 1% = 10000ppm
+    /// @param asset underlying asset address
+    /// @param maxStrategies Number of maximum strategies
+    /// @param swapPoolAddr Address of swapPool contract
     function initialize(
         string memory name,
         string memory symbol,
@@ -71,6 +81,9 @@ ReentrancyGuardUpgradeable
         uint8 maxStrategies,
         address swapPoolAddr
     ) public initializer {
+        require(maxDepositFees > 0 && maxDepositFees < 1e6, "invalid maxDepositFee");
+        require(maxWithdrawalFees > 0 && maxDepositFees < 1e6, "invalid maxWithdrawalFees");
+
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -83,6 +96,9 @@ ReentrancyGuardUpgradeable
         feeReceiver = payable(msg.sender);
         swapPool = ISwapPool(swapPoolAddr);
     }
+    
+    /// @dev deposits assets and mints shares(amount - swapFee + depositFee) to callers address
+    /// @return shares - number of minted vault tokens
     function depositETH() public 
     payable
     override
@@ -93,9 +109,13 @@ ReentrancyGuardUpgradeable
         address src = msg.sender;
         uint256 amount = msg.value;
         require(amount > 0, "invalid amount");
+        shares = _assessSwapFee(amount, swapPool.stakeFee());
         shares = _assessFee(amount, depositFee);
+
         uint256 waitingPoolDebt = waitingPool.totalDebt();
         uint256 waitingPoolBalance = address(waitingPool).balance;
+
+        // check and fullfil the pending withdrawals of the waiting pool first
         if(waitingPoolDebt > 0 && waitingPoolBalance < waitingPoolDebt) {
             uint256 poolAmount = (waitingPoolDebt < shares) ? waitingPoolDebt - waitingPoolBalance : shares;
             payable(address(waitingPool)).transfer(poolAmount);
@@ -106,6 +126,11 @@ ReentrancyGuardUpgradeable
         _mint(src, shares);
         emit Deposit(src, src, amount, shares);
     }
+
+    /// @dev burns vault tokens and withdraws(amount - swapFee + withdrawalFee) to callers address
+    /// @param account receipient's address
+    /// @param amount amount of assets to withdraw
+    /// @return shares : amount of assets(excluding fee)
     function withdrawETH(address account, uint256 amount) 
     external
     override
@@ -120,20 +145,21 @@ ReentrancyGuardUpgradeable
         if(wethBalance < amount) {
             shares = withdrawFromActiveStrategies(amount - wethBalance);
             if(shares == 0) {
-                // submit to waiting pool
-                shares = _assessSwapFee(amount);
+                // deduct swapFee and withdrawalFee and then submit to waiting pool
+                shares = _assessSwapFee(amount, swapPool.unstakeFee());
                 shares = _assessFee(shares, withdrawalFee);
                 waitingPool.addToQueue(account, shares);
                 if(wethBalance > 0) {
                     IWETH(asset()).withdraw(wethBalance);
                     payable(address(waitingPool)).transfer(wethBalance);
                 }
-                emit Withdraw(src, src, src, amount, amount);
+                emit Withdraw(src, src, src, amount, shares);
                 return amount;
             }
-            shares += _assessSwapFee(wethBalance);
+            // assess swapFee only on the assests which were already in the contract.
+            shares += _assessSwapFee(wethBalance, swapPool.unstakeFee());
         } else {
-            shares = _assessSwapFee(amount);
+            shares = _assessSwapFee(amount, swapPool.unstakeFee());
         }
         shares = _assessFee(shares, withdrawalFee);
         IWETH(asset()).withdraw(shares);
@@ -142,9 +168,15 @@ ReentrancyGuardUpgradeable
         emit Withdraw(src, src, src, amount, shares);
         return amount;
     }
+
+    /// @dev Triggers tryRemove() of waiting pool contract
     function payDebt() public {
         waitingPool.tryRemove();
     }
+
+    /// @dev attemps withdrawal from the strategies
+    /// @param amount assets to withdraw from strategy
+    /// @return withdrawn - assets withdrawn from the strategy
     function withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn) {
         for(uint8 i = 0; i < strategies.length; i++) {
            if(strategyParams[strategies[i]].active && 
@@ -153,6 +185,10 @@ ReentrancyGuardUpgradeable
            }
         }
     }
+
+    /// @dev internal method to deposit assets into the given strategy
+    /// @param strategy address of the strategy
+    /// @param amount assets to deposit into strategy
     function _depositToStrategy(address strategy, uint256 amount) private {
         require(amount > 0, "invalid deposit amount");
         IWETH weth = IWETH(asset());
@@ -161,23 +197,43 @@ ReentrancyGuardUpgradeable
         strategyParams[strategy].debt += amount;
         weth.transfer(strategy, amount);
     }
+
+    /// @dev deposits all the assets into the given strategy
+    /// @param strategy address of the strategy
     function depositAllToStrategy(address strategy) public onlyManager {
         uint256 amount = totalAssetInVault();
         _depositToStrategy(strategy, amount);
         IBaseStrategy(strategy).deposit(amount);
         emit DepositedToStrategy(strategy, amount);
     }
+    /// @dev deposits specific amount of assets into the given strategy
+    /// @param strategy address of the strategy
+    /// @param amount assets to deposit into strategy
     function depositToStrategy(address strategy, uint256 amount) public onlyManager {
         _depositToStrategy(strategy, amount);
         IBaseStrategy(strategy).deposit(amount);
         emit DepositedToStrategy(strategy, amount);
     }
+
+    /// @dev withdraw specific amount of assets from the given strategy
+    /// @param strategy address of the strategy
+    /// @param amount assets to withdraw from the strategy
     function withdrawFromStrategy(address strategy, uint256 amount) public onlyManager {
         _withdrawFromStrategy(strategy, amount);
     }
+
+    /// @dev withdraw strategy's total debt
+    /// @param strategy address of the strategy
     function withdrawAllFromStrategy(address strategy) external onlyManager {
         _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
     }
+
+    /// @dev internal function to withdraw specific amount of assets from the given strategy
+    /// @param strategy address of the strategy
+    /// @param amount assets to withdraw from the strategy
+    /// NOTE: subtracts the given amount of assets instead of value(withdrawn funds) because 
+    ///       of the swapFee that is deducted in the swapPool contract and that fee needs 
+    ///       to be paid by the users only
     function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256) {
         require(amount > 0, "invalid withdrawal amount");
         require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
@@ -189,6 +245,11 @@ ReentrancyGuardUpgradeable
         }
         return value;
     }
+
+    /// @dev sets new strategy
+    /// @param strategy address of the strategy
+    /// @param allocation percentage of total assets available in the contract 
+    ///                   that needs to be allocated to the given strategy
     function setStrategy(
         address strategy,
         uint256 allocation   // 1% = 10000
@@ -197,32 +258,57 @@ ReentrancyGuardUpgradeable
         require(strategy != address(0));
         require(strategies.length < MAX_STRATEGIES, "max strategies exceeded");
 
+        uint256 totalAllocations;
         for(uint256 i = 0; i < strategies.length; i++) {
             if(strategies[i] == strategy) {
                 revert("strategy already exists");
             }
+            if(strategyParams[strategies[i]].active) {
+                totalAllocations += strategyParams[strategies[i]].allocation;
+            }
         }
+
+        require(totalAllocations + allocation < 1e6, "allocations cannot be more than 100%");
 
         StrategyParams memory params = StrategyParams({
             active: true,
             allocation: allocation,
             debt: 0
         });
-        
+
         strategyParams[strategy] = params;
         strategies.push(strategy);
         emit StrategyAdded(strategy, allocation);
     }
+    
+    /// @dev withdraws all the assets from the strategy and marks it inactive
+    /// @param strategy address of the strategy
+    /// NOTE: To avoid any unforeseen issues because of solidity divisions 
+    ///       and always be able to deactivate a strategy, 
+    ///       it withdraws strategy's (debt - 10) assets and set debt to 0.
     function retireStrat(address strategy) external onlyManager {
         // require(strategyParams[strategy].active, "strategy is not active");
+        if(_deactivateStrategy(strategy)) {
+            return;
+        }
         _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
+        _deactivateStrategy(strategy);
+    }
+
+    /// @dev internal function to check strategy's debt and deactive it.
+    /// @param strategy address of the strategy
+    function _deactivateStrategy(address strategy) private returns(bool success) {
         if (strategyParams[strategy].debt <= 10) {
             strategyParams[strategy].active = false;
             strategyParams[strategy].debt = 0;
+            return true;
         }
     }
+
+    /// @dev Tries to allocate funds to strategies based on their allocations.
+    /// NOTE: OnlyManager can trigger this function
+    ///      (It will be triggered mostly in case of deposits to avoid unnecessary swapFees)
     function allocate() external onlyManager {
-        // allocate to all active strategies based on respective allocation
         for(uint8 i = 0; i < strategies.length; i++) {
             if(strategyParams[strategies[i]].active) {
                 StrategyParams memory strategy =  strategyParams[strategies[i]];
@@ -241,21 +327,42 @@ ReentrancyGuardUpgradeable
                         if(withdrawAmount > 0) {
                             _withdrawFromStrategy(strategies[i], withdrawAmount);
                         }
-                            
                     }
                 }
             }
         }
     }
+
+    function _isValidAllocation() private view returns(bool) {
+        uint256 totalAllocations;
+        for(uint256 i = 0; i < strategies.length; i++) {
+            if(strategyParams[strategies[i]].active) {
+                totalAllocations += strategyParams[strategies[i]].allocation;
+            }
+        }
+
+        return totalAllocations <= 1e16;
+    }
+
+    /// @dev Returns the amount of assets that can be withdrawn instantly
     function availableToWithdraw() public view returns(uint256 available) {
         for(uint8 i = 0; i < strategies.length; i++) {
             available += IWETH(asset()).balanceOf(strategies[i]);   // excluding the amount that is deposited to strategies
         }
         available += totalAssetInVault();
     }
+
+    /// @dev Returns the amount of assets present in the contract(assetBalance - feeEarned)
     function totalAssetInVault() public view returns(uint256 balance) {
         return (totalAssets() > feeEarned) ? totalAssets() - feeEarned : 0;
     }
+
+    /// @dev migrates strategy contract - withdraws everything from the oldStrategy and 
+    ///      overwrites it with new strategy
+    /// @param oldStrategy address of the old strategy
+    /// @param newStrategy address of the new strategy 
+    /// @param newAllocation percentage of total assets available in the contract
+    ///                      that needs to be allocated to the new strategy
     function migrateStrategy(address oldStrategy, address newStrategy, uint256 newAllocation) external onlyManager {
         require(oldStrategy != address(0));
         require(newStrategy != address(0));
@@ -281,8 +388,13 @@ ReentrancyGuardUpgradeable
             }
         }
         require(isValidStrategy, "invalid oldStrategy address");
+        require(_isValidAllocation(), "allocations cannot be more than 100%");
         emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
     }
+
+    /// @dev deducts the fee percentage from the given amount
+    /// @param amount amount to deduct fee from
+    /// @param fees fee percentage
     function _assessFee(uint256 amount, uint256 fees) private returns(uint256 value) {
         if(fees > 0) {
             uint256 fee = (amount * fees) / 1e6;
@@ -292,9 +404,13 @@ ReentrancyGuardUpgradeable
             return amount;
         }
     }
-    function _assessSwapFee(uint256 amount) private returns(uint256 value) {
-        if(swapPool.unstakeFee() > 0 && amount > 0) {
-            uint256 swapFee =  (amount * swapPool.unstakeFee()) / swapPool.FEE_MAX();
+
+    /// @dev deducts the fee percentage from the given amount
+    /// @param amount amount to deduct fee from
+    /// @param fee fee percentage
+    function _assessSwapFee(uint256 amount, uint fee) private returns(uint256 value) {
+        if(fee > 0 && amount > 0) {
+            uint256 swapFee =  (amount * fee) / swapPool.FEE_MAX();
             feeEarned += swapFee;
             return (amount - swapFee);
         } else {
@@ -303,72 +419,112 @@ ReentrancyGuardUpgradeable
     }
     receive() external payable {
     }
+
+    /// @dev only owner can call this function to withdraw earned fees
     function withdrawFee() external onlyOwner{
         if(feeEarned > 0) {
             IWETH(asset()).withdraw(feeEarned);
             feeEarned = 0;
             feeReceiver.transfer(feeEarned);
         }
-    } 
+    }
+
+    /// @dev only owner can set new deposit fee
+    /// @param newDepositFee new deposit fee percentage
     function setDepositFee(uint256 newDepositFee) external onlyOwner {
         require(maxDepositFee > newDepositFee,"more than maxDepositFee");
         depositFee = newDepositFee;    // 1% = 10000ppm
         emit DepositFeeChanged(newDepositFee);
     }
+
+    /// @dev only owner can set new withdrawal fee
+    /// @param newWithdrawalFee new withdrawal fee percentage
     function setWithdrawalFee(uint256 newWithdrawalFee) external onlyOwner {
         require(maxWithdrawalFee > newWithdrawalFee,"more than maxWithdrawalFee");
         withdrawalFee = newWithdrawalFee;
         emit WithdrawalFeeChanged(newWithdrawalFee);
     }
+
+    /// @dev only owner can set new waiting pool address
+    /// @param _waitingPool new waiting pool address
     function setWaitingPool(address _waitingPool) external onlyOwner {
         require(_waitingPool != address(0));
         waitingPool = IWaitingPool(_waitingPool);
         emit WaitingPoolChanged(_waitingPool);
     }
+
+    /// @dev only owner can set new cap limit of waiting pool
+    /// @param _cap new cap limit
     function setWaitingPoolCap(uint256 _cap) external onlyOwner {
         waitingPool.setCapLimit(_cap);
         emit WaitingPoolCapChanged(_cap);
     }
+
+    /// @dev only owner can add new manager
+    /// @param newManager new manager address
     function addManager(address newManager) external onlyOwner {
         require(newManager != address(0));
         manager[newManager] = true;
         emit ManagerAdded(newManager);
     }
+
+    /// @dev only owner can remove manager
+    /// @param _manager manager address
     function removeManager(address _manager) external onlyOwner {
         require(manager[_manager]);
         manager[_manager] = false;
         emit ManagerRemoved(_manager);
     } 
+
+    /// @dev only owner can change provider address
+    /// @param provider new provider address
     function changeProvider(address provider) external onlyOwner {
         require(provider != address(0));
         _provider = provider;
         emit ProviderChanged(provider);
     }
+
+    /// @dev only owner can change fee receiver address
+    /// @param _feeReceiver new fee receiver address
     function changeFeeReceiver(address payable _feeReceiver) external onlyOwner {
         require(_feeReceiver != address(0));
         feeReceiver = _feeReceiver;
         emit FeeReceiverChanged(_feeReceiver);
     }
+
+    /// @dev only owner can change swap pool address
+    /// @param _swapPool new swap pool address
     function changeSwapPool(address _swapPool) external onlyOwner {
         require(_swapPool != address(0));
         swapPool = ISwapPool(_swapPool);
         emit SwapPoolChanged(_swapPool);
     }
+
+    /// @dev only owner can change strategy's allocation
+    /// @param strategy strategy address
+    /// @param allocation new allocation - percentage of total assets available in the contract
+    ///                   that needs to be allocated to the new strategy
     function changeStrategyAllocation(address strategy, uint256 allocation) external onlyOwner {
         require(strategy != address(0));        
         strategyParams[strategy].allocation = allocation;
+        require(_isValidAllocation(), "allocations cannot be more than 100%");
+
         emit StrategyAllocationChanged(strategy, allocation);
     }
     function deposit(uint256 assets, address receiver) public override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
+        revert();
     }
     function mint(uint256 shares, address receiver) public override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
+        revert();
     }
     function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
+        revert();
     }
     function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
         // Kept only for the sake of ERC4626 standard
+        revert();
     }
 }

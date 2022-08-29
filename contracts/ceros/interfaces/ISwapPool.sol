@@ -15,6 +15,7 @@ interface ISwapPool {
         external view returns(uint amountOut, bool enoughLiquidity);
     
     function unstakeFee() external view returns (uint24 unstakeFee);
+    function stakeFee() external view returns (uint24 stakeFee);
 
     function FEE_MAX() external view returns (uint24 feeMax);
 }

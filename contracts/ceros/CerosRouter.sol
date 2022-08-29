@@ -164,7 +164,7 @@ ReentrancyGuardUpgradeable
         } else {
             amountOut = _pool.swap(false, realAmount, recipient);
         }
-        // require(amountOut >= amount, "price too low");
+        require(amountOut >= outAmount, "price too low");
         emit Withdrawal(msg.sender, recipient, _wMaticAddress, amountOut);
         return amountOut;
     }

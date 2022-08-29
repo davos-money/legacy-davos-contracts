@@ -13,14 +13,28 @@ contract WaitingPool is Initializable {
     uint256 public index;
     uint256 public totalDebt;
     uint256 public capLimit;
+
+    event WithdrawPending(address user, uint256 amount);
+    event WithdrawCompleted(address user, uint256 amount);
+
     modifier onlyMasterVault() {
         require(msg.sender == address(masterVault));
         _;
     }
+
+    /// @dev initialize function - Constructor for Upgradable contract, can be only called once during deployment
+    /// @param _masterVault name of the vault token
+    /// @param _capLimit symbol of the vault token
     function initialize(address _masterVault, uint256 _capLimit) external initializer {
+        require(_capLimit > 0, "invalid cap limit");
         masterVault = IMasterVault(_masterVault);
         capLimit = _capLimit;
     }
+
+    /// @dev Only masterVault can call to submit a new withdrawal request
+    /// @param _person address of the withdrawer
+    /// @param _debt amount that needs to be paid to _person
+    /// NOTE: withdrawal and swap fees are already deducted in masterVault
     function addToQueue(address _person, uint256 _debt) external onlyMasterVault {
         if(_debt != 0) {
             Person memory p = Person({
@@ -30,26 +44,33 @@ contract WaitingPool is Initializable {
             });
             totalDebt += _debt;
             people.push(p);
+            emit WithdrawPending(_person, _debt);
         }
     }
+
+    /// @dev Only masterVault can trigger this function to pay outstanding debt of users 
+    ///      and set the settled flag on successful withdrawal.
     function tryRemove() external onlyMasterVault {
         uint256 balance;
         uint256 cap = 0;
         for(uint256 i = index; i < people.length; i++) {
             balance = address(this).balance;
+            uint256 userDebt = people[index]._debt;
+            address userAddr = people[index]._address;
             if(
-                balance >= people[index]._debt && 
-                people[index]._debt != 0 &&
+                balance >= userDebt && 
+                userDebt != 0 &&
                 !people[index]._settled && 
                 cap < capLimit
             ) {
-                bool success = payable(people[index]._address).send(people[index]._debt);
-                if(success) {
-                    totalDebt -= people[index]._debt;
-                    people[index]._settled = true;
-                }
+                bool success = payable(userAddr).send(userDebt);
                 cap++;
                 index++;
+                if(success) {
+                    totalDebt -= userDebt;
+                    people[index]._settled = true;
+                    emit WithdrawCompleted(userAddr, userDebt);
+                }
             } else {
                 return;
             }
@@ -58,29 +79,30 @@ contract WaitingPool is Initializable {
     
     receive() external payable {
     }
-    function _assessFee(uint256 amount, uint256 fees) internal returns(uint256 value) {
-        if(fees > 0) {
-            uint256 fee = (amount * fees) / 1e6;
-            value = amount - fee;
-            payable(masterVault.feeReceiver()).transfer(fee);
-        } else {
-            return amount;
-        }
-    }
+
+    /// @dev returns the balance of this contract
     function getPoolBalance() public view returns(uint256) {
         return address(this).balance;
     }
+
+    /// @dev users can withdraw their funds if they were not transferred in tryRemove()
     function withdrawUnsettled(uint256 _index) external {
+        address src = msg.sender;
         require(
             !people[_index]._settled && 
             _index < index && 
-            people[_index]._address == msg.sender,
+            people[_index]._address == src,
             "already settled"
         );
-        totalDebt -= people[index]._debt;
+        uint256 withdrawAmount = people[_index]._debt;
+        totalDebt -= withdrawAmount;
         people[_index]._settled = true;
-        payable(msg.sender).transfer(people[index]._debt);
+        payable(src).transfer(withdrawAmount);
+        emit WithdrawCompleted(src, withdrawAmount);
     }
+
+    /// @dev only MasterVault can set new cap limit
+    /// @param _capLimit new cap limit
     function setCapLimit(uint256 _capLimit) external onlyMasterVault {
         require(
             _capLimit != 0, 
