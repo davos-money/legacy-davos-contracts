@@ -143,6 +143,13 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         emit CollateralEnabled(token, ilk);
     }
 
+    function setCollateralDuty(address token, uint data) external auth {
+        CollateralType memory collateralType = collaterals[token];
+        _checkIsLive(collateralType.live);
+        jug.drip(collateralType.ilk);
+        jug.file(collateralType.ilk, "duty", data);
+    }
+
     function setSikkaProvider(address token, address sikkaProvider) external auth {
         sikkaProviders[token] = sikkaProvider;
     }

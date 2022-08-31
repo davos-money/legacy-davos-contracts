@@ -335,8 +335,8 @@ async function main() {
     // 1000000000627937192491029810 2% Borrow Rate
     // 1000000000937303470807876290 3% Borrow Rate
     // 1000000003022266000000000000 10% Borrow Rate
-    BR = new BN(_jug_base).toString(); // 2%
-    await(await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR)).wait();
+    // ***We don't set base rate. We set only duty rate via interaction***
+    // await(await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), "1000000000627937192491029810")).wait();
     await(await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address)).wait();
 
     console.log("Vow init...");
@@ -357,6 +357,8 @@ async function main() {
     await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
     await(await interaction.enableWhitelist()).wait();  // Deposits are limited to whitelist
     await(await interaction.setWhitelistOperator(_whitelistOperator)).wait();  // Whitelist manager
+    await(await interaction.setCollateralDuty(ceaMATICc.address, "1000000000627937192491029810")).wait();
+
 
     console.log("Abaci init...");
     await(await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau)).wait(); // Price will reach 0 after this time
