@@ -57,12 +57,12 @@ module.exports = {
             timeout: 10000000
         },
         polygon: {
-            url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_POLYGON_ID}`,
+            url: process.env.ANKR_POLYGON_URL,
             chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
         mumbai: {
-            url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_MUMBAI_ID}`,
+            url: process.env.ANKR_MUMBAI_URL,
             chainId: 80001,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },

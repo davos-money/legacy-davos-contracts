@@ -81,17 +81,17 @@ async function main() {
     console.log("SwapPool...");
 
     let { _swapPoolManager , _swapPool_stakeFee, _swapPool_unstakeFee , _maticPool } = require(`./${hre.network.name}_config.json`);
-    let lp = await upgrades.deployProxy(LP, ["aMATICcLP", "aMATICcLP"], {initializer: "initialize"});
+    let lp = await upgrades.deployProxy(this.LP, ["aMATICcLP", "aMATICcLP"], {initializer: "initialize"});
     await lp.deployed();
     let lpImplementation = await upgrades.erc1967.getImplementationAddress(lp.address);
-    console.log("lp  : " + lp.address);
-    console.log("imp        : " + lpImplementation);
+    console.log("lp              : " + lp.address);
+    console.log("imp             : " + lpImplementation);
 
-    let swapPool = await upgrades.deployProxy(SwapPool, [_wMatic, _aMATICc, lp.address, false, false], {initializer: "initialize"});
+    let swapPool = await upgrades.deployProxy(this.SwapPool, [_wMatic, _aMATICc, lp.address, false, false], {initializer: "initialize"});
     await swapPool.deployed();
     let swapPoolImplementation = await upgrades.erc1967.getImplementationAddress(swapPool.address);
-    console.log("swapPool: " + swapPool.address);
-    console.log("imp        : " + swapPoolImplementation);
+    console.log("swapPool        : " + swapPool.address);
+    console.log("imp             : " + swapPoolImplementation);
 
     // Ceros Deployment
     console.log("Ceros...");
@@ -186,11 +186,11 @@ async function main() {
     console.log("SikkaJoin       :", sikkaJoin.address);
     console.log("SikkaJoinImp    :", sikkaJoinImp)
 
-    let ceaMATICcJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, masterVault.address], {initializer: "initialize"});
-    await ceaMATICcJoin.deployed();
-    ceaMATICcJoinImp = await upgrades.erc1967.getImplementationAddress(ceaMATICcJoin.address);
-    console.log("GemJoin         :", ceaMATICcJoin.address);
-    console.log("GemJoinImp      :", ceaMATICcJoinImp);
+    let gemJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, masterVault.address], {initializer: "initialize"});
+    await gemJoin.deployed();
+    gemJoinImp = await upgrades.erc1967.getImplementationAddress(gemJoin.address);
+    console.log("GemJoin         :", gemJoin.address);
+    console.log("GemJoinImp      :", gemJoinImp);
 
     let jug = await upgrades.deployProxy(this.Jug, [vat.address], {initializer: "initialize"});
     await jug.deployed();
@@ -279,7 +279,7 @@ async function main() {
     await(await masterVault.changeProvider(sikkaProvider.address)).wait();
 
     console.log("Vat init...");
-    await(await vat.rely(ceaMATICcJoin.address)).wait();
+    await(await vat.rely(gemJoin.address)).wait();
     await(await vat.rely(spot.address)).wait();
     await(await vat.rely(sikkaJoin.address)).wait();
     await(await vat.rely(jug.address)).wait();
@@ -292,6 +292,7 @@ async function main() {
     
     console.log("Sikka init...");
     await(await sikka.rely(sikkaJoin.address)).wait();
+    await(await sikka.setSupplyCap("5000000" + wad)).wait();
 
     console.log("Spot init...");
     await(await spot.rely(interaction.address)).wait();
@@ -302,7 +303,7 @@ async function main() {
     await(await rewards.rely(interaction.address)).wait();
 
     console.log("Joins init...");
-    await(await ceaMATICcJoin.rely(interaction.address)).wait();
+    await(await gemJoin.rely(interaction.address)).wait();
     await(await sikkaJoin.rely(interaction.address)).wait();
     await(await sikkaJoin.rely(vow.address)).wait();
 
@@ -331,6 +332,23 @@ async function main() {
 
     console.log("Jug...");
     await(await jug.rely(interaction.address)).wait();
+    // Initialize Rates Module
+    // IMPORTANT: Base and Duty are added together first, thus will compound together.
+    //            It is adviced to set a constant base first then duty for all ilks.
+    //            Otherwise, a change in base rate will require a change in all ilks rate.
+    //            Due to addition of both rates, the ratio should be adjusted by factoring.
+    //            rate(Base) + rate(Duty) != rate(Base + Duty)
+
+    // Calculating Base Rate (1% Yearly)
+    // ==> principal*(rate**seconds)-principal = 0.01 (1%)
+    // ==> 1 * (BR ** 31536000 seconds) - 1 = 0.01
+    // ==> 1*(BR**31536000) = 1.01
+    // ==> BR**31536000 = 1.01
+    // ==> BR = 1.01**(1/31536000)
+    // ==> BR = 1.000000000315529215730000000 [ray]
+    // Factoring out Ilk Duty Rate (1% Yearly)
+    // ((1 * (BR + 0.000000000312410000000000000 DR)^31536000)-1) * 100 = 0.000000000312410000000000000 = 2% (BR + DR Yearly)
+    
     // 1000000000315522921573372069 1% Borrow Rate
     // 1000000000627937192491029810 2% Borrow Rate
     // 1000000000937303470807876290 3% Borrow Rate
@@ -345,11 +363,7 @@ async function main() {
 
     console.log("Interaction init...");
     await(await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address)).wait();
-    tx = await interaction.setCollateralType(masterVault.address, ceaMATICcJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000});
-    await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
-    tx = await interaction.poke(ceaMATICc.address, {gasLimit: 200000});
-    await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
-    tx = await interaction.drip(ceaMATICc.address, {gasLimit: 200000});
+    tx = await interaction.setCollateralType(masterVault.address, gemJoin.address, _ilkCeMatic, clip.address, _mat, {gasLimit: 700000});
     await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
     tx = await interaction.poke(masterVault.address, {gasLimit: 200000});
     await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
@@ -357,8 +371,8 @@ async function main() {
     await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
     await(await interaction.enableWhitelist()).wait();  // Deposits are limited to whitelist
     await(await interaction.setWhitelistOperator(_whitelistOperator)).wait();  // Whitelist manager
-    await(await interaction.setCollateralDuty(ceaMATICc.address, "1000000000627937192491029810")).wait();
-
+    tx = await interaction.setCollateralDuty(masterVault.address, "1000000000627937192491029810", {gasLimit: 250000});
+    await ethers.provider.waitForTransaction(tx.hash, 1, 60000);
 
     console.log("Abaci init...");
     await(await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau)).wait(); // Price will reach 0 after this time
@@ -391,8 +405,8 @@ async function main() {
         sikkaImp       : sikkaImp,
         sikkaJoin      : sikkaJoin.address,
         sikkaJoinImp   : sikkaJoinImp,
-        gemJoin        : ceaMATICcJoin.address,
-        gemJoinImp     : ceaMATICcJoinImp,
+        gemJoin        : gemJoin.address,
+        gemJoinImp     : gemJoinImp,
         jug            : jug.address,
         jugImp         : jugImp,
         vow            : vow.address,

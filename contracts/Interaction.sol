@@ -135,7 +135,6 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         require(collaterals[token].live == 0, "Interaction/token-already-init");
         vat.init(ilk);
         jug.init(ilk);
-        jug.file(ilk, "duty", 0);
         spotter.file(ilk, "mat", mat);
         collaterals[token] = CollateralType(GemJoinLike(gemJoin), ilk, 1, clip);
         IERC20Upgradeable(token).safeApprove(gemJoin, type(uint256).max);
