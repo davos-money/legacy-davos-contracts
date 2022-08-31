@@ -81,8 +81,8 @@ ReentrancyGuardUpgradeable
         uint8 maxStrategies,
         address swapPoolAddr
     ) public initializer {
-        require(maxDepositFees > 0 && maxDepositFees < 1e6, "invalid maxDepositFee");
-        require(maxWithdrawalFees > 0 && maxDepositFees < 1e6, "invalid maxWithdrawalFees");
+        require(maxDepositFees > 0 && maxDepositFees <= 1e6, "invalid maxDepositFee");
+        require(maxWithdrawalFees > 0 && maxDepositFees <= 1e6, "invalid maxWithdrawalFees");
 
         __Ownable_init();
         __Pausable_init();
@@ -268,7 +268,7 @@ ReentrancyGuardUpgradeable
             }
         }
 
-        require(totalAllocations + allocation < 1e6, "allocations cannot be more than 100%");
+        require(totalAllocations + allocation <= 1e6, "allocations cannot be more than 100%");
 
         StrategyParams memory params = StrategyParams({
             active: true,

@@ -45,8 +45,9 @@ const {
     rewardsImp,
     ikkaToken,
     ikkaTokenImp,
-    auctionProxy
-} = require('../' + network_file_name);
+    auctionProxy,
+    sikkaProviderImp
+} = require('./' + network_file_name);
 
 async function main() {
 
@@ -72,7 +73,7 @@ async function main() {
     await hre.run("verify:verify", {address: rewardsImp});
     await hre.run("verify:verify", {address: interactionImp});
     await hre.run("verify:verify", {address: auctionProxy});
-    await hre.run("verify:verify", {address: helioProviderImp});
+    await hre.run("verify:verify", {address: sikkaProviderImp});
     await hre.run("verify:verify", {address: priceGetter});
     await hre.run("verify:verify", {address: LPImp});
     await hre.run("verify:verify", {address: swapPoolImplementation});
