@@ -121,6 +121,11 @@ contract CerosYieldConverterStrategy is BaseStrategy {
 
     }
 
+    function canDeposit(uint256 amount) public view returns(bool) {
+        (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, ((amount) * _certToken.ratio()) / 1e18, false);
+        return enoughLiquidity;
+    }
+
     /// @dev claims yeild from ceros in aMATICc and transfers to feeRecipient
     function harvest() external onlyStrategist {
         _harvestTo(feeRecipient);

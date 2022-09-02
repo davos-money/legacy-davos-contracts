@@ -110,7 +110,7 @@ ReentrancyGuardUpgradeable
         uint256 amount = msg.value;
         require(amount > 0, "invalid amount");
         shares = _assessSwapFee(amount, swapPool.stakeFee());
-        shares = _assessFee(amount, depositFee);
+        shares = _assessFee(shares, depositFee);
 
         uint256 waitingPoolDebt = waitingPool.totalDebt();
         uint256 waitingPoolBalance = address(waitingPool).balance;
@@ -171,6 +171,22 @@ ReentrancyGuardUpgradeable
 
     /// @dev Triggers tryRemove() of waiting pool contract
     function payDebt() public {
+        uint256 waitingPoolDebt = waitingPool.totalDebt();
+        uint256 waitingPoolBal = address(waitingPool).balance;
+        
+        if (waitingPoolDebt > waitingPoolBal) {
+            uint256 maxFee = swapPool.FEE_MAX();
+            uint256 withdrawAmount = 
+                (
+                    ((waitingPoolDebt - waitingPoolBal) * 1e18) / 
+                    (maxFee - swapPool.unstakeFee()) * maxFee
+                ) / 1e18;
+            uint256 withdrawn = withdrawFromActiveStrategies(withdrawAmount + 1);
+            if(withdrawn > 0) {
+                IWETH(asset()).withdraw(withdrawn);
+                payable(address(waitingPool)).transfer(withdrawn);
+            }
+        }
         waitingPool.tryRemove();
     }
 
@@ -189,30 +205,31 @@ ReentrancyGuardUpgradeable
     /// @dev internal method to deposit assets into the given strategy
     /// @param strategy address of the strategy
     /// @param amount assets to deposit into strategy
-    function _depositToStrategy(address strategy, uint256 amount) private {
+    function _depositToStrategy(address strategy, uint256 amount) private returns (bool success){
         require(amount > 0, "invalid deposit amount");
         IWETH weth = IWETH(asset());
         require(totalAssetInVault() >= amount, "insufficient balance");
-        totalDebt += amount;
-        strategyParams[strategy].debt += amount;
-        weth.transfer(strategy, amount);
+        if (IBaseStrategy(strategy).canDeposit(amount)) {
+            weth.transfer(strategy, amount);
+            uint256 value = IBaseStrategy(strategy).deposit(amount);
+            totalDebt += value;
+            strategyParams[strategy].debt += value;
+            emit DepositedToStrategy(strategy, amount);
+            return true;
+        }
     }
 
     /// @dev deposits all the assets into the given strategy
     /// @param strategy address of the strategy
     function depositAllToStrategy(address strategy) public onlyManager {
         uint256 amount = totalAssetInVault();
-        _depositToStrategy(strategy, amount);
-        IBaseStrategy(strategy).deposit(amount);
-        emit DepositedToStrategy(strategy, amount);
+        require(_depositToStrategy(strategy, amount));
     }
     /// @dev deposits specific amount of assets into the given strategy
     /// @param strategy address of the strategy
     /// @param amount assets to deposit into strategy
     function depositToStrategy(address strategy, uint256 amount) public onlyManager {
-        _depositToStrategy(strategy, amount);
-        IBaseStrategy(strategy).deposit(amount);
-        emit DepositedToStrategy(strategy, amount);
+        require(_depositToStrategy(strategy, amount));
     }
 
     /// @dev withdraw specific amount of assets from the given strategy
@@ -320,13 +337,13 @@ ReentrancyGuardUpgradeable
                         uint256 depositAmount = ((totalAssets * allocation) / 1e6) - strategy.debt;
                         if(totalAssetInVault() > depositAmount) {
                             _depositToStrategy(strategies[i], depositAmount);
-                            IBaseStrategy(strategies[i]).depositAll();
+                            // IBaseStrategy(strategies[i]).depositAll();
                         }
-                    } else {
-                        uint256 withdrawAmount = strategy.debt - (totalAssets * allocation) / 1e6;
-                        if(withdrawAmount > 0) {
-                            _withdrawFromStrategy(strategies[i], withdrawAmount);
-                        }
+                    // } else {
+                    //     uint256 withdrawAmount = strategy.debt - (totalAssets * allocation) / 1e6;
+                    //     if(withdrawAmount > 0) {
+                    //         _withdrawFromStrategy(strategies[i], withdrawAmount);
+                    //     }
                     }
                 }
             }
@@ -341,7 +358,7 @@ ReentrancyGuardUpgradeable
             }
         }
 
-        return totalAllocations <= 1e16;
+        return totalAllocations <= 1e6;
     }
 
     /// @dev Returns the amount of assets that can be withdrawn instantly
@@ -408,10 +425,9 @@ ReentrancyGuardUpgradeable
     /// @dev deducts the fee percentage from the given amount
     /// @param amount amount to deduct fee from
     /// @param fee fee percentage
-    function _assessSwapFee(uint256 amount, uint fee) private returns(uint256 value) {
+    function _assessSwapFee(uint256 amount, uint fee) public view returns(uint256 value) {
         if(fee > 0 && amount > 0) {
             uint256 swapFee =  (amount * fee) / swapPool.FEE_MAX();
-            feeEarned += swapFee;
             return (amount - swapFee);
         } else {
             return amount;
