@@ -21,10 +21,14 @@ const main = async () => {
 
   const proxyAdminAddress = parseAddress(proxyAddress);
   let proxyAdmin = await ethers.getContractAt(PROXY_ADMIN_ABI, proxyAdminAddress);
-
-  await (await proxyAdmin.upgrade(masterVaultProxy, masterVaultImp.address)).wait();
-  await (await proxyAdmin.upgrade(cerosStrategyProxy, cerosStrImp.address)).wait();
-  console.log("Upgraded Successfully...")
+  
+  if (proxyAdminAddress != ethers.constants.AddressZero) {
+    await (await proxyAdmin.upgrade(masterVaultProxy, masterVaultImp.address)).wait();
+    await (await proxyAdmin.upgrade(cerosStrategyProxy, cerosStrImp.address)).wait();
+    console.log("Upgraded Successfully...")
+  } else {
+    console.log("Invalid proxyAdmin address");
+  }
   
   console.log("Verifying MasterVaultImp...")
   await hre.run("verify:verify", {address: masterVaultImp.address});
