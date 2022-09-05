@@ -212,10 +212,12 @@ ReentrancyGuardUpgradeable
         if (IBaseStrategy(strategy).canDeposit(amount)) {
             weth.transfer(strategy, amount);
             uint256 value = IBaseStrategy(strategy).deposit(amount);
-            totalDebt += value;
-            strategyParams[strategy].debt += value;
-            emit DepositedToStrategy(strategy, amount);
-            return true;
+            if(value > 0) {
+                totalDebt += value;
+                strategyParams[strategy].debt += value;
+                emit DepositedToStrategy(strategy, amount);
+                return true;
+            }
         }
     }
 
@@ -386,8 +388,9 @@ ReentrancyGuardUpgradeable
         
         uint256 oldStrategyDebt = strategyParams[oldStrategy].debt;
         
-        if(oldStrategyDebt > 0) {
-            _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt - 10);
+        if(oldStrategyDebt > 10) {
+            uint256 withdrawn = _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt - 10);
+            require(withdrawn > 0, "cannot withdraw from strategy");
         }
         StrategyParams memory params = StrategyParams({
             active: true,

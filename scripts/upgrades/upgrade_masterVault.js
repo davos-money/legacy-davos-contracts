@@ -9,26 +9,28 @@ const main = async () => {
   const proxyAddress = await ethers.provider.getStorageAt(masterVaultProxy, admin_slot);
   const PROXY_ADMIN_ABI = ["function upgrade(address proxy, address implementation) public"]
   
-  // this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
-  // let masterVaultImp = await this.MasterVault.deploy();
-  // await masterVaultImp.deployed();
-  // console.log("Master Vault Imp     : " + masterVaultImp.address);
+  this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
+  let masterVaultImp = await this.MasterVault.deploy();
+  await masterVaultImp.deployed();
+  console.log("Master Vault Imp     : " + masterVaultImp.address);
 
-  // this.CerosYieldConverterStrategy = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
-  // let cerosStrImp = await this.CerosYieldConverterStrategy.deploy();
-  // await cerosStrImp.deployed();
-  // console.log("Master Vault Imp     : " + cerosStrImp.address);
+  this.CerosYieldConverterStrategy = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
+  let cerosStrImp = await this.CerosYieldConverterStrategy.deploy();
+  await cerosStrImp.deployed();
+  console.log("Ceros Strategy Imp     : " + cerosStrImp.address);
 
-  let proxyAdmin = await ethers.getContractAt(PROXY_ADMIN_ABI, parseAddress(proxyAddress));
-  await (await proxyAdmin.upgrade(masterVaultProxy, "0x99a5bc1524e1ceb75a205c3f02be9ac3ed042e63")).wait();
-  await (await proxyAdmin.upgrade(cerosStrategyProxy, "0x6DeF4570251E1f435E121b3Ee47174496D851C99")).wait();
+  const proxyAdminAddress = parseAddress(proxyAddress);
+  let proxyAdmin = await ethers.getContractAt(PROXY_ADMIN_ABI, proxyAdminAddress);
+
+  await (await proxyAdmin.upgrade(masterVaultProxy, masterVaultImp.address)).wait();
+  await (await proxyAdmin.upgrade(cerosStrategyProxy, cerosStrImp.address)).wait();
   console.log("Upgraded Successfully...")
   
-  // console.log("Verifying MasterVaultImp...")
-  // await hre.run("verify:verify", {address: masterVaultImp.address});
+  console.log("Verifying MasterVaultImp...")
+  await hre.run("verify:verify", {address: masterVaultImp.address});
   
-  // console.log("Verifying CerosStrategyImp...")
-  // await hre.run("verify:verify", {address: cerosStrImp.address});
+  console.log("Verifying CerosStrategyImp...")
+  await hre.run("verify:verify", {address: cerosStrImp.address});
 };
 
 function parseAddress(addressString){

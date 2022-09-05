@@ -122,7 +122,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     }
 
     function canDeposit(uint256 amount) public view returns(bool) {
-        (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, ((amount) * _certToken.ratio()) / 1e18, false);
+        (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false);
         return enoughLiquidity;
     }
 
