@@ -4,16 +4,66 @@ const { ethers } = require("hardhat");
 const ethUtils = ethers.utils;
 const NetworkSnapshotter = require("../helpers/NetworkSnapshotter");
 
+async function deploySwapPool() {
+  const { MaxUint256 } = ethers.constants;
+  const mintAmount = ethUtils.parseEther("10000000");
+  const addAmount = ethUtils.parseEther("30");
+
+  [deployer, user1] = await ethers.getSigners();
+
+  const LPFactory = await ethers.getContractFactory("LP");
+  const SwapPoolFactory = await ethers.getContractFactory("SwapPool");
+  const WNativeFactory = await ethers.getContractFactory("WNative");
+  const CerosTokenFactory = await ethers.getContractFactory("CerosToken");
+
+  lp = await LPFactory.connect(deployer).deploy();
+  await lp.deployed();
+  wNative = await WNativeFactory.connect(deployer).deploy();
+  await wNative.deployed();
+  cerosToken = await CerosTokenFactory.connect(deployer).deploy();
+  await cerosToken.deployed();
+
+  swapPool = await upgrades.deployProxy(
+    SwapPoolFactory,
+    [wNative.address,
+    cerosToken.address,
+    lp.address,
+    false,
+    false],
+    {initializer: "initialize"}
+  );
+  await swapPool.deployed();
+
+  await wNative.connect(user1).deposit({ value: mintAmount });
+  await cerosToken.connect(user1).mintMe(mintAmount);
+
+  await wNative.connect(user1).approve(swapPool.address, MaxUint256);
+  await cerosToken.connect(user1).approve(swapPool.address, MaxUint256);
+  
+  await cerosToken.setRatio(ethUtils.parseEther("0.6"));
+  
+  await swapPool.setFee(100, 3);
+  await swapPool.setFee(100, 4);
+  // Initialize Contracts
+  await lp.setSwapPool(swapPool.address);
+  await swapPool.connect(user1).addLiquidity(addAmount, addAmount);
+  return [swapPool, wNative, cerosToken];
+} 
+
 describe.only("MasterVault", function () {
 
   // Variables
   let masterVault, cerosStrategy, wMatic, aMaticc, swapPool,
-      destination, feeRecipient , underlyingToken , certToekn;
+      destination, feeRecipient , underlyingToken , certToekn, wNative, cerosToken;
 
   let wMaticAddress = "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       aMATICcAddress = "0xaC32206a73C8406D74eB21cF7bd060bf841e64aD",
       swapPoolAddress = "0x149372728fC852E6A724C59CDfB41dF0799fe042",
       ceRouterAddress = "0x5E990e6aA10d224bF45def8A55E41c39Ea087682",
+      dex = "0xE592427A0AEce92De3Edee1F18E0157C05861564", 
+      dexPairFee = 3000,
+      // priceGetterAddress = "0xc82e5792F393a1D90681773B75d7a408010ade2c",
+      priceGetterAddress = ethers.constants.AddressZero,
       maxDepositFee = 500000, 
       maxWithdrawalFee = 500000,
       maxStrategies = 10,
@@ -52,6 +102,11 @@ describe.only("MasterVault", function () {
     signer2 =  accounts[2];
     signer3 =  accounts[3];
 
+    [swapPool, wNative, cerosToken] = await deploySwapPool();
+    wMaticAddress = wNative.address
+    aMATICcAddress = cerosToken.address
+    swapPoolAddress = swapPool.address
+
     // Get Contracts
     MasterVault = await ethers.getContractFactory("MasterVault");
     CerosStrategy = await ethers.getContractFactory("CerosYieldConverterStrategy");
@@ -60,12 +115,30 @@ describe.only("MasterVault", function () {
     Token = await ethers.getContractFactory("Token");
     CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     CeVault = await hre.ethers.getContractFactory("CeVault");
+    PriceGetter = await hre.ethers.getContractFactory("PriceGetter");
     
     // Deploy Contracts
     wMatic = await Token.attach(wMaticAddress);
     aMaticc = await Token.attach(aMATICcAddress);
-    ceRouter = await CeRouter.attach(ceRouterAddress);
-    swapPool = await ethers.getContractAt("ISwapPool", swapPoolAddress);
+    swapPool = await ethers.getContractAt("SwapPool", swapPoolAddress);
+    // ceRouter = await CeRouter.attach(ceRouterAddress);
+    
+    priceGetter = await PriceGetter.deploy(dex);
+    await priceGetter.deployed();
+
+    ceaMATICc = await upgrades.deployProxy(CeaMATICc, ["CEROS aMATICc Vault Token", "ceaMATICc"], {initializer: "initialize"});
+    await ceaMATICc.deployed();
+
+    ceVault = await upgrades.deployProxy(CeVault, ["CEROS aMATICc Vault", ceaMATICc.address, aMATICcAddress], {initializer: "initialize"});
+    await ceVault.deployed();
+    ceVaultImp = await upgrades.erc1967.getImplementationAddress(ceVault.address);
+
+    cerosRouter = await upgrades.deployProxy(CeRouter, [aMATICcAddress, wMaticAddress, ceaMATICc.address, ceVault.address, dex, dexPairFee, swapPool.address, priceGetterAddress], {initializer: "initialize"}, {gasLimit: 2000000});
+    await cerosRouter.deployed();
+    cerosRouterImp = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
+
+    await ceaMATICc.changeVault(ceVault.address);
+    await ceVault.changeRouter(cerosRouter.address);
 
     masterVault = await upgrades.deployProxy(
       MasterVault,
@@ -78,7 +151,7 @@ describe.only("MasterVault", function () {
     await waitingPool.deployed();
     await masterVault.setWaitingPool(waitingPool.address);
     await masterVault.changeProvider(signer1.address)
-      destination = ceRouter.address,
+      destination = cerosRouter.address,
       feeRecipient = deployer.address,
       underlyingToken = wMaticAddress,
       certToekn = aMATICcAddress;
@@ -192,7 +265,7 @@ describe.only("MasterVault", function () {
       assert.equal(feeEarned.toString(), Number(((depositAmount - swapFee) * fee) / 1e6));
     });
 
-    it.only("Allocate: wMatic balance should match allocation ratios", async function () {
+    it("Allocate: wMatic balance should match allocation ratios", async function () {
       let depositAmount = ethUtils.parseEther("1");
           allocation = 80 * 10000   // 80%
       availableToWithdrawBefore = await masterVault.availableToWithdraw();
@@ -203,8 +276,8 @@ describe.only("MasterVault", function () {
       await masterVault.allocate();
       availableToWithdrawAfter = await masterVault.availableToWithdraw();
       strategyDebt = await masterVault.strategyParams(cerosStrategy.address);
-
-      assert.equal(depositAmount.toString(), Number(availableToWithdrawAfter) + Number(strategyDebt.debt));
+      swapFee = (((depositAmount * allocation) / 1e6 ) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      assert.equal(depositAmount.toString(), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + swapFee);
     });
 
     it("Allocate: wMatic balance should match allocation ratios", async function () {
@@ -216,8 +289,8 @@ describe.only("MasterVault", function () {
       await depositAndAllocate(masterVault, signer1, depositAmount);
       availableToWithdrawAfter = await masterVault.availableToWithdraw();
       strategyDebt = await masterVault.strategyParams(cerosStrategy.address);
-      
-      assert.equal(Number(depositAmount) + Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt));
+      swapFee = ((((Number(depositAmount) + Number(depositAmount)) * allocation) / 1000000 ) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      assert.equal(Number(depositAmount) + Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + swapFee);
     });
 
     it("Allocate: wMatic balance should match allocation ratios(deposit fee: 0.1%)", async function () {
@@ -235,8 +308,14 @@ describe.only("MasterVault", function () {
       strategyDebt = await masterVault.strategyParams(cerosStrategy.address);
 
       totalSupplyAfter = await masterVault.totalSupply();
-      swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + Number(((depositAmount - swapFee) * fee) / 1e6));
+
+      let swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      let depositFee = (Number(depositAmount - swapFee) * fee) / 1e6;
+      let depositedAmount = Number(depositAmount) - swapFee -depositFee;
+      assert.equal(Number(totalSupplyAfter), depositedAmount);
+
+      swapFee = ((((depositAmount - depositFee) * allocation) / 1000000) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      assert.equal(Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + swapFee + depositFee);
     });
 
     it("revert:: withdraw: should revert if withdrawal amount is more than vault-token balance(depositAmount)", async function () {
@@ -290,7 +369,9 @@ describe.only("MasterVault", function () {
       
       let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
       assert.equal(event[0].args.shares, withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
-      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6) - txFee2);
+      // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
+      expect(maticBalanceAfter.eq(maticBalanceBefore.add(event[0].args.shares).sub(txFee2)));
+
     });
 
     it("withdraw: should let user withdraw when funds are allocated to strategy (withdrawal fee: 0.1%)", async function () {
@@ -324,19 +405,18 @@ describe.only("MasterVault", function () {
 
       swapFee = (withdrawAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
       
-      let event1 = (receipt.events?.filter((x) => {return x.event == "Withdrawal"}));
       let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
       assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       assert.equal(Number(vaultTokenBalanceAfter), 0);
-      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
+      // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
+      expect(maticBalanceAfter, maticBalanceBefore.add(event[0].args.shares).sub(txFee2));
     });
 
-
-    it("withdraw: should let user withdraw (withdrawal fee: 0.1%)", async function () {
+    it("withdrawFee: should let user withdraw when funds are allocated to strategy (withdrawal fee: 0.1%)", async function () {
       let fee = 1000, // 0.1%
           allocation = 80 * 10000,   // 80%
           depositAmount = ethUtils.parseEther("1");
-          withdrawalAmount = ethUtils.parseEther("0.99999");
+          // withdrawalAmount = ethUtils.parseEther("1");
       await masterVault.connect(deployer).setWithdrawalFee(fee);
       
       vaultTokenBalanceBefore = await getTokenBalance(signer1.address, masterVault.address);
@@ -351,9 +431,59 @@ describe.only("MasterVault", function () {
       assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
-      tx = await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount);
+      let withdrawAmount = depositAmount - swapFee;
+      let wethBal = await masterVault.totalAssetInVault();
+      
+      tx = await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawAmount.toString());
+      let receipt = await tx.wait(1);
+      txFee2 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
+      
+      maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
+      vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
+
+      swapFee = (withdrawAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
+      
+      let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
+      assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
+      assert.equal(Number(vaultTokenBalanceAfter), 0);
+      // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
+      expect(maticBalanceAfter, maticBalanceBefore.add(event[0].args.shares).sub(txFee2));
+
+      maticBalanceBefore = await ethers.provider.getBalance(deployer.address);
+      feeEarned = await masterVault.feeEarned();
+      assert.equal(feeEarned, (Number(withdrawAmount - swapFee) * fee / 1e6))
+      
+      tx = await masterVault.withdrawFee();
+      receipt = await tx.wait(1);
+      txFee3 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
+      
+      maticBalanceAfter = await ethers.provider.getBalance(deployer.address);
+      expect(maticBalanceAfter.eq(maticBalanceBefore.add(feeEarned).sub(txFee3)));
+    });
+
+
+    it("withdraw: should let user withdraw (withdrawal fee: 0.1%)", async function () {
+      let fee = 1000, // 0.1%
+          allocation = 80 * 10000,   // 80%
+          depositAmount = ethUtils.parseEther("1");
+      await masterVault.connect(deployer).setWithdrawalFee(fee);
+      
+      vaultTokenBalanceBefore = await getTokenBalance(signer1.address, masterVault.address);
+      // tx = await masterVault.connect(signer1).depositETH({value: depositAmount});
+      await masterVault.setStrategy(cerosStrategy.address, allocation);
+      await depositAndAllocate(masterVault, signer1, depositAmount);
+
       // receipt = await tx.wait(1);
-      // txFee2 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
+      // txFee1 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
+      vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
+      swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      let withdrawalAmount = depositAmount - swapFee;
+      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+
+      maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
+      tx = await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount.toString());
+      receipt = await tx.wait(1);
+      txFee2 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
       
       maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
@@ -361,7 +491,8 @@ describe.only("MasterVault", function () {
       swapFee = (depositAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
 
       assert.equal(Number(vaultTokenBalanceAfter), 0);
-      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(depositAmount) - Number(swapFee) - (Number(depositAmount) * fee / 1e6));
+      // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(depositAmount) - Number(swapFee) - (Number(depositAmount) * fee / 1e6) - txFee2);
+      expect(maticBalanceAfter.eq(maticBalanceBefore.add(depositAmount).sub(swapFee).sub(depositAmount.mul(fee).div(ethers.BigNumber.from("1000000"))).sub(txFee2)));
     });
 
     it("withdraw: withdrawal request should go to the waiting pool(withdrawal fee: 0)", async function () {
@@ -381,9 +512,7 @@ describe.only("MasterVault", function () {
       assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
-      let certToken = await ethers.getContractAt("ICertToken", certToekn);
-      await certToken.connect(signer1).transfer(cerosStrategy.address, ethUtils.parseEther("6"));
-
+      await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
       await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount);
       // receipt = await tx.wait(1);
       // txFee2 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
@@ -393,15 +522,17 @@ describe.only("MasterVault", function () {
 
       waitingPoolBalance = await ethers.provider.getBalance(waitingPool.address);
       pendingWithdrawal = await waitingPool.people(0);
+      unstakeSwapFee = (withdrawalAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+
       assert.equal(Number(vaultTokenBalanceAfter), Number(depositAmount) - Number(withdrawalAmount) - swapFee);
-      assert.equal(Number(pendingWithdrawal[1]), Number(withdrawalAmount) - swapFee);
-      assert.equal(Number(waitingPoolBalance), Number(depositAmount) / 5);
+      assert.equal(Number(pendingWithdrawal[1]), Number(withdrawalAmount) - unstakeSwapFee);
+      assert.equal(Number(waitingPoolBalance), Number(depositAmount) / 5 );
     });
 
     it("payDebt: should pay the pending withdrawal (withdrawal fee: 0)", async function () {
       let allocation = 80 * 10000,   // 80%
-          depositAmount = ethUtils.parseEther("100");
-          withdrawalAmount = ethUtils.parseEther("80");
+          depositAmount = ethUtils.parseEther("6");
+          withdrawalAmount = ethUtils.parseEther("5");
       
       vaultTokenBalanceBefore = await getTokenBalance(signer1.address, masterVault.address);
       await masterVault.setStrategy(cerosStrategy.address, allocation);
@@ -412,6 +543,7 @@ describe.only("MasterVault", function () {
       assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
+      await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
       await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount);
       
       maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
@@ -422,7 +554,44 @@ describe.only("MasterVault", function () {
      
       assert.equal(pendingWithdrawal[0], signer1.address);
       assert.equal(Number(pendingWithdrawal[1]), Number(withdrawalAmount) - withdrawSwapFee);
-      assert.equal(Number(vaultTokenBalanceAfter), Number(depositAmount) - depositSwapFee - Number(withdrawalAmount) - withdrawSwapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(depositAmount) - Number(withdrawalAmount) - depositSwapFee);
+      poolBalanceBefore = await waitingPool.getPoolBalance()
+      await masterVault.connect(signer1).depositETH({value: withdrawalAmount});
+      poolBalanceAfter = await waitingPool.getPoolBalance()
+      expect(poolBalanceAfter.gt(poolBalanceBefore));
+      balanceOfWithdrawerBefore = await ethers.provider.getBalance(signer1.address)
+      await masterVault.connect(signer2).payDebt();
+      balanceOfWithdrawerAfter = await ethers.provider.getBalance(signer1.address)
+
+      assert(Number(balanceOfWithdrawerAfter) > Number(balanceOfWithdrawerBefore));
+    });
+
+    it("revert:: waitingPool: withdrawUnsettled(): cannot withdraw already settled debt", async function () {
+      let allocation = 80 * 10000,   // 80%
+          depositAmount = ethUtils.parseEther("6");
+          withdrawalAmount = ethUtils.parseEther("5");
+      
+      vaultTokenBalanceBefore = await getTokenBalance(signer1.address, masterVault.address);
+      await masterVault.setStrategy(cerosStrategy.address, allocation);
+      await depositAndAllocate(masterVault, signer1, depositAmount);
+
+      vaultTokenBalanceAfterDeposit = await getTokenBalance(signer1.address, masterVault.address);
+      depositSwapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
+
+      maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
+      await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
+      await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount);
+      
+      maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
+      vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
+
+      withdrawSwapFee = (withdrawalAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
+      pendingWithdrawal = await waitingPool.people(0);
+     
+      assert.equal(pendingWithdrawal[0], signer1.address);
+      assert.equal(Number(pendingWithdrawal[1]), Number(withdrawalAmount) - withdrawSwapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(depositAmount) - depositSwapFee - Number(withdrawalAmount));
 
       await masterVault.connect(signer1).depositETH({value: withdrawalAmount});
       balanceOfWithdrawerBefore = await ethers.provider.getBalance(signer1.address)
@@ -430,6 +599,12 @@ describe.only("MasterVault", function () {
       balanceOfWithdrawerAfter = await ethers.provider.getBalance(signer1.address)
 
       assert(Number(balanceOfWithdrawerAfter) > Number(balanceOfWithdrawerBefore));
+
+      await expect(
+        waitingPool
+          .connect(signer1)
+          .withdrawUnsettled(0)
+      ).to.be.revertedWith("already settled");
     });
 
     it("retireStrat(): should withdraw all the assets from given strategy", async function () {
@@ -461,15 +636,15 @@ describe.only("MasterVault", function () {
       await newStrategy.deployed();
 
       totalDebtBefore = await masterVault.totalDebt();
-      swapFee = (totalDebtBefore * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
-
+      swapFee = ((totalDebtBefore - 10)* await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
       await masterVault.migrateStrategy(cerosStrategy.address, newStrategy.address, newAllocation);
       totalDebtAfter = await masterVault.totalDebt();
       assert.equal(Number(totalDebtAfter), 10);
+      let assetInVault = await masterVault.totalAssetInVault();
       await masterVault.allocate();
       totalDebtAfter = await masterVault.totalDebt();
-
-      assert.equal(Number(totalDebtAfter), (Number(depositAmount) - swapFee) / 2);
+      stakeSwapFee = ((assetInVault/2) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+      assert.equal(Number(totalDebtAfter), 10 + (assetInVault / 2) - stakeSwapFee);
     });
 
     it("depositAllToStrategy(): should deposit all the assets to given strategy", async function () {
@@ -509,6 +684,38 @@ describe.only("MasterVault", function () {
       await masterVault.depositAllToStrategy(cerosStrategy.address);
       wMaticBalanceAfter = await getTokenBalance(masterVault.address, wMaticAddress);
       assert.equal(Number(wMaticBalanceAfter), 0);
+    });
+
+    it("revert:: deposit(): should revert", async function () {
+      await expect(
+        masterVault
+          .connect(deployer)
+          .deposit(1, deployer.address)
+      ).to.be.revertedWith("");
+    });
+
+    it("revert:: mint(): should revert", async function () {
+      await expect(
+        masterVault
+          .connect(deployer)
+          .mint(1, deployer.address)
+      ).to.be.revertedWith("");
+    });
+
+    it("revert:: withdraw(): should revert", async function () {
+      await expect(
+        masterVault
+          .connect(deployer)
+          .withdraw(1, deployer.address, deployer.address)
+      ).to.be.revertedWith("");
+    });
+
+    it("revert:: redeem(): should revert", async function () {
+      await expect(
+        masterVault
+          .connect(deployer)
+          .redeem(1, deployer.address, deployer.address)
+      ).to.be.revertedWith("");
     });
 
     describe("setters", async () => {
@@ -643,6 +850,195 @@ describe.only("MasterVault", function () {
             .connect(deployer)
             .changeStrategyAllocation(cerosStrategy.address, 101 * 10000)
         ).to.be.revertedWith("allocations cannot be more than 100%");         
+      });
+
+      it("revert:: setWaitingPoolCap(): onlyOwner can call", async function() {
+        await expect(
+          masterVault
+            .connect(signer1)
+            .setWaitingPoolCap(12)
+        ).to.be.revertedWith("Ownable: caller is not the owner"); 
+      });
+
+      it("revert:: setWaitingPoolCap(): should let owner set waiting pool cap limit", async function() {
+        let capLimit = 12
+        await masterVault.connect(deployer).setWaitingPoolCap(capLimit);
+        let waitingPoolCapLimit = await waitingPool.capLimit();
+        assert.equal(waitingPoolCapLimit, capLimit)
+      });
+
+      it("revert:: setCapLimit(): onlyMasterVault can call", async function() {
+        await expect(
+          masterVault
+            .connect(signer1)
+            .setWaitingPoolCap(12)
+        ).to.be.revertedWith(""); 
+      });
+
+      it("revert:: setCapLimit(): cannot be zero", async function() {
+        await expect(
+          masterVault
+            .connect(deployer)
+            .setWaitingPoolCap(0)
+        ).to.be.revertedWith("invalid cap"); 
+      });
+
+      it("revert:: setCapLimit(): onlyMasterVault can call", async function() {
+        await expect(
+          waitingPool
+            .connect(signer1)
+            .setCapLimit(12)
+        ).to.be.revertedWith(""); 
+      });
+      
+      it("revert:: changeSwapPool(): onlyOwner can call", async function() {
+        await expect(
+          masterVault
+            .connect(signer1)
+            .changeSwapPool(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("changeSwapPool(): should let owner change swapPool", async function() {
+        expect(await masterVault.connect(deployer).changeSwapPool(signer2.address))
+          .to.emit(masterVault, "SwapPoolChanged")
+          .withArgs(signer2.address);
+      });
+
+      it("revert:: changeFeeReceiver(): onlyOwner can call", async function() {
+        await expect(
+          masterVault
+            .connect(signer1)
+            .changeFeeReceiver(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("changeFeeReceiver(): should let owner change swapPool", async function() {
+        expect(await masterVault.connect(deployer).changeFeeReceiver(signer2.address))
+          .to.emit(masterVault, "FeeReceiverChanged")
+          .withArgs(signer2.address);
+      });
+      
+    });
+
+    describe("CerosYieldConverterStrategy: setters", async () => {
+
+      it("revert:: changeSwapPool(): onlyOwner can call", async function() {
+        await expect(
+          cerosStrategy
+            .connect(signer1)
+            .changeSwapPool(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("revert:: changeCeRouter(): onlyOwner can call", async function() {
+        await expect(
+          cerosStrategy
+            .connect(signer1)
+            .changeCeRouter(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("changeCeRouter(): should let owner change ceRouter", async function() {
+        expect(await cerosStrategy.connect(deployer).changeCeRouter(signer2.address))
+          .to.emit(cerosStrategy, "CeRouterChanged")
+          .withArgs(signer2.address);
+      });
+
+      it("changeSwapPool(): should let owner change swapPool", async function() {
+        expect(await cerosStrategy.connect(deployer).changeSwapPool(signer2.address))
+          .to.emit(cerosStrategy, "SwapPoolChanged")
+          .withArgs(signer2.address);
+      });
+
+      it("revert:: setStrategist(): onlyOwner can call", async function() {
+        await expect(
+          cerosStrategy
+            .connect(signer1)
+            .setStrategist(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("setStrategist(): should let owner change Strategist", async function() {
+        expect(await cerosStrategy.connect(deployer).setStrategist(signer2.address))
+          .to.emit(cerosStrategy, "UpdatedStrategist")
+          .withArgs(signer2.address);
+      });
+
+      it("revert:: setStrategist(): onlyOwner can call", async function() {
+        await expect(
+          cerosStrategy
+            .connect(signer1)
+            .setStrategist(signer2.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("setFeeRecipient(): should let owner change feeRecipient", async function() {
+        expect(await cerosStrategy.connect(deployer).setFeeRecipient(signer2.address))
+          .to.emit(cerosStrategy, "UpdatedFeeRecipient")
+          .withArgs(signer2.address);
+      });
+
+      it("revert:: pause(): onlyStrategist can call", async function() {
+        await expect(
+          cerosStrategy
+            .connect(signer1)
+            .pause()
+        ).to.be.revertedWith("");  
+      });
+
+      it("pause(): should let Strategist pause deposits", async function() {
+        await cerosStrategy.connect(deployer).pause()
+        let depositPaused = await cerosStrategy.depositPaused();
+        assert.equal(depositPaused, true);
+      });
+
+      it("unpause(): should let Strategist unpause deposits", async function() {
+        await cerosStrategy.connect(deployer).unpause()
+        let depositPaused = await cerosStrategy.depositPaused();
+        assert.equal(depositPaused, false);
+      });
+
+      it("harvest(): should let strategiest harvest(claim yeild)", async function() {
+
+        let depositAmount = ethUtils.parseEther("1"),
+            allocation = 80 * 10000   // 80%
+            availableToWithdrawBefore = await masterVault.availableToWithdraw();
+        await masterVault.setStrategy(cerosStrategy.address, allocation);
+        await masterVault.connect(signer1).depositETH({value: depositAmount});
+        await depositAndAllocate(masterVault, signer1, depositAmount);
+        availableToWithdrawAfter = await masterVault.availableToWithdraw();
+        strategyDebt = await masterVault.strategyParams(cerosStrategy.address);
+        swapFee = ((((Number(depositAmount) + Number(depositAmount)) * allocation) / 1000000 ) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+        assert.equal(Number(depositAmount) + Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + swapFee);
+
+        await cerosToken.setRatio(ethUtils.parseEther("0.5"));
+
+        certTokenBalanceBefore = await cerosToken.balanceOf(deployer.address);
+        await cerosStrategy.connect(deployer).harvest();
+        certTokenBalanceAfter = await cerosToken.balanceOf(deployer.address);
+        assert(certTokenBalanceBefore < certTokenBalanceAfter)
+      });
+
+      it("harvestAndSwap(): should let strategiest harvest(claim yeild in wMatic)", async function() {
+
+        let depositAmount = ethUtils.parseEther("1"),
+            allocation = 80 * 10000   // 80%
+            availableToWithdrawBefore = await masterVault.availableToWithdraw();
+        await masterVault.setStrategy(cerosStrategy.address, allocation);
+        await masterVault.connect(signer1).depositETH({value: depositAmount});
+        await depositAndAllocate(masterVault, signer1, depositAmount);
+        availableToWithdrawAfter = await masterVault.availableToWithdraw();
+        strategyDebt = await masterVault.strategyParams(cerosStrategy.address);
+        swapFee = ((((Number(depositAmount) + Number(depositAmount)) * allocation) / 1000000 ) * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
+        assert.equal(Number(depositAmount) + Number(depositAmount), Number(availableToWithdrawAfter) + Number(strategyDebt.debt) + swapFee);
+
+        await cerosToken.setRatio(ethUtils.parseEther("0.5"));
+
+        wMaticBalanceBefore = await wMatic.balanceOf(deployer.address);
+        await cerosStrategy.connect(deployer).harvestAndSwap();
+        wMaticBalanceAfter = await wMatic.balanceOf(deployer.address);
+        assert(wMaticBalanceBefore < wMaticBalanceAfter)
       });
     });
   });

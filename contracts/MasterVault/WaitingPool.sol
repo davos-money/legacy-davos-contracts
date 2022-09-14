@@ -64,14 +64,15 @@ contract WaitingPool is Initializable {
                 cap < capLimit
             ) {
                 bool success = payable(userAddr).send(userDebt);
-                cap++;
-                index++;
                 if(success) {
                     totalDebt -= userDebt;
                     people[index]._settled = true;
                     emit WithdrawCompleted(userAddr, userDebt);
                 }
-            } else {
+                cap++;
+                index++;
+            } 
+            else {
                 return;
             }
         }

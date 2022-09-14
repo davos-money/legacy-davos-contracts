@@ -141,13 +141,17 @@ ReentrancyGuardUpgradeable
         emit Claim(recipient, address(_certToken), profit);
     }
     function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
-        amountOut = IPriceGetter(_priceGetter).getPrice(
-            tokenIn,
-            tokenOut,
-            amountIn,
-            0,
-            _pairFee
-        );
+        if(address(_priceGetter) == address(0)) {
+            return 0;
+        } else {
+            amountOut = IPriceGetter(_priceGetter).getPrice(
+                tokenIn,
+                tokenOut,
+                amountIn,
+                0,
+                _pairFee
+            );
+        }
     }
 
     // withdrawal in MATIC via DEX or Swap Pool
