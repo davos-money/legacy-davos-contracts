@@ -11,6 +11,7 @@ import "./interfaces/IPriceGetter.sol";
 import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ICertToken.sol";
 import "../MasterVault/interfaces/IMasterVault.sol";
+import "../MasterVault/interfaces/IWETH.sol";
 
 contract CerosRouter is
 ICerosRouter,
@@ -74,6 +75,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         uint256 amount = msg.value;
+        IWETH(_wMaticAddress).deposit{value: amount}();
         return _deposit(amount);
     }
 

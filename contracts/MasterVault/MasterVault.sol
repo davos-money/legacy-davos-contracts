@@ -238,13 +238,15 @@ ReentrancyGuardUpgradeable
     /// @param strategy address of the strategy
     /// @param amount assets to withdraw from the strategy
     function withdrawFromStrategy(address strategy, uint256 amount) public onlyManager {
-        _withdrawFromStrategy(strategy, amount);
+        uint256 withdrawn = _withdrawFromStrategy(strategy, amount);
+        require(withdrawn > 0, "cannot withdraw from strategy");
     }
 
     /// @dev withdraw strategy's total debt
     /// @param strategy address of the strategy
     function withdrawAllFromStrategy(address strategy) external onlyManager {
-        _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
+        uint256 withdrawn = _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
+        require(withdrawn > 0, "cannot withdraw from strategy");
     }
 
     /// @dev internal function to withdraw specific amount of assets from the given strategy
@@ -310,12 +312,12 @@ ReentrancyGuardUpgradeable
         if(_deactivateStrategy(strategy)) {
             return;
         }
-        _withdrawFromStrategy(strategy, strategyParams[strategy].debt - 10);
+        _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
         _deactivateStrategy(strategy);
     }
 
-    /// @dev internal function to check strategy's debt and deactive it.
-    /// @param strategy address of the strategy
+    // /// @dev internal function to check strategy's debt and deactive it.
+    // /// @param strategy address of the strategy
     function _deactivateStrategy(address strategy) private returns(bool success) {
         if (strategyParams[strategy].debt <= 10) {
             strategyParams[strategy].active = false;
@@ -388,8 +390,8 @@ ReentrancyGuardUpgradeable
         
         uint256 oldStrategyDebt = strategyParams[oldStrategy].debt;
         
-        if(oldStrategyDebt > 10) {
-            uint256 withdrawn = _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt - 10);
+        if(oldStrategyDebt > 0) {
+            uint256 withdrawn = _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt);
             require(withdrawn > 0, "cannot withdraw from strategy");
         }
         StrategyParams memory params = StrategyParams({
