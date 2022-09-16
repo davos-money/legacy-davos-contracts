@@ -65,12 +65,14 @@ describe("SwapPool", () => {
     await wNative.deployed();
     cerosToken = await CerosTokenFactory.connect(deployer).deploy();
     await cerosToken.deployed();
-    swapPool = await SwapPoolFactory.connect(deployer).deploy(
-      wNative.address,
+    swapPool = await upgrades.deployProxy(
+      SwapPoolFactory,
+      [wNative.address,
       cerosToken.address,
       lp.address,
       false,
-      false
+      false],
+      {initializer: "initialize"}
     );
     await swapPool.deployed();
 

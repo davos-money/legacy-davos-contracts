@@ -11,6 +11,7 @@ import "./interfaces/IPriceGetter.sol";
 import "./interfaces/ICerosRouter.sol";
 import "./interfaces/ICertToken.sol";
 import "../MasterVault/interfaces/IMasterVault.sol";
+import "../MasterVault/interfaces/IWETH.sol";
 
 contract CerosRouter is
 ICerosRouter,
@@ -74,6 +75,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         uint256 amount = msg.value;
+        IWETH(_wMaticAddress).deposit{value: amount}();
         return _deposit(amount);
     }
 
@@ -141,13 +143,17 @@ ReentrancyGuardUpgradeable
         emit Claim(recipient, address(_certToken), profit);
     }
     function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view returns (uint256 amountOut) {
-        amountOut = IPriceGetter(_priceGetter).getPrice(
-            tokenIn,
-            tokenOut,
-            amountIn,
-            0,
-            _pairFee
-        );
+        if(address(_priceGetter) == address(0)) {
+            return 0;
+        } else {
+            amountOut = IPriceGetter(_priceGetter).getPrice(
+                tokenIn,
+                tokenOut,
+                amountIn,
+                0,
+                _pairFee
+            );
+        }
     }
 
     // withdrawal in MATIC via DEX or Swap Pool
