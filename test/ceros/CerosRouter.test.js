@@ -44,6 +44,11 @@ describe('Ceros Router', () => {
             // available_yields * ratio_2 -> convert to aMATICc
             available_yields = amount_1.sub(amount_1.mul(ratio_2).div(toBN(1e18)));
             // claim to third address
+            const yield = await ce_rot.getYieldFor(staker_1.address);
+            assert.equal(
+                yield.toString(),
+                available_yields.toString()
+            );
             await expect(
                 ce_rot.connect(staker_1).claim(intermediary.address)
             ).to.emit(ce_rot, "Claim")
@@ -138,8 +143,12 @@ describe('Ceros Router', () => {
             expect(
                 await aMaticc.allowance(ce_rot.address, example_address)
             ).to.be.equal(constants.MAX_UINT256.toString());
+            
+            expect(await ce_rot.getPoolAddress()).to.be.equal(example_address);
+            expect(await ce_rot.getWMaticAddress()).to.be.equal(wmatic.address);
+            expect(await ce_rot.getCertToken()).to.be.equal(aMaticc.address);
         });
-        it("change Dex and verify allowancesken", async () => {
+        it("change Dex and verify allowances", async () => {
             example_address = "0x66bea595aefd5a65799a920974b377ed20071118";
             // try to update from not owner and waiting for a revert
             await expect(
@@ -154,6 +163,7 @@ describe('Ceros Router', () => {
             expect(
                 await wmatic.allowance(ce_rot.address, example_address)
             ).to.be.equal(constants.MAX_UINT256.toString());
+            assert.equal((await ce_rot.getDexAddress()), ethers.utils.getAddress(example_address))            
         });
         it("change vault and verify allowancesken", async () => {
             example_address = "0xcb0006b31e6b403feeec257a8abee0817bed7eba";
@@ -171,6 +181,29 @@ describe('Ceros Router', () => {
             expect(
                 await wmatic.allowance(ce_rot.address, ce_vault.address)
             ).to.be.equal('0');
+
+            assert.equal((await ce_rot.getVaultAddress()), ethers.utils.getAddress(example_address))            
+            assert.equal((await ce_rot.getCeToken()), ethers.utils.getAddress(ce_token.address))            
+        });
+
+        it("change price getter contract address", async () => {
+            example_address = "0xcb0006b31e6b403feeec257a8abee0817bed7eba";
+            // try to update from not owner and waiting for a revert
+            await expect(
+                ce_rot.connect(staker_1).changePriceGetter(example_address)
+            ).to.be.revertedWith("Ownable: caller is not the owner");
+            // update
+            await ce_rot.connect(owner).changePriceGetter(example_address);
+        });
+
+        it("change price getter contract address", async () => {
+            example_fee = "3000";
+            // try to update from not owner and waiting for a revert
+            await expect(
+                ce_rot.connect(staker_1).changePairFee(example_fee)
+            ).to.be.revertedWith("Ownable: caller is not the owner");
+            // update
+            await ce_rot.connect(owner).changePairFee(example_fee);
         });
 
         
