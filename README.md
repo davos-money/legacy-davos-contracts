@@ -1,8 +1,5 @@
 # SIKKA
 
-`cp .env.example .env`
-edit .env with your variables 
-
 ## Contracts
 
 ### MakerDAO contracts
@@ -32,3 +29,29 @@ edit .env with your variables
 Provide deposit&withdraw and borrow&payback functions for end users
 * **AuctionProxy** — entrypoint for auction methods.
 End users can start auctions and participate in it via this contract
+
+
+Installation
+------------
+To run Sikka, pull the repository from GitHub and install its dependencies. You will need [yarn](https://yarnpkg.com/lang/en/docs/install/) or [npm](https://docs.npmjs.com/cli/install) installed.
+
+    git clone https://github.com/sikka-money/sikka-smart-contracts.git
+    cd sikka-smart-contracts
+    yarn install # or `npm install`
+
+`cp .env.example .env`
+edit .env with your variables 
+
+
+Testing
+-------
+To run the tests run:
+
+    yarn test
+
+Code Coverage
+-------------
+To run code coverage, run:
+
+    yarn coverage
+

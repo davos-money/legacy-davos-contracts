@@ -31,7 +31,7 @@ const wad = ten.pow(18);
 const ray = ten.pow(27);
 const rad = ten.pow(45);
 
-describe("Auction", () => {
+xdescribe("Auction", () => {
   const networkSnapshotter = new NetworkSnapshotter();
 
   let deployer, signer1, signer2, signer3;
@@ -600,21 +600,15 @@ describe("Auction", () => {
     // Approve and send some collateral inside. collateral value == 400 == `dink`
     let dink = toWad("1000").toString();
 
-    console.log("ereerere")
-
     await amaticc.connect(signer1).approve(interaction.address, dink);
     // Deposit collateral(aMATICc) to the interaction contract
     await interaction.connect(signer1).deposit(amaticc.address, dink);
 
-    console.log("ereerere")
-    
     let s1Balance = await amaticc.balanceOf(signer1.address);
     expect(s1Balance).to.equal(toWad("9000"));
-    console.log("ereerere")
     
     let s1SIKKABalance = await sikka.balanceOf(signer1.address);
     expect(s1SIKKABalance).to.equal("0");
-    console.log("ereerere")
 
     let free = await interaction
       .connect(signer1)

@@ -204,21 +204,21 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         return dink;
     }
 
-    function _mul(uint x, int y) internal pure returns (int z) {
-    unchecked {
-        z = int(x) * y;
-        require(int(x) >= 0);
-        require(y == 0 || z / y == int(x));
-    }
-    }
+    // function _mul(uint x, int y) internal pure returns (int z) {
+    // unchecked {
+    //     z = int(x) * y;
+    //     require(int(x) >= 0);
+    //     require(y == 0 || z / y == int(x));
+    // }
+    // }
 
-    function _add(uint x, int y) internal pure returns (uint z) {
-    unchecked {
-        z = x + uint(y);
-        require(y >= 0 || z <= x);
-        require(y <= 0 || z >= x);
-    }
-    }
+    // function _add(uint x, int y) internal pure returns (uint z) {
+    // unchecked {
+    //     z = x + uint(y);
+    //     require(y >= 0 || z <= x);
+    //     require(y <= 0 || z >= x);
+    // }
+    // }
 
     function borrow(address token, uint256 sikkaAmount) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
@@ -228,11 +228,10 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         dropRewards(token, msg.sender);
 
         (, uint256 rate, , ,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(sikkaAmount * 10 ** 27 / rate);
+        int256 dart = int256(sikkaAmount * RAY / rate);
         require(dart >= 0, "Interaction/too-much-requested");
-
-        if (uint256(dart) * rate < sikkaAmount * (10 ** 27)) {
-            dart += 1; //ceiling
+        if (uint256(dart) * rate < sikkaAmount * RAY) {
+            // dart += 1; //ceiling
         }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, dart);
         vat.move(msg.sender, address(this), sikkaAmount * RAY);
@@ -254,18 +253,23 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
 
-        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), sikkaAmount);
-        sikkaJoin.join(msg.sender, sikkaAmount);
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(FullMath.mulDiv(sikkaAmount, 10 ** 27, rate));
+        (,uint256 art) = vat.urns(collateralType.ilk, msg.sender);
+        int256 dart;
+        uint256 realAmount = sikkaAmount;
+        uint256 debt = rate * art;
+        if (realAmount * RAY >= debt) { // Close CDP
+            dart = int(art);
+            realAmount = (debt / RAY) + 1;
+        } else { // Less/Greater than dust
+            dart = int256(FullMath.mulDiv(realAmount, RAY, rate));
+        }
+
+        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), realAmount);
+        sikkaJoin.join(msg.sender, realAmount);
+
         require(dart >= 0, "Interaction/too-much-requested");
 
-        if (uint256(dart) * rate < sikkaAmount * (10 ** 27) &&
-            uint256(dart + 1) * rate <= vat.sikka(msg.sender)
-        ) {
-            dart += 1;
-            // ceiling
-        }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, - dart);
         dropRewards(token, msg.sender);
 
@@ -273,8 +277,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
         (uint256 ink, uint256 userDebt) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, userDebt);
-
-        emit Payback(msg.sender, token, sikkaAmount, userDebt, liqPrice);
+        emit Payback(msg.sender, token, realAmount, userDebt, liqPrice);
         return dart;
     }
 
