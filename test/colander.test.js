@@ -8,7 +8,7 @@ const toBytes32 = ethers.utils.formatBytes32String;
 const { toWad, toRay, toRad } = require("../helpers/utils");
 const { expect } = require("chai");
 
-describe.skip("===Colander===", () => {
+describe("===Colander===", () => {
 
     // Global Variables
     let deployer, 
@@ -101,7 +101,7 @@ describe.skip("===Colander===", () => {
     ikkaToken = await upgrades.deployProxy(IkkaToken, [ether("100000000").toString(), rewards.address], 
     { initializer: "initialize"});
 
-    sikka = await upgrades.deployProxy(Sikka, [80001, "SIKKA"], 
+    sikka = await upgrades.deployProxy(Sikka, [80001, "SIKKA", toWad("10000000")], 
     { initializer: "initialize"});
 
     sikkaJoin = await upgrades.deployProxy(SikkaJoin, [vat.address, sikka.address], 

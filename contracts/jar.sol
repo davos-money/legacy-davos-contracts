@@ -19,9 +19,10 @@
 
 pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 /*
    "Put rewards in the jar and close it".
@@ -31,9 +32,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
    after exit delay.
 */
 
-contract Jar is Initializable{
+contract Jar is Initializable, ReentrancyGuardUpgradeable {
     // --- Wrapper ---
-    using SafeERC20 for IERC20;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // --- Auth ---
     mapping (address => uint) public wards;
@@ -47,42 +48,53 @@ contract Jar is Initializable{
     // --- Derivative ---
     string public name;
     string public symbol;
-    uint8 public decimals = 18;
+    uint8 public decimals;
     uint public totalSupply;
     mapping(address => uint) public balanceOf;
 
     // --- Reward Data ---
-    uint public spread;      // Distribution time       [sec]
-    uint public endTime;     // Time "now" + spread     [sec]
-    uint public rate;        // Emission per second     [wad]
-    uint public tps;         // SIKKA tokens per share  [wad]
-    uint public lastUpdate;  // Last tps update         [sec]
-    uint public exitDelay;   // User unstake delay      [sec]
-    address public SIKKA;    // The SIKKA Stable Coin
+    uint public spread;          // Distribution time     [sec]
+    uint public endTime;         // Time "now" + spread   [sec]
+    uint public rate;            // Emission per second   [wad]
+    uint public tps;             // SIKKA tokens per share  [wad]
+    uint public lastUpdate;      // Last tps update       [sec]
+    uint public exitDelay;       // User unstake delay    [sec]
+    uint public flashLoanDelay;  // Anti flash loan time  [sec]
+    address public SIKKA;        // The SIKKA Stable Coin
 
     mapping(address => uint) public tpsPaid;      // SIKKA per share paid
     mapping(address => uint) public rewards;      // Accumulated rewards
     mapping(address => uint) public withdrawn;    // Capital withdrawn
     mapping(address => uint) public unstakeTime;  // Time of Unstake
+    mapping(address => uint) public stakeTime;    // Time of Stake
+
+    mapping(address => uint) public operators;  // Operators of contract
 
     uint    public live;     // Active Flag
 
     // --- Events ---
-    event Initialized(address indexed token, uint indexed duration, uint indexed exitDelay);
     event Replenished(uint reward);
     event SpreadUpdated(uint newDuration);
     event ExitDelayUpdated(uint exitDelay);
+    event OperatorSet(address operator);
+    event OperatorUnset(address operator);
     event Join(address indexed user, uint indexed amount);
     event Exit(address indexed user, uint indexed amount);
     event Redeem(address[] indexed user);
     event Cage();
 
     // --- Init ---
-    function initialize(string memory _name, string memory _symbol) public initializer {
+    function initialize(string memory _name, string memory _symbol, address _sikkaToken, uint _spread, uint _exitDelay, uint _flashLoanDelay) external initializer {
+        __ReentrancyGuard_init();
         wards[msg.sender] = 1;
-        live = 1;
+        decimals = 18;
         name = _name;
         symbol = _symbol;
+        SIKKA = _sikkaToken;
+        spread = _spread;
+        exitDelay = _exitDelay;
+        flashLoanDelay = _flashLoanDelay;
+        live = 1;
     }
 
     // --- Math ---
@@ -98,6 +110,10 @@ contract Jar is Initializable{
             rewards[account] = earned(account);
             tpsPaid[account] = tps;
         }
+        _;
+    }
+    modifier authOrOperator {
+        require(operators[msg.sender] == 1 || wards[msg.sender] == 1, "Jar/not-auth-or-operator");
         _;
     }
 
@@ -116,52 +132,47 @@ contract Jar is Initializable{
         uint perToken = tokensPerShare() - tpsPaid[account];
         return ((balanceOf[account] * perToken) / 1e18) + rewards[account];
     }
-    function redeemable(address account) public view returns (uint) {
-        return balanceOf[account] + earned(account);
-    }
-    function getRewardForDuration() external view returns (uint) {
-        return rate * spread;
-    }
-    function getAPR() external view returns (uint) {
-        if(spread == 0 || totalSupply == 0) {
-            return 0;
-        }
-        return ((rate * 31536000 * 1e18) / totalSupply) * 100;
-    }
 
-    // --- Administration ---
-    function initialize(address _sikkaToken, uint _spread, uint _exitDelay) public auth {
-        require(spread == 0);
-        SIKKA = _sikkaToken;
-        spread = _spread;
-        exitDelay = _exitDelay;
-        emit Initialized(SIKKA, spread, exitDelay);
-    }
-    
-    // Can be called by anybody. In order to fill the contract with additional funds
-    function replenish(uint wad) external update(address(0)) {
+    // --- Administration --
+    function replenish(uint wad, bool newSpread) external authOrOperator update(address(0)) {
+        uint timeline = spread;
         if (block.timestamp >= endTime) {
-            rate = wad / spread;
+            rate = wad / timeline;
         } else {
             uint remaining = endTime - block.timestamp;
             uint leftover = remaining * rate;
-            rate = (wad + leftover) / spread;
+            timeline = newSpread ? spread : remaining;
+            rate = (wad + leftover) / timeline;
         }
         lastUpdate = block.timestamp;
-        endTime = block.timestamp + spread;
+        endTime = block.timestamp + timeline;
 
-        IERC20(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
         emit Replenished(wad);
     }
-    function setSpread(uint _spread) external auth {
-        require(block.timestamp > endTime, "Jar/rewards-active");
+    function setSpread(uint _spread) external authOrOperator {
         require(_spread > 0, "Jar/duration-non-zero");
         spread = _spread;
         emit SpreadUpdated(_spread);
     }
-    function setExitDelay(uint _exitDelay) external auth {
+    function setExitDelay(uint _exitDelay) external authOrOperator {
         exitDelay = _exitDelay;
         emit ExitDelayUpdated(_exitDelay);
+    }
+    function addOperator(address _operator) external auth {
+        operators[_operator] = 1;
+        emit OperatorSet(_operator);
+    }
+    function removeOperator(address _operator) external auth {
+        operators[_operator] = 0;
+        emit OperatorUnset(_operator);
+    }
+    function extractDust() external auth {
+        require(block.timestamp >= endTime, "Jar/in-distribution");
+        uint dust = IERC20Upgradeable(SIKKA).balanceOf(address(this)) - totalSupply;
+        if (dust != 0) {
+            IERC20Upgradeable(SIKKA).safeTransfer(msg.sender, dust);
+        }
     }
     function cage() external auth {
         live = 0;
@@ -169,39 +180,51 @@ contract Jar is Initializable{
     }
 
     // --- User ---
-    function join(uint256 wad) external update(msg.sender) {
+    function join(uint256 wad) external update(msg.sender) nonReentrant {
         require(live == 1, "Jar/not-live");
 
         balanceOf[msg.sender] += wad;
         totalSupply += wad;
+        stakeTime[msg.sender] = block.timestamp + flashLoanDelay;
 
-        IERC20(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
         emit Join(msg.sender, wad);
     }
-    function exit(uint256 wad) external update(msg.sender) {
+    function exit(uint256 wad) external update(msg.sender) nonReentrant {
         require(live == 1, "Jar/not-live");
-        require(wad > 0);
+        require(block.timestamp > stakeTime[msg.sender], "Jar/flash-loan-delay");
 
-        balanceOf[msg.sender] -= wad;        
-        totalSupply -= wad;
-        withdrawn[msg.sender] += wad;
-        unstakeTime[msg.sender] = block.timestamp + exitDelay;
-
+        if (wad > 0) {
+            balanceOf[msg.sender] -= wad;        
+            totalSupply -= wad;
+            withdrawn[msg.sender] += wad;
+        }
+        if (exitDelay <= 0) {
+            // Immediate claim
+            address[] memory accounts = new address[](1);
+            accounts[0] = msg.sender;
+            _redeemHelper(accounts);
+        } else {
+            unstakeTime[msg.sender] = block.timestamp + exitDelay;
+        }
+        
         emit Exit(msg.sender, wad);
     }
-    function redeemBatch(address[] memory accounts) external {
-        // Target is to allow direct and on-behalf redemption
+    function redeemBatch(address[] memory accounts) external nonReentrant {
+        // Allow direct and on-behalf redemption
         require(live == 1, "Jar/not-live");
-
+        _redeemHelper(accounts);
+    }
+    function _redeemHelper(address[] memory accounts) private {
         for (uint i = 0; i < accounts.length; i++) {
-            if (block.timestamp < unstakeTime[accounts[i]] && unstakeTime[accounts[i]] != 0)
+            if (block.timestamp < unstakeTime[accounts[i]] && unstakeTime[accounts[i]] != 0 && exitDelay != 0)
                 continue;
             
             uint _amount = rewards[accounts[i]] + withdrawn[accounts[i]];
             if (_amount > 0) {
                 rewards[accounts[i]] = 0;
                 withdrawn[accounts[i]] = 0;
-                IERC20(SIKKA).safeTransfer(accounts[i], _amount);
+                IERC20Upgradeable(SIKKA).safeTransfer(accounts[i], _amount);
             }
         }
        
