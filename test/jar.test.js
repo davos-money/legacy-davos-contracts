@@ -254,6 +254,8 @@ describe('===Jar===', function () {
                 await jar.connect(signer1).redeemBatch([signer1.address]);
 
                 await network.provider.send("evm_mine");
+
+                await network.provider.send("evm_setAutomine", [true]);
             }
         });
     });
