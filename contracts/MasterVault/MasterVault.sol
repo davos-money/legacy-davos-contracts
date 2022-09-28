@@ -445,8 +445,8 @@ ReentrancyGuardUpgradeable
     function withdrawFee() external onlyOwner{
         if(feeEarned > 0) {
             IWETH(asset()).withdraw(feeEarned);
-            feeEarned = 0;
             feeReceiver.transfer(feeEarned);
+            feeEarned = 0;
         }
     }
 

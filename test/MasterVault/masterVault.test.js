@@ -550,8 +550,7 @@ describe("MasterVault", function () {
       let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
       assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       assert.equal(Number(vaultTokenBalanceAfter), 0);
-      // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
-      expect(maticBalanceAfter, maticBalanceBefore.add(event[0].args.shares).sub(txFee2));
+      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
 
       maticBalanceBefore = await ethers.provider.getBalance(deployer.address);
       feeEarned = await masterVault.feeEarned();
@@ -562,7 +561,7 @@ describe("MasterVault", function () {
       txFee3 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
       
       maticBalanceAfter = await ethers.provider.getBalance(deployer.address);
-      expect(maticBalanceAfter.eq(maticBalanceBefore.add(feeEarned).sub(txFee3)));
+      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore.add(feeEarned).sub(txFee3)));
     });
 
 
