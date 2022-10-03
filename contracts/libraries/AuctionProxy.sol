@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "../interfaces/ClipperLike.sol";
 import "../interfaces/GemJoinLike.sol";
 import "../interfaces/SikkaJoinLike.sol";
-import "../interfaces/SikkaLike.sol";
 import "../interfaces/DogLike.sol";
 import "../interfaces/VatLike.sol";
 import "../ceros/interfaces/ISikkaProvider.sol";
@@ -23,7 +22,7 @@ library AuctionProxy {
   function startAuction(
     address user,
     address keeper,
-    SikkaLike sikka,
+    IERC20Upgradeable sikka,
     SikkaJoinLike sikkaJoin,
     VatLike vat,
     DogLike dog,
@@ -39,16 +38,16 @@ library AuctionProxy {
     sikkaBal = sikka.balanceOf(address(this)) - sikkaBal;
     sikka.transfer(keeper, sikkaBal);
 
-    // Burn any derivative token (hMATIC incase of ceaMATICc collateral)
+    // Burn any derivative token (sMATIC incase of ceaMATICc collateral)
     if (address(sikkaProvider) != address(0)) {
-      sikkaProvider.daoBurn(user, ClipperLike(collateral.clip).sales(id).lot);
+      sikkaProvider.daoBurn(user, _clip.sales(id).lot);
     }
   }
 
   function resetAuction(
     uint auctionId,
     address keeper,
-    SikkaLike sikka,
+    IERC20Upgradeable sikka,
     SikkaJoinLike sikkaJoin,
     VatLike vat,
     CollateralType calldata collateral
@@ -63,12 +62,13 @@ library AuctionProxy {
     sikka.transfer(keeper, sikkaBal);
   }
 
+  // Returns lefover from auction
   function buyFromAuction(
     uint256 auctionId,
     uint256 collateralAmount,
     uint256 maxPrice,
     address receiverAddress,
-    SikkaLike sikka,
+    IERC20Upgradeable sikka,
     SikkaJoinLike sikkaJoin,
     VatLike vat,
     ISikkaProvider sikkaProvider,

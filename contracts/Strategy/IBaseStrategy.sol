@@ -6,16 +6,11 @@ interface IBaseStrategy {
 // to deposit funds to a destination contract
 function deposit(uint256 amount) external returns(uint256);
 
-function depositAll() external returns(uint256);
-
 // to withdraw funds from the destination contract
 function withdraw(uint256 amount) external returns(uint256);
 
 // claim or collect rewards functions
 function harvest() external;
-
-// withdraw all funds from the destination contract
-function panic() external returns (uint256);
 
 // disable deposit
 function pause() external;

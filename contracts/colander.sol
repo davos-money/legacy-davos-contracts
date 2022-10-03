@@ -173,7 +173,7 @@ contract Colander is IStabilityPool, ReentrancyGuardUpgradeable {
         uint256 lot;          // Auction collateral  [wad]
         {
             (, bytes32 ilk,, address clip) = IDao(interaction).collaterals(_collateral);
-            // CollateralType memory collateral = IDao(interaction).collaterals(_collateral);
+            // CollateralType memory collateral = Interaction(interaction).collaterals(_collateral);
             (,abacusPrice,,) = ClipperLike(clip).getStatus(_auction_id);
             feedPrice = _getFeedPrice(ilk);  // [ray]
 
