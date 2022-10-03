@@ -7,6 +7,8 @@ const web3 = require('web3');
 const toBN = web3.utils.toBN;
 const { constants } = require('@openzeppelin/test-helpers');
 const { ZERO_ADDRESS } = require("@openzeppelin/test-helpers/src/constants");
+const { parse } = require("dotenv");
+const { parseEther } = require("ethers/lib/utils");
 
 let owner, staker_1, staker_2,
     amount_1, amount_2,
@@ -142,6 +144,20 @@ describe('Sikka Provider', () => {
             ).to.emit(h_provider, "ChangeCollateralToken")
                 .withArgs(example_address);
             // check allowances for new Dao
+        });
+        it("dao token(non-transferable)", async () => {
+            await sMatic.changeMinter(staker_1.address);
+            await expect(
+                sMatic.connect(staker_1).mint(ZERO_ADDRESS, parseEther("1"))
+                ).to.be.revertedWith("ERC20: mint to the zero address");
+            await sMatic.connect(staker_1).mint(staker_2.address, parseEther("1"));
+
+            await expect(
+                sMatic.connect(staker_1).burn(ZERO_ADDRESS, parseEther("1"))
+            ).to.be.revertedWith("ERC20: burn from the zero address");
+            await expect(
+                sMatic.connect(staker_1).burn(staker_2.address, parseEther("2"))
+            ).to.be.revertedWith("ERC20: burn amount exceeds balance");
         });
     });
 });
