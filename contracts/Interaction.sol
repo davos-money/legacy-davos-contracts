@@ -258,6 +258,7 @@ contract Interaction is Initializable, IDao {
         uint256 debt = rate * art;
         if (realAmount * RAY >= debt) { // Close CDP
             dart = int(art);
+            realAmount = debt / RAY;
             realAmount = realAmount * RAY == debt ? realAmount : realAmount + 1;
         } else { // Less/Greater than dust
             dart = int256(FullMath.mulDiv(realAmount, RAY, rate));
