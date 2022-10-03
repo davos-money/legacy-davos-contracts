@@ -45,7 +45,7 @@ describe.skip('Ceros Router (Mumbai Fork)', () => {
     afterEach("revert", async () => await networkSnapshotter.revert());
 
     describe('Basic functionality', async () => {
-        it.only('staker_1 deposits wMatic and claims profit(swap executed on uniswap-v3)', async () => {
+        it('staker_1 deposits wMatic and claims profit(swap executed on uniswap-v3)', async () => {
             await aMaticc.connect(staker_1).approve(ce_rot.address, amount_1.toString());
             await wmatic.connect(staker_1).approve(ce_rot.address, amount_1.toString());
             await wmatic.connect(staker_1).deposit({value: amount_1.toString()});
