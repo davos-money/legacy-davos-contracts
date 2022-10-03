@@ -27,11 +27,34 @@ describe('Sikka Provider', () => {
                     staker_1.address,
                     amount_2.toString()
                 );
-
+            
+            // check sMatic Minter role
+            await sMatic.changeMinter(intermediary.address);
+            await expect(
+                h_provider.connect(staker_1).provide({ value: amount_2.toString() })
+            )
+            .to.be.revertedWith("Minter: not allowed");
+            await sMatic.changeMinter(sikkaProvider.address);
+            const minter = await sMatic.getMinter();
+            expect(minter).to.be.equal(sikkaProvider.address);
+            
             console.log(`------- balance after staker_1 provided(${amount_2.toString()} MATIC) -------`);
             await printBalances();
         });
         it('staker_1 releases MATIC', async () => {
+            // check if participant is zero address
+            await expect(
+                h_provider.connect(staker_1).release(ZERO_ADDRESS, amount_1.toString())
+            )
+            .to.be.revertedWith("");
+            
+            // check if staker can provide when it's paused
+            await h_provider.connect(owner).pause();
+            await expect(
+                h_provider.connect(staker_1).release(staker_1.address, amount_1.toString())
+            )
+            .to.be.revertedWith("Pausable: paused");
+            await h_provider.connect(owner).unPause();
             await expect(
                 h_provider.connect(staker_1).release(staker_1.address, amount_1.toString())
             ).to.emit(h_provider, "Withdrawal")
@@ -52,7 +75,12 @@ describe('Sikka Provider', () => {
             // change DAO to check access easily
             await h_provider.connect(owner).changeProxy(intermediary.address);
 
+            // check if zero address can be liquidated
             await h_provider.connect(intermediary).daoBurn(staker_1.address, toBN('1000').toString());
+            await expect(
+                h_provider.connect(intermediary).daoBurn(ZERO_ADDRESS, toBN('1000').toString())
+            )
+            .to.be.revertedWith("");
         });
         it('daoMint()', async () => {
             await expect(
@@ -60,6 +88,17 @@ describe('Sikka Provider', () => {
             ).to.be.revertedWith("AuctionProxy: not allowed");
 
             await h_provider.connect(intermediary).daoMint(staker_1.address, toBN('1000').toString());
+            // check if participant can be zero address
+            await expect(
+                h_provider.connect(intermediary).daoMint(ZERO_ADDRESS, toBN('1000').toString())
+            )
+            .to.be.revertedWith("");
+
+            // check if zero address can be liquidated
+            await expect(
+                h_provider.connect(intermediary).liquidation(ZERO_ADDRESS, toBN('1000').toString())
+            )
+            .to.be.revertedWith("");
         });
     });
     describe("Updating functionality", async () => {

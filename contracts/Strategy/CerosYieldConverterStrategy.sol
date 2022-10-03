@@ -59,12 +59,6 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         return _deposit(amount);
     }
 
-    /// @dev deposits all the available underlying tokens into ceros
-    function depositAll() external onlyVault returns(uint256 value) {
-        uint256 amount = underlying.balanceOf(address(this));
-        return _deposit(amount);
-    }
-
     /// @dev internal function to deposit the given amount of underlying tokens into ceros
     /// @param amount amount of underlying tokens
     function _deposit(uint256 amount) internal returns (uint256 value) {
@@ -81,12 +75,6 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     /// @param amount amount of underlying tokens
     function withdraw(uint256 amount) onlyVault external returns(uint256 value) {
         return _withdraw(amount);
-    }
-
-    /// @dev withdraws everything from ceros and transfers to masterVault
-    function panic() external onlyStrategist returns (uint256 value) {
-        (,, uint256 debt) = vault.strategyParams(address(this));
-        return _withdraw(debt);
     }
 
     /// @dev internal function to withdraw the given amount of underlying tokens from ceros

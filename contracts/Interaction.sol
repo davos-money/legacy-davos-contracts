@@ -8,7 +8,6 @@ import "./sMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
 import "./interfaces/VatLike.sol";
-import "./interfaces/SikkaLike.sol";
 import "./interfaces/SikkaJoinLike.sol";
 import "./interfaces/GemJoinLike.sol";
 import "./interfaces/JugLike.sol";
@@ -16,7 +15,6 @@ import "./interfaces/DogLike.sol";
 import "./interfaces/PipLike.sol";
 import "./interfaces/SpotLike.sol";
 import "./interfaces/IRewards.sol";
-import "./interfaces/IAuctionProxy.sol";
 import "./ceros/interfaces/ISikkaProvider.sol";
 import "./ceros/interfaces/IDao.sol";
 
@@ -27,7 +25,7 @@ uint256 constant WAD = 10 ** 18;
 uint256 constant RAD = 10 ** 45;
 uint256 constant YEAR = 31556952; //seconds in year (365.2425 * 24 * 3600)
 
-contract Interaction is Initializable, IDao, IAuctionProxy {
+contract Interaction is Initializable, IDao {
 
     mapping(address => uint) public wards;
 
@@ -41,7 +39,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
     VatLike public vat;
     SpotLike public spotter;
-    SikkaLike public sikka;
+    IERC20Upgradeable public sikka;
     SikkaJoinLike public sikkaJoin;
     JugLike public jug;
     address public dog;
@@ -95,7 +93,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
         vat = VatLike(vat_);
         spotter = SpotLike(spot_);
-        sikka = SikkaLike(sikka_);
+        sikka = IERC20Upgradeable(sikka_);
         sikkaJoin = SikkaJoinLike(sikkaJoin_);
         jug = JugLike(jug_);
         dog = dog_;
@@ -200,7 +198,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
         deposits[token] += dink;
 
-        emit Deposit(participant, dink);
+        emit Deposit(participant, token, dink, locked(token, participant));
         return dink;
     }
 
@@ -231,7 +229,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         int256 dart = int256(sikkaAmount * RAY / rate);
         require(dart >= 0, "Interaction/too-much-requested");
         if (uint256(dart) * rate < sikkaAmount * RAY) {
-            // dart += 1; //ceiling
+            dart += 1; //ceiling
         }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, dart);
         vat.move(msg.sender, address(this), sikkaAmount * RAY);
@@ -239,7 +237,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
         (uint256 ink, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, art);
-        emit Borrow(msg.sender, token, sikkaAmount, liqPrice);
+        emit Borrow(msg.sender, token, ink, sikkaAmount, liqPrice);
         return uint256(dart);
     }
 
@@ -260,7 +258,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         uint256 debt = rate * art;
         if (realAmount * RAY >= debt) { // Close CDP
             dart = int(art);
-            realAmount = (debt / RAY) + 1;
+            realAmount = sikkaAmount == (debt / RAY) + 1 ? (debt / RAY) + 1 : sikkaAmount;
         } else { // Less/Greater than dust
             dart = int256(FullMath.mulDiv(realAmount, RAY, rate));
         }
@@ -394,7 +392,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
     }
 
     // User collateral in aMATICc
-    function locked(address token, address usr) external view returns (uint256) {
+    function locked(address token, address usr) public view returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
 
@@ -409,7 +407,8 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
 
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
         (, uint256 art) = vat.urns(collateralType.ilk, usr);
-        return (art * rate) / 10 ** 27;
+        // 100 Wei is added as a ceiling to help close CDP in repay()
+        return ((art * rate) / RAY) + 100;
     }
 
     // Collateral minus borrowed. Basically free collateral (nominated in SIKKA)
@@ -537,7 +536,7 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
         uint256 collateralAmount,
         uint256 maxPrice,
         address receiverAddress
-    ) external override(IAuctionProxy, IDao) {
+    ) external {
         CollateralType memory collateral = collaterals[token];
         ISikkaProvider sikkaProvider = ISikkaProvider(sikkaProviders[token]);
         uint256 leftover = AuctionProxy.buyFromAuction(
@@ -579,6 +578,6 @@ contract Interaction is Initializable, IDao, IAuctionProxy {
     }
 
     function _checkIsLive(uint256 live) internal pure {
-        require(live == 1, "Interaction/inactive collateral");
+        require(live != 0, "Interaction/inactive collateral");
     }
 }

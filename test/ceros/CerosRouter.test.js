@@ -23,6 +23,14 @@ describe('Ceros Router', () => {
             await printBalances();
             await aMaticc.connect(staker_1).approve(ce_rot.address, amount_1.toString());
             await wmatic.connect(staker_1).approve(ce_rot.address, amount_1.toString());
+            await expect(
+                ce_rot.connect(staker_1).depositWMatic("0")
+            ).to.be.revertedWith("invalid deposit amount");
+            await ce_token.changeVault(staker_1.address);
+            await expect(
+                ce_rot.connect(staker_1).depositWMatic(amount_1.toString())
+                ).to.be.revertedWith("Minter: not allowed");
+            await ce_token.changeVault(ce_vault.address);
             await ce_rot.connect(staker_1).depositWMatic(amount_1.toString());
             console.log(`------- balances and supplies after deposit 1 aMATICc-------`);
             await printBalances()
@@ -49,6 +57,9 @@ describe('Ceros Router', () => {
                 yield.toString(),
                 available_yields.toString()
             );
+            await expect(
+                ce_rot.connect(staker_1).claimProfit(intermediary.address)
+            ).to.be.revertedWith("has not got a profit");
             await expect(
                 ce_rot.connect(staker_1).claim(intermediary.address)
             ).to.emit(ce_rot, "Claim")

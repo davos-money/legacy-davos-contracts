@@ -1,5 +1,5 @@
 const { expect, assert } = require("chai");
-const { BigNumber } = require("ethers");
+const { parseEther } = require("ethers/lib/utils");
 const { ethers } = require("hardhat");
 const ethUtils = ethers.utils;
 const NetworkSnapshotter = require("../helpers/NetworkSnapshotter");
@@ -207,6 +207,13 @@ describe("MasterVault", function () {
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       vaultTokenBalanceBefore = await getTokenBalance(signer1.address, masterVault.address)
       wMaticTokenBalanceBefore = await getTokenBalance(masterVault.address, wMaticAddress)
+      await masterVault.changeProvider(deployer.address);
+      await expect(
+        masterVault
+          .connect(signer1)
+          .depositETH({value: depositAmount})
+      ).to.be.revertedWith("Provider: not allowed");
+      await masterVault.changeProvider(signer1.address);
       tx = await masterVault.connect(signer1).depositETH({value: depositAmount});
       receipt = await tx.wait(1);
       txFee = receipt.gasUsed.mul(receipt.effectiveGasPrice)
@@ -550,8 +557,7 @@ describe("MasterVault", function () {
       let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
       assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       assert.equal(Number(vaultTokenBalanceAfter), 0);
-      assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
-
+      expect(maticBalanceBefore.add(event[0].args.shares).sub(txFee2)).to.be.equal(maticBalanceAfter);
       maticBalanceBefore = await ethers.provider.getBalance(deployer.address);
       feeEarned = await masterVault.feeEarned();
       assert.equal(feeEarned, (Number(withdrawAmount - swapFee) * fee / 1e6))
@@ -800,6 +806,22 @@ describe("MasterVault", function () {
 
       totalDebtBefore = await masterVault.totalDebt();
       swapFee = ((totalDebtBefore)* await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
+      await expect(
+        masterVault
+          .migrateStrategy(cerosStrategy.address, ethers.constants.AddressZero, newAllocation)
+      ).to.be.revertedWith("");
+      await expect(
+        masterVault
+          .migrateStrategy(ethers.constants.AddressZero, cerosStrategy.address, newAllocation)
+      ).to.be.revertedWith("");
+      await expect(
+        masterVault
+          .migrateStrategy(signer1.address, newStrategy.address, newAllocation)
+      ).to.be.revertedWith("");
+      await expect(
+        masterVault
+          .migrateStrategy(cerosStrategy.address, newStrategy.address, "10000000")
+      ).to.be.revertedWith("allocations cannot be more than 100%");
       await masterVault.migrateStrategy(cerosStrategy.address, newStrategy.address, newAllocation);
       totalDebtAfter = await masterVault.totalDebt();
       assert.equal(Number(totalDebtAfter), 0);
@@ -813,6 +835,10 @@ describe("MasterVault", function () {
     it("depositAllToStrategy(): should deposit all the assets to given strategy", async function () {
       let depositAmount = ethUtils.parseEther("1"),
           allocation = 80 * 10000;
+      await expect(
+        masterVault
+          .setStrategy(ethers.constants.AddressZero, allocation)
+      ).to.be.revertedWith("");
       await masterVault.setStrategy(cerosStrategy.address, allocation);
       await masterVault.connect(signer1).depositETH({value: depositAmount});
       wMaticBalanceBefore = await getTokenBalance(masterVault.address, wMaticAddress);
@@ -831,6 +857,13 @@ describe("MasterVault", function () {
       wMaticBalanceBefore = await getTokenBalance(masterVault.address, wMaticAddress);
       assert.equal(Number(wMaticBalanceBefore), Number(depositAmount))
       
+      await expect(
+        masterVault.depositToStrategy(cerosStrategy.address, "0")
+      ).to.be.revertedWith("invalid deposit amount");
+
+      await expect(
+        masterVault.depositToStrategy(cerosStrategy.address, depositAmount.add(parseEther("100")))
+      ).to.be.revertedWith("insufficient balance");
       await masterVault.depositToStrategy(cerosStrategy.address, depositAmount.div(ethers.BigNumber.from("2")));
       wMaticBalanceAfter = await getTokenBalance(masterVault.address, wMaticAddress);
       assert.equal(Number(wMaticBalanceAfter), Number(wMaticBalanceBefore) / 2);
@@ -1082,6 +1115,14 @@ describe("MasterVault", function () {
         ).to.be.revertedWith("Ownable: caller is not the owner");  
       });
 
+      it("revert:: changeSwapPool(): cannot set zero address", async function() {
+        await expect(
+          masterVault
+            .connect(deployer)
+            .changeSwapPool(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
+      });
+
       it("changeSwapPool(): should let owner change swapPool", async function() {
         expect(await masterVault.connect(deployer).changeSwapPool(signer2.address))
           .to.emit(masterVault, "SwapPoolChanged")
@@ -1094,6 +1135,36 @@ describe("MasterVault", function () {
             .connect(signer1)
             .changeFeeReceiver(signer2.address)
         ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("revert:: changeFeeReceiver(): cannot set zero address", async function() {
+        await expect(
+          masterVault
+            .connect(deployer)
+            .changeFeeReceiver(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
+      });
+
+      it("revert:: initialize(): cannot set maxDeposit more than 1e6", async function() {
+        let _masterVault = await MasterVault.deploy();
+        await _masterVault.deployed();
+
+        await expect(
+          _masterVault
+            .connect(deployer)
+            .initialize("CEROS MATIC Vault Token", "ceMATIC", "10000000", maxWithdrawalFee, wMaticAddress, maxStrategies, swapPoolAddress)
+        ).to.be.revertedWith("invalid maxDepositFee");  
+      });
+
+      it("rrevert:: initialize(): cannot set maxDeposit more than 1e6", async function() {
+        let _masterVault = await MasterVault.deploy();
+        await _masterVault.deployed();
+
+        await expect(
+          _masterVault
+            .connect(deployer)
+            .initialize("CEROS MATIC Vault Token", "ceMATIC", maxDepositFee, "10000000", wMaticAddress, maxStrategies, swapPoolAddress)
+        ).to.be.revertedWith("invalid maxWithdrawalFees");  
       });
 
       it("changeFeeReceiver(): should let owner change swapPool", async function() {
@@ -1122,6 +1193,14 @@ describe("MasterVault", function () {
         ).to.be.revertedWith("Ownable: caller is not the owner");  
       });
 
+      it("revert:: changeCeRouter(): cannot set zero address", async function() {
+        await expect(
+          cerosStrategy
+            .connect(deployer)
+            .changeCeRouter(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
+      });
+
       it("changeCeRouter(): should let owner change ceRouter", async function() {
         expect(await cerosStrategy.connect(deployer).changeCeRouter(signer2.address))
           .to.emit(cerosStrategy, "CeRouterChanged")
@@ -1134,12 +1213,28 @@ describe("MasterVault", function () {
           .withArgs(signer2.address);
       });
 
+      it("changeSwapPool(): cannot set to zero address", async function() {
+        await expect(
+          cerosStrategy
+            .connect(deployer)
+            .changeSwapPool(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
+      });
+
       it("revert:: setStrategist(): onlyOwner can call", async function() {
         await expect(
           cerosStrategy
             .connect(signer1)
             .setStrategist(signer2.address)
         ).to.be.revertedWith("Ownable: caller is not the owner");  
+      });
+
+      it("revert:: setStrategist(): cannot set zero address", async function() {
+        await expect(
+          cerosStrategy
+            .connect(deployer)
+            .setStrategist(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
       });
 
       it("setStrategist(): should let owner change Strategist", async function() {
@@ -1156,10 +1251,26 @@ describe("MasterVault", function () {
         ).to.be.revertedWith("Ownable: caller is not the owner");  
       });
 
+      it("revert:: setFeeRecipient(): cannot set zero address", async function() {
+        await expect(
+          cerosStrategy
+            .connect(deployer)
+            .setFeeRecipient(ethers.constants.AddressZero)
+        ).to.be.revertedWith("");  
+      });
+
       it("setFeeRecipient(): should let owner change feeRecipient", async function() {
         expect(await cerosStrategy.connect(deployer).setFeeRecipient(signer2.address))
           .to.emit(cerosStrategy, "UpdatedFeeRecipient")
           .withArgs(signer2.address);
+      });
+
+      it("revert:: withdraw(): only masterVault can withdraw funds", async function() {
+        await expect(
+          cerosStrategy
+            .connect(deployer)
+            .withdraw("100")
+        ).to.be.revertedWith("!vault");
       });
 
       it("revert:: pause(): onlyStrategist can call", async function() {
@@ -1176,6 +1287,19 @@ describe("MasterVault", function () {
         assert.equal(depositPaused, true);
       });
 
+      it("pause(): cannot deposit when paused", async function() {
+        let allocation = 80 * 10000   // 80%
+          depositAmount = ethUtils.parseEther("1");
+          
+        await masterVault.setStrategy(cerosStrategy.address, allocation);
+        await cerosStrategy.connect(deployer).pause()
+        await masterVault.connect(signer1).depositETH({value: depositAmount});
+        await expect(
+          masterVault
+            .depositToStrategy(cerosStrategy.address, depositAmount.div(2))
+        ).to.be.revertedWith("deposits are paused");        
+      });
+
       it("unpause(): should let Strategist unpause deposits", async function() {
         await cerosStrategy.connect(deployer).unpause()
         let depositPaused = await cerosStrategy.depositPaused();
@@ -1189,6 +1313,7 @@ describe("MasterVault", function () {
             availableToWithdrawBefore = await masterVault.availableToWithdraw();
         await masterVault.setStrategy(cerosStrategy.address, allocation);
         await masterVault.connect(signer1).depositETH({value: depositAmount});
+        await cerosStrategy.connect(deployer).harvest(); 
         await depositAndAllocate(masterVault, signer1, depositAmount);
         availableToWithdrawAfter = await masterVault.availableToWithdraw();
         strategyDebt = await masterVault.strategyParams(cerosStrategy.address);

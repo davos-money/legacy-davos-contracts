@@ -82,7 +82,7 @@ ReentrancyGuardUpgradeable
         address swapPoolAddr
     ) public initializer {
         require(maxDepositFees > 0 && maxDepositFees <= 1e6, "invalid maxDepositFee");
-        require(maxWithdrawalFees > 0 && maxDepositFees <= 1e6, "invalid maxWithdrawalFees");
+        require(maxWithdrawalFees > 0 && maxWithdrawalFees <= 1e6, "invalid maxWithdrawalFees");
 
         __Ownable_init();
         __Pausable_init();

@@ -304,14 +304,14 @@ describe("Interaction", function () {
         it("deposit(): should let user deposit collateral", async function () {
             await setCollateralType();
             const depositAmount = parseEther("1");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
+            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
             await expect(
-                interaction.connect(signer1).deposit(
+            tx = await interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const deposits = await interaction.deposits(aMaticc.address);
             expect(deposits.eq(depositAmount));
         });
@@ -353,7 +353,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
             
@@ -379,7 +379,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
             
@@ -402,7 +402,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
            
@@ -425,7 +425,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
@@ -459,7 +459,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
@@ -517,7 +517,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
@@ -547,7 +547,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
@@ -588,7 +588,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
@@ -609,7 +609,7 @@ describe("Interaction", function () {
             const availableToBorrowAfter = await interaction.availableToBorrow(aMaticc.address, signer1.address);
             assert.equal(availableToBorrowAfter, availableToBorrowBefore - borrowAmount);
 
-            const paybackAmount = (await interaction.borrowed(collateralToken.address, signer1.address)).sub(parseEther("100"))
+            const paybackAmount = (await interaction.borrowed(collateralToken.address, signer1.address)).sub(parseEther("100")).sub("100");
             await expect(
                 interaction.connect(signer1).payback(
                 aMaticc.address,
@@ -632,7 +632,7 @@ describe("Interaction", function () {
                 aMaticc.address,
                 depositAmount
             )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, depositAmount);
+            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
               
