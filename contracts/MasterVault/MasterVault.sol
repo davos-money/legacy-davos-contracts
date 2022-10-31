@@ -335,16 +335,16 @@ ReentrancyGuardUpgradeable
                 StrategyParams memory strategy =  strategyParams[strategies[i]];
                 uint256 allocation = strategy.allocation;
                 if(allocation > 0) {
-                    uint256 totalAssets = totalAssetInVault() + totalDebt;
-                    uint256 strategyRatio = (strategy.debt * 1e6) / totalAssets;
+                    uint256 totalAssetAndDebt = totalAssetInVault() + totalDebt;
+                    uint256 strategyRatio = (strategy.debt * 1e6) / totalAssetAndDebt;
                     if(strategyRatio < allocation) {
-                        uint256 depositAmount = ((totalAssets * allocation) / 1e6) - strategy.debt;
+                        uint256 depositAmount = ((totalAssetAndDebt * allocation) / 1e6) - strategy.debt;
                         if(totalAssetInVault() > depositAmount) {
                             _depositToStrategy(strategies[i], depositAmount);
                             // IBaseStrategy(strategies[i]).depositAll();
                         }
                     // } else {
-                    //     uint256 withdrawAmount = strategy.debt - (totalAssets * allocation) / 1e6;
+                    //     uint256 withdrawAmount = strategy.debt - (totalAssetAndDebt * allocation) / 1e6;
                     //     if(withdrawAmount > 0) {
                     //         _withdrawFromStrategy(strategies[i], withdrawAmount);
                     //     }
@@ -439,6 +439,7 @@ ReentrancyGuardUpgradeable
         }
     }
     receive() external payable {
+        require(msg.sender == asset()); // only accept ETH from the WETH contract
     }
 
     /// @dev only owner can call this function to withdraw earned fees

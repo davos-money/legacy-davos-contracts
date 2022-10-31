@@ -106,7 +106,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     }
 
     receive() external payable {
-
+        require(msg.sender == address(underlying)); // only accept ETH from the WETH contract
     }
 
     function canDeposit(uint256 amount) public view returns(bool) {
