@@ -408,8 +408,14 @@ contract Interaction is Initializable, IDao {
 
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
         (, uint256 art) = vat.urns(collateralType.ilk, usr);
+        
         // 100 Wei is added as a ceiling to help close CDP in repay()
-        return ((art * rate) / RAY) + 100;
+        if ((art * rate) / RAY != 0) {
+            return ((art * rate) / RAY) + 100;
+        }
+        else {
+            return 0;
+        }
     }
 
     // Collateral minus borrowed. Basically free collateral (nominated in SIKKA)
