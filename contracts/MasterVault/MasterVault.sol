@@ -327,9 +327,8 @@ ReentrancyGuardUpgradeable
     }
 
     /// @dev Tries to allocate funds to strategies based on their allocations.
-    /// NOTE: OnlyManager can trigger this function
     ///      (It will be triggered mostly in case of deposits to avoid unnecessary swapFees)
-    function allocate() external onlyManager {
+    function allocate() external {
         for(uint8 i = 0; i < strategies.length; i++) {
             if(strategyParams[strategies[i]].active) {
                 StrategyParams memory strategy =  strategyParams[strategies[i]];
