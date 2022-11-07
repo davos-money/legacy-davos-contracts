@@ -117,7 +117,8 @@ ReentrancyGuardUpgradeable
 
         // check and fullfil the pending withdrawals of the waiting pool first
         if(waitingPoolDebt > 0 && waitingPoolBalance < waitingPoolDebt) {
-            uint256 poolAmount = (waitingPoolDebt < shares) ? waitingPoolDebt - waitingPoolBalance : shares;
+            uint256 waitingPoolDebtDiff = waitingPoolDebt - waitingPoolBalance;
+            uint256 poolAmount = (waitingPoolDebtDiff < shares) ? waitingPoolDebtDiff : shares;
             payable(address(waitingPool)).transfer(poolAmount);
             IWETH(asset()).deposit{value: amount - poolAmount}();
         } else {
