@@ -10,72 +10,65 @@ import "./interfaces/VatLike.sol";
 import "./interfaces/IRewards.sol";
 import "./interfaces/PipLike.sol";
 
+/*
+   "Distribute Ikka Tokens to Borrowers".
+   Borrowers of Sikka token against collaterals are incentivized 
+   to get Ikka Tokens.
+*/
 
 contract IkkaRewards is IRewards, Initializable {
+    // --- Wrapper ---
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { require(live == 1, "Rewards/not-live"); wards[usr] = 1; }
     function deny(address usr) external auth { require(live == 1, "Rewards/not-live"); wards[usr] = 0; }
-    modifier auth {
-        require(wards[msg.sender] == 1, "Rewards/not-authorized");
-        _;
-    }
+    modifier auth { require(wards[msg.sender] == 1, "Rewards/not-authorized"); _; }
 
-    uint256 constant YEAR = 365 * 24 * 3600; //seconds
-    uint256 constant RAD = 10 ** 18; // ray
-    uint256 constant ONE = 10 ** 27; // wad
-    uint256 public live;  // Active Flag
+    // --- State Vars/Constants ---
+    uint256 constant YEAR = 365 * 24 * 3600;
+    uint256 constant RAY = 10 ** 27;  
 
-    // --- Data ---
     struct Ilk {
-        uint256 rewardRate;  // Collateral-specific, per-second reward rate [ray]
-        uint256 rho;  // Time of last drip [unix epoch time]
+        uint256 rewardRate;  // Collateral, per-second reward rate [ray]
+        uint256 rho;         // Pool init time
         bytes32 ilk;
     }
-
-    modifier poolInit(address token) {
-        require(pools[token].rho != 0, "Reward/pool-not-init");
-        _;
-    }
-
     struct Pile {
         uint256 amount;
         uint256 ts;
     }
 
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    uint256 public live;
 
-    mapping (address => mapping(address => Pile)) public piles; // usr => token(collateral type) => time last realise
+    mapping (address => mapping(address => Pile)) public piles;  // usr > collateral > Pile
     mapping (address => uint256) public claimedRewards;
     mapping (address => Ilk) public pools;
     address[] public poolsList;
 
-    VatLike                  public vat; // CDP engine
+    VatLike public vat;
     address public ikkaToken;
     PipLike public oracle;
 
-    uint256 public rewardsPool;
+    uint256 public rewardsPool;  // <Unused>
     uint256 public poolLimit;
 
-    function initialize(address vat_, uint256 poolLimit_) public initializer {
+    // --- Modifiers ---
+    modifier poolInit(address token) {
+        require(pools[token].rho != 0, "Reward/pool-not-init");
+        _;
+    }
+
+    // --- Init ---
+    function initialize(address vat_, uint256 poolLimit_ ) public initializer {
         live = 1;
         wards[msg.sender] = 1;
         vat = VatLike(vat_);
         poolLimit = poolLimit_;
     }
 
-    function stop() public auth {
-        live = 0;
-
-        emit Stop(msg.sender);
-    }
-
-    function start() public auth {
-        live = 1;
-
-        emit Start(msg.sender);
-    }
-
+    // --- Admin ---
     function initPool(address token, bytes32 ilk, uint256 rate) external auth {
         require(IERC20Upgradeable(ikkaToken).balanceOf(address(this)) >= poolLimit, "Reward/not-enough-reward-token");
         require(pools[token].rho == 0, "Reward/pool-existed");
@@ -85,41 +78,38 @@ contract IkkaRewards is IRewards, Initializable {
 
         emit PoolInited(token, rate);
     }
-
     function setIkkaToken(address ikkaToken_) external auth {
         require(ikkaToken_ != address(0), "Reward/invalid-token");
         ikkaToken = ikkaToken_;
 
         emit IkkaTokenChanged(ikkaToken);
     }
-
     function setRewardsMaxLimit(uint256 newLimit) external auth {
         require(IERC20Upgradeable(ikkaToken).balanceOf(address(this)) >= newLimit, "Reward/not-enough-reward-token");
         poolLimit = newLimit;
 
         emit RewardsLimitChanged(poolLimit);
     }
-
     function setOracle(address oracle_) external auth {
         require(oracle_ != address(0), "Reward/invalid-oracle");
         oracle = PipLike(oracle_);
 
         emit IkkaOracleChanged(address(oracle));
     }
-
     function setRate(address token, uint256 newRate) external auth {
         require(pools[token].rho == 0, "Reward/pool-existed");
         require(token != address(0), "Reward/invalid-token");
-        require(newRate >= ONE, "Reward/negative-rate");
-        require(newRate < 2 * ONE, "Reward/high-rate");
+        require(newRate >= RAY, "Reward/negative-rate");
+        require(newRate < 2 * RAY, "Reward/high-rate");
         Ilk storage pool = pools[token];
         pool.rewardRate = newRate;
 
         emit RateChanged(token, newRate);
     }
 
-    // 1 SIKKA is ikkaPrice() ikkas
+    // --- View ---
     function ikkaPrice() public view returns(uint256) {
+        // 1 SIKKA is ikkaPrice() ikkas
         (bytes32 price, bool has) = oracle.peek();
         if (has) {
             return uint256(price);
@@ -127,20 +117,13 @@ contract IkkaRewards is IRewards, Initializable {
             return 0;
         }
     }
-
     function rewardsRate(address token) public view returns(uint256) {
         return pools[token].rewardRate;
     }
-
-    // Yearly api in percents with 18 decimals
     function distributionApy(address token) public view returns(uint256) {
-        return (sMath.rpow(pools[token].rewardRate, YEAR, ONE) - ONE) / 10 ** 7;
+        // Yearly api in percents with 18 decimals
+        return (sMath.rpow(pools[token].rewardRate, YEAR, RAY) - RAY) / 10 ** 7;
     }
-//
-    function claimable(address token, address usr) public poolInit(token) view returns (uint256) {
-        return piles[usr][token].amount + unrealisedRewards(token, usr);
-    }
-
     function pendingRewards(address usr) public view returns(uint256) {
         uint256 i = 0;
         uint256 acc = 0;
@@ -150,11 +133,29 @@ contract IkkaRewards is IRewards, Initializable {
         }
         return acc - claimedRewards[usr];
     }
+    function claimable(address token, address usr) public poolInit(token) view returns (uint256) {
+        return piles[usr][token].amount + unrealisedRewards(token, usr);
+    }
+    function unrealisedRewards(address token, address usr) public poolInit(token) view returns(uint256) {
+        if (pools[token].rho == 0) {
+            // No pool for this token
+            return 0;
+        }
+        bytes32 poolIlk = pools[token].ilk;
+        (, uint256 art) = vat.urns(poolIlk, usr);
+        uint256 last = piles[usr][token].ts;
+        if (last == 0) {
+            return 0;
+        }
+        uint256 rate = sMath.rpow(pools[token].rewardRate, block.timestamp - last, RAY);
+        uint256 rewards = FullMath.mulDiv(rate, art, 10 ** 27) - art;                     // $ amount
+        return FullMath.mulDiv(rewards, ikkaPrice(), 10 ** 18);                           // Ikka Tokens
+    }
 
-    //drop unrealised rewards
+    // --- Externals ---
     function drop(address token, address usr) public {
         if (pools[token].rho == 0) {
-            // No pool for this token — skip rewards
+            // No pool for this token
             return;
         }
         Pile storage pile = piles[usr][token];
@@ -162,23 +163,6 @@ contract IkkaRewards is IRewards, Initializable {
         pile.amount += unrealisedRewards(token, usr);
         pile.ts = block.timestamp;
     }
-
-    function unrealisedRewards(address token, address usr) public poolInit(token) view returns(uint256) {
-        if (pools[token].rho == 0) {
-            // No pool for this token
-            return 0;
-        }
-        bytes32 poolIlk = pools[token].ilk;
-        (, uint256 usrDebt) = vat.urns(poolIlk, usr);
-        uint256 last = piles[usr][token].ts;
-        if (last == 0) {
-            return 0;
-        }
-        uint256 rate = sMath.rpow(pools[token].rewardRate, block.timestamp - last, ONE);
-        uint256 rewards = FullMath.mulDiv(rate, usrDebt, 10 ** 27) - usrDebt; //$ amount
-        return FullMath.mulDiv(rewards, ikkaPrice(), 10 ** 18); //ikka tokens
-    }
-
     function claim(uint256 amount) external {
         require(amount <= pendingRewards(msg.sender), "Rewards/not-enough-rewards");
         require(poolLimit >= amount, "Rewards/rewards-limit-exceeded");
@@ -192,5 +176,15 @@ contract IkkaRewards is IRewards, Initializable {
 
         poolLimit -= amount;
         emit Claimed(msg.sender, amount);
+    }
+
+    // --- Locks ---
+    function cage() public auth {
+        live = 0;
+        emit Cage(msg.sender);
+    }
+    function uncage() public auth {
+        live = 1;
+        emit Uncage(msg.sender);
     }
 }
