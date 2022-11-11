@@ -199,6 +199,7 @@ ReentrancyGuardUpgradeable
         return _vault.getYieldFor(account);
     } 
     function changeVault(address vault) external onlyOwner {
+        require(vault != address(0));
         // update allowances
         _certToken.approve(address(_vault), 0);
         _vault = IVault(vault);
@@ -206,6 +207,7 @@ ReentrancyGuardUpgradeable
         emit ChangeVault(vault);
     }
     function changeDex(address dex) external onlyOwner {
+        require(dex != address(0));
         IERC20(_wMaticAddress).approve(address(_dex), 0);
         _certToken.approve(address(_dex), 0);
         _dex = ISwapRouter(dex);
@@ -215,6 +217,7 @@ ReentrancyGuardUpgradeable
         emit ChangeDex(dex);
     }
     function changeSwapPool(address swapPool) external onlyOwner {
+        require(swapPool != address(0));
         IERC20(_wMaticAddress).approve(address(_pool), 0);
         _certToken.approve(address(_pool), 0);
         _pool = ISwapPool(swapPool);
@@ -223,6 +226,7 @@ ReentrancyGuardUpgradeable
         emit ChangeSwapPool(swapPool);
     }
     function changeProvider(address masterVault) external onlyOwner {
+        require(masterVault != address(0));
         _masterVault = IMasterVault(masterVault);
         emit ChangeProvider(masterVault);
     }
@@ -231,7 +235,11 @@ ReentrancyGuardUpgradeable
         emit ChangePairFee(fee);
     }
     function changePriceGetter(address priceGetter) external onlyOwner {
+        require(priceGetter != address(0));
         _priceGetter = IPriceGetter(priceGetter);
+    }
+    function getSwapPool() external view returns(address) {
+        return address(_pool);
     }
     function getCeToken() external view returns(address) {
         return address(_ceToken);

@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/IMasterVault.sol";
-contract WaitingPool is Initializable {
+import "./interfaces/IWaitingPool.sol";
+
+contract WaitingPool is IWaitingPool, Initializable {
     IMasterVault public masterVault;
     struct Person {
         address _address;

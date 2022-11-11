@@ -178,10 +178,8 @@ ReentrancyGuardUpgradeable
         if (waitingPoolDebt > waitingPoolBal) {
             uint256 maxFee = swapPool.FEE_MAX();
             uint256 withdrawAmount = 
-                (
-                    ((waitingPoolDebt - waitingPoolBal) * 1e18) / 
-                    (maxFee - swapPool.unstakeFee()) * maxFee
-                ) / 1e18;
+                    ((waitingPoolDebt - waitingPoolBal) * maxFee) /
+                    (maxFee - swapPool.unstakeFee());
             uint256 withdrawn = withdrawFromActiveStrategies(withdrawAmount + 1);
             if(withdrawn > 0) {
                 IWETH(asset()).withdraw(withdrawn);
@@ -225,6 +223,7 @@ ReentrancyGuardUpgradeable
     /// @dev deposits all the assets into the given strategy
     /// @param strategy address of the strategy
     function depositAllToStrategy(address strategy) public onlyManager {
+        require(strategyParams[strategy].active, "invalid strategy address");
         uint256 amount = totalAssetInVault();
         require(_depositToStrategy(strategy, amount));
     }
@@ -232,6 +231,7 @@ ReentrancyGuardUpgradeable
     /// @param strategy address of the strategy
     /// @param amount assets to deposit into strategy
     function depositToStrategy(address strategy, uint256 amount) public onlyManager {
+        require(strategyParams[strategy].active, "invalid strategy address");
         require(_depositToStrategy(strategy, amount));
     }
 
@@ -261,6 +261,10 @@ ReentrancyGuardUpgradeable
         require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
         uint256 value = IBaseStrategy(strategy).withdraw(amount);
         if(value > 0) {
+            require(
+                value <= amount && 
+                value >= _assessSwapFee(amount, swapPool.unstakeFee()) - 100,
+                "invalid withdrawn amount");
             totalDebt -= amount;
             strategyParams[strategy].debt -= amount;
             emit WithdrawnFromStrategy(strategy, amount);
@@ -317,8 +321,8 @@ ReentrancyGuardUpgradeable
         _deactivateStrategy(strategy);
     }
 
-    // /// @dev internal function to check strategy's debt and deactive it.
-    // /// @param strategy address of the strategy
+    /// @dev internal function to check strategy's debt and deactive it.
+    /// @param strategy address of the strategy
     function _deactivateStrategy(address strategy) private returns(bool success) {
         if (strategyParams[strategy].debt <= 10) {
             strategyParams[strategy].active = false;
@@ -341,13 +345,7 @@ ReentrancyGuardUpgradeable
                         uint256 depositAmount = ((totalAssetAndDebt * allocation) / 1e6) - strategy.debt;
                         if(totalAssetInVault() > depositAmount) {
                             _depositToStrategy(strategies[i], depositAmount);
-                            // IBaseStrategy(strategies[i]).depositAll();
                         }
-                    // } else {
-                    //     uint256 withdrawAmount = strategy.debt - (totalAssetAndDebt * allocation) / 1e6;
-                    //     if(withdrawAmount > 0) {
-                    //         _withdrawFromStrategy(strategies[i], withdrawAmount);
-                    //     }
                     }
                 }
             }
