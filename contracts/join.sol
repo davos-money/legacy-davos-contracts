@@ -22,21 +22,12 @@ pragma solidity ^0.8.10;
 import "./interfaces/GemJoinLike.sol";
 import "./interfaces/SikkaJoinLike.sol";
 import "./interfaces/GemLike.sol";
+import "./interfaces/VatLike.sol";
+import "./interfaces/ISikka.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface DSTokenLike {
-    function mint(address,uint) external;
-    function burn(address,uint) external;
-}
-
-interface VatLike {
-    function slip(bytes32,address,int) external;
-    function move(address,address,uint) external;
-}
 
 /*
     Here we provide *adapters* to connect the Vat to arbitrary external
@@ -130,7 +121,7 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
     }
 
     VatLike public vat;      // CDP Engine
-    DSTokenLike public sikka;  // Stablecoin Token
+    ISikka public sikka;  // Stablecoin Token
     uint    public live;     // Active Flag
 
     // Events
@@ -145,7 +136,7 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
         wards[msg.sender] = 1;
         live = 1;
         vat = VatLike(vat_);
-        sikka = DSTokenLike(sikka_);
+        sikka = ISikka(sikka_);
     }
     function cage() external auth {
         live = 0;

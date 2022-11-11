@@ -23,27 +23,12 @@ pragma solidity ^0.8.10;
 import "./interfaces/ClipperLike.sol";
 import "./interfaces/VatLike.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-interface PipLike {
-    function peek() external returns (bytes32, bool);
-}
-
-interface SpotterLike {
-    function par() external returns (uint256);
-    function ilks(bytes32) external returns (PipLike, uint256);
-}
-
-interface DogLike {
-    function chop(bytes32) external returns (uint256);
-    function digs(bytes32, uint256) external;
-}
+import "./interfaces/SpotLike.sol";
+import "./interfaces/DogLike.sol";
+import { Abacus } from "./abaci.sol";
 
 interface ClipperCallee {
     function clipperCall(address, uint256, uint256, bytes calldata) external;
-}
-
-interface AbacusLike {
-    function price(uint256, uint256) external view returns (uint256);
 }
 
 contract Clipper is Initializable, ClipperLike {
@@ -62,8 +47,8 @@ contract Clipper is Initializable, ClipperLike {
 
     DogLike     public dog;      // Liquidation module
     address     public vow;      // Recipient of sikka raised in auctions
-    SpotterLike public spotter;  // Collateral price module
-    AbacusLike  public calc;     // Current price calculator
+    SpotLike public spotter;  // Collateral price module
+    Abacus  public calc;     // Current price calculator
 
     uint256 public buf;    // Multiplicative factor to increase starting price                  [ray]
     uint256 public tail;   // Time elapsed before auction reset                                 [seconds]
@@ -126,7 +111,7 @@ contract Clipper is Initializable, ClipperLike {
     // --- Init ---
     function initialize(address vat_, address spotter_, address dog_, bytes32 ilk_) public initializer {
         vat     = VatLike(vat_);
-        spotter = SpotterLike(spotter_);
+        spotter = SpotLike(spotter_);
         dog     = DogLike(dog_);
         ilk     = ilk_;
         buf     = RAY;
@@ -164,10 +149,10 @@ contract Clipper is Initializable, ClipperLike {
         emit File(what, data);
     }
     function file(bytes32 what, address data) external auth lock {
-        if (what == "spotter") spotter = SpotterLike(data);
+        if (what == "spotter") spotter = SpotLike(data);
         else if (what == "dog")    dog = DogLike(data);
         else if (what == "vow")    vow = data;
-        else if (what == "calc")  calc = AbacusLike(data);
+        else if (what == "calc")  calc = Abacus(data);
         else revert("Clipper/file-unrecognized-param");
         emit File(what, data);
     }

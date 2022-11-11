@@ -37,4 +37,8 @@ interface VatLike {
     function heal(uint rad) external;
 
     function suck(address u, address v, uint rad) external;
+
+    function grab(bytes32,address,address,address,int256,int256) external;
+
+    function slip(bytes32,address,int) external;
 }
