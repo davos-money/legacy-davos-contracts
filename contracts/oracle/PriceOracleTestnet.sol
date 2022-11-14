@@ -52,7 +52,7 @@ contract PriceOracleTestnet is Initializable, UUPSUpgradeable, OwnableUpgradeabl
     } else {
       amountOut = pancakeOracle.consult(tokenIn, oneTokenIn, USD);
     }
-    uint256 price = oneTokenOut / amountOut * 10**18 ;
+    uint256 price = (amountOut * 10**18) / oneTokenOut;
     return (bytes32(price), true);
   }
 
