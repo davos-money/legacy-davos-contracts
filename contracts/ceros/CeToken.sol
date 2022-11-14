@@ -45,6 +45,7 @@ contract CeToken is OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function changeVault(address vault) external onlyOwner {
+        require(vault != address(0));
         _vault = vault;
         emit VaultChanged(vault);
     }

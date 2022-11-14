@@ -192,6 +192,7 @@ ReentrancyGuardUpgradeable
         return _claimed[account];
     }
     function changeRouter(address router) external onlyOwner {
+        require(router != address(0));
         _router = router;
         emit RouterChanged(router);
     }

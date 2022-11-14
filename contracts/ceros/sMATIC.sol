@@ -40,6 +40,7 @@ contract sMATIC is OwnableUpgradeable, NonTransferableERC20 {
     }
 
     function changeMinter(address minter) external onlyOwner {
+        require(minter != address(0));
         _minter = minter;
         emit MinterChanged(minter);
     }

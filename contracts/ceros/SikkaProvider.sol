@@ -140,22 +140,26 @@ ReentrancyGuardUpgradeable
      * UPDATING FUNCTIONALITY
      */
     function changeDao(address dao) external onlyOwner {
+        require(dao != address(0));
         IERC20(_ceToken).approve(address(_dao), 0);
         _dao = IDao(dao);
         IERC20(_ceToken).approve(address(_dao), type(uint256).max);
         emit ChangeDao(dao);
     }
     function changeCeToken(address ceToken) external onlyOwner {
+        require(ceToken != address(0));
         IERC20(_ceToken).approve(address(_dao), 0);
         _ceToken = ceToken;
         IERC20(_ceToken).approve(address(_dao), type(uint256).max);
         emit ChangeCeToken(ceToken);
     }
     function changeProxy(address auctionProxy) external onlyOwner {
+        require(auctionProxy != address(0));
         _proxy = auctionProxy;
         emit ChangeProxy(auctionProxy);
     }
     function changeCollateralToken(address collateralToken) external onlyOwner {
+        require(collateralToken != address(0));
         _collateralToken = ICertToken(collateralToken);
         emit ChangeCollateralToken(collateralToken);
     }
