@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
+import { IERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import { SafeERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import { EnumerableSetUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import { ILP } from "./interfaces/ILP.sol";
+import { ISwapPool } from "../ceros/interfaces/ISwapPool.sol";
 import { IMaticPool } from "./interfaces/IMaticPool.sol";
 import { ICerosToken } from "./interfaces/ICerosToken.sol";
 import { INativeERC20 } from "./interfaces/INativeERC20.sol";
@@ -31,8 +34,14 @@ struct FeeAmounts {
 }
 
 // solhint-disable max-states-count
-contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract SwapPool is
+  ISwapPool,
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+  using SafeERC20Upgradeable for IERC20Upgradeable;
 
   event UserTypeChanged(address indexed user, UserType indexed utype, bool indexed added);
   event FeeChanged(FeeType indexed utype, uint24 oldFee, uint24 newFee);
@@ -61,9 +70,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
   EnumerableSetUpgradeable.AddressSet internal integrators_;
   EnumerableSetUpgradeable.AddressSet internal liquidityProviders_;
 
-  INativeERC20 public nativeToken;
-  ICerosToken public cerosToken;
-  ILP public lpToken;
+  address public nativeToken;
+  address public cerosToken;
+  address public lpToken;
 
   uint256 public nativeTokenAmount;
   uint256 public cerosTokenAmount;
@@ -130,17 +139,23 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     __Ownable_init();
     __Pausable_init();
     __ReentrancyGuard_init();
-    nativeToken = INativeERC20(_nativeToken);
-    cerosToken = ICerosToken(_cerosToken);
-    lpToken = ILP(_lpToken);
+    nativeToken = _nativeToken;
+    cerosToken = _cerosToken;
+    lpToken = _lpToken;
     integratorLockEnabled = _integratorLockEnabled;
     providerLockEnabled = _providerLockEnabled;
   }
 
+  /**
+   * @notice adds liquidity to the pool with native coin. See - {_addLiquidity}
+   */
   function addLiquidityEth(uint256 amount1) external payable virtual onlyProvider nonReentrant {
     _addLiquidity(msg.value, amount1, true);
   }
 
+  /**
+   * @notice adds liquidity to the pool. See - {_addLiquidity}
+   */
   function addLiquidity(uint256 amount0, uint256 amount1)
     external
     virtual
@@ -150,12 +165,18 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _addLiquidity(amount0, amount1, false);
   }
 
+  /**
+   * @notice adds liquidity of nativeToken and cerosToken by 50/50
+   * @param amount0 - the amount of nativeToken
+   * @param amount1 - the amount of cerosToken
+   * @param useEth - if 'true', then it will get nativeToken as native else it will get ERC20 wrapped token
+   */
   function _addLiquidity(
     uint256 amount0,
     uint256 amount1,
     bool useEth
   ) internal virtual {
-    uint256 ratio = cerosToken.ratio();
+    uint256 ratio = ICerosToken(cerosToken).ratio();
     uint256 value = (amount0 * ratio) / 1e18;
     if (amount1 < value) {
       amount0 = (amount1 * 1e18) / ratio;
@@ -163,57 +184,79 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
       amount1 = value;
     }
     if (useEth) {
-      nativeToken.deposit{ value: amount0 }();
+      INativeERC20(nativeToken).deposit{ value: amount0 }();
       uint256 diff = msg.value - amount0;
       if (diff != 0) {
         _sendValue(msg.sender, diff);
       }
     } else {
-      nativeToken.transferFrom(msg.sender, address(this), amount0);
+      IERC20Upgradeable(nativeToken).safeTransferFrom(msg.sender, address(this), amount0);
     }
-    cerosToken.transferFrom(msg.sender, address(this), amount1);
+    IERC20Upgradeable(cerosToken).safeTransferFrom(msg.sender, address(this), amount1);
     if (nativeTokenAmount == 0 && cerosTokenAmount == 0) {
       require(amount0 > 1e18, "cannot add first time less than 1 token");
       nativeTokenAmount = amount0;
       cerosTokenAmount = amount1;
 
-      lpToken.mint(msg.sender, (2 * amount0) / 10**8);
+      ILP(lpToken).mint(msg.sender, (2 * amount0) / 10**8);
     } else {
       uint256 allInNative = nativeTokenAmount + (cerosTokenAmount * 1e18) / ratio;
-      uint256 mintAmount = (2 * amount0 * lpToken.totalSupply()) / allInNative;
+      uint256 mintAmount = (2 * amount0 * ILP(lpToken).totalSupply()) / allInNative;
       nativeTokenAmount += amount0;
       cerosTokenAmount += amount1;
 
-      lpToken.mint(msg.sender, mintAmount);
+      ILP(lpToken).mint(msg.sender, mintAmount);
     }
     emit LiquidityChange(msg.sender, amount0, amount1, nativeTokenAmount, cerosTokenAmount, true);
   }
 
+  /**
+   * @notice removes liquidity from pool by lp amount. See - {_removeliquidityLp}
+   */
   function removeLiquidity(uint256 lpAmount) external virtual nonReentrant {
     _removeLiquidityLp(lpAmount, false);
   }
 
+  /**
+   * @notice removes liquidity from pool by lp amount. See - {_removeliquidityLp}
+   */
   function removeLiquidityEth(uint256 lpAmount) external virtual nonReentrant {
     _removeLiquidityLp(lpAmount, true);
   }
 
+  /**
+   * @notice removes liquidity from pool by percent. See - {_removeliquidityPercent}
+   */
   function removeLiquidityPercent(uint256 percent) external virtual nonReentrant {
     _removeLiquidityPercent(percent, false);
   }
 
+  /**
+   * @notice removes liquidity from pool by percent. See - {_removeliquidityPercent}
+   */
   function removeLiquidityPercentEth(uint256 percent) external virtual nonReentrant {
     _removeLiquidityPercent(percent, true);
   }
 
+  /**
+   * @notice removes liquidity from pool by percent.
+   * @param percent - the percent of your provided liquidity that you want to remove
+   * @param useEth - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _removeLiquidityPercent(uint256 percent, bool useEth) internal virtual {
     require(percent > 0 && percent <= 1e18, "percent should be more than 0 and less than 1e18"); // max percnet(100%) is -> 10 ** 18
-    uint256 balance = lpToken.balanceOf(msg.sender);
+    uint256 balance = ILP(lpToken).balanceOf(msg.sender);
     uint256 removedLp = (balance * percent) / 1e18;
     _removeLiquidity(removedLp, useEth);
   }
 
+  /**
+   * @notice removes liquidity from pool by lp amount.
+   * @param removedLp - the amount of your lp tokens that you want to remove.
+   * @param useEth - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _removeLiquidityLp(uint256 removedLp, bool useEth) internal virtual {
-    uint256 balance = lpToken.balanceOf(msg.sender);
+    uint256 balance = ILP(lpToken).balanceOf(msg.sender);
     if (removedLp == type(uint256).max) {
       removedLp = balance;
     } else {
@@ -223,9 +266,14 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _removeLiquidity(removedLp, useEth);
   }
 
+  /**
+   * @notice removes liquidity from pool by lp amount.
+   * @param removedLp - the amount of your lp tokens that you want to remove.
+   * @param useEth - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _removeLiquidity(uint256 removedLp, bool useEth) internal virtual {
-    uint256 totalSupply = lpToken.totalSupply();
-    lpToken.burn(msg.sender, removedLp);
+    uint256 totalSupply = ILP(lpToken).totalSupply();
+    ILP(lpToken).burn(msg.sender, removedLp);
     uint256 amount0Removed = (removedLp * nativeTokenAmount) / totalSupply;
     uint256 amount1Removed = (removedLp * cerosTokenAmount) / totalSupply;
 
@@ -233,12 +281,12 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     cerosTokenAmount -= amount1Removed;
 
     if (useEth) {
-      nativeToken.withdraw(amount0Removed);
+      INativeERC20(nativeToken).withdraw(amount0Removed);
       _sendValue(msg.sender, amount0Removed);
     } else {
-      nativeToken.transfer(msg.sender, amount0Removed);
+      IERC20Upgradeable(nativeToken).safeTransfer(msg.sender, amount0Removed);
     }
-    cerosToken.transfer(msg.sender, amount1Removed);
+    IERC20Upgradeable(cerosToken).safeTransfer(msg.sender, amount1Removed);
     emit LiquidityChange(
       msg.sender,
       amount0Removed,
@@ -249,6 +297,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     );
   }
 
+  /**
+   * @notice swaps the native coin to ceros or vise versa. See - {_swap}
+   */
   function swapEth(
     bool nativeToCeros,
     uint256 amountIn,
@@ -262,6 +313,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     return _swap(nativeToCeros, amountIn, receiver, true);
   }
 
+  /**
+   * @notice swaps the native wrapped token to ceros or vise versa. See - {_swap}
+   */
   function swap(
     bool nativeToCeros,
     uint256 amountIn,
@@ -270,18 +324,25 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     return _swap(nativeToCeros, amountIn, receiver, false);
   }
 
+  /**
+   * @notice swaps native token to ceros or ceros token to native.
+   * @param nativeToCeros - if 'true' then will swap native token to ceros, else ceros-native
+   * @param amountIn - the amount of tokens that you want to swap
+   * @param receiver - the address of swap receiver
+   * @param useEth - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _swap(
     bool nativeToCeros,
     uint256 amountIn,
     address receiver,
     bool useEth
   ) internal virtual returns (uint256 amountOut) {
-    uint256 ratio = cerosToken.ratio();
+    uint256 ratio = ICerosToken(cerosToken).ratio();
     if (nativeToCeros) {
       if (useEth) {
-        nativeToken.deposit{ value: amountIn }();
+        INativeERC20(nativeToken).deposit{ value: amountIn }();
       } else {
-        nativeToken.transferFrom(msg.sender, address(this), amountIn);
+        IERC20Upgradeable(nativeToken).safeTransferFrom(msg.sender, address(this), amountIn);
       }
       if (!excludedFromFee[msg.sender]) {
         uint256 stakeFeeAmt = (amountIn * stakeFee) / FEE_MAX;
@@ -292,7 +353,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
         if (integratorLockEnabled) {
           integratorFeeAmt = (stakeFeeAmt * integratorFee) / FEE_MAX;
           if (integratorFeeAmt > 0) {
-            nativeToken.transfer(msg.sender, integratorFeeAmt);
+            IERC20Upgradeable(nativeToken).safeTransfer(msg.sender, integratorFeeAmt);
           }
         }
         nativeTokenAmount +=
@@ -307,10 +368,10 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
       amountOut = (amountIn * ratio) / 1e18;
       require(cerosTokenAmount >= amountOut, "Not enough liquidity");
       cerosTokenAmount -= amountOut;
-      cerosToken.transfer(receiver, amountOut);
+      IERC20Upgradeable(cerosToken).safeTransfer(receiver, amountOut);
       emit Swap(msg.sender, receiver, nativeToCeros, amountIn, amountOut);
     } else {
-      cerosToken.transferFrom(msg.sender, address(this), amountIn);
+      IERC20Upgradeable(cerosToken).safeTransferFrom(msg.sender, address(this), amountIn);
       if (!excludedFromFee[msg.sender]) {
         uint256 unstakeFeeAmt = (amountIn * unstakeFee) / FEE_MAX;
         amountIn -= unstakeFeeAmt;
@@ -320,7 +381,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
         if (integratorLockEnabled) {
           integratorFeeAmt = (unstakeFeeAmt * integratorFee) / FEE_MAX;
           if (integratorFeeAmt > 0) {
-            cerosToken.transfer(msg.sender, integratorFeeAmt);
+            IERC20Upgradeable(cerosToken).safeTransfer(msg.sender, integratorFeeAmt);
           }
         }
         cerosTokenAmount +=
@@ -336,21 +397,27 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
       require(nativeTokenAmount >= amountOut, "Not enough liquidity");
       nativeTokenAmount -= amountOut;
       if (useEth) {
-        nativeToken.withdraw(amountOut);
+        INativeERC20(nativeToken).withdraw(amountOut);
         _sendValue(receiver, amountOut);
       } else {
-        nativeToken.transfer(receiver, amountOut);
+        IERC20Upgradeable(nativeToken).safeTransfer(receiver, amountOut);
       }
       emit Swap(msg.sender, receiver, nativeToCeros, amountIn, amountOut);
     }
   }
 
+  /**
+   * @notice view function which retruns amount out by amount in
+   * @param nativeToCeros - if 'true' then will show native token to ceros, else ceros-native
+   * @param amountIn - the amount of tokens that you want to swap
+   * @param isExcludedFromFee - if 'true' will calculate amount out without fees
+   */
   function getAmountOut(
     bool nativeToCeros,
     uint256 amountIn,
     bool isExcludedFromFee
   ) external view virtual returns (uint256 amountOut, bool enoughLiquidity) {
-    uint256 ratio = cerosToken.ratio();
+    uint256 ratio = ICerosToken(cerosToken).ratio();
     if (nativeToCeros) {
       if (!isExcludedFromFee) {
         uint256 stakeFeeAmt = (amountIn * stakeFee) / FEE_MAX;
@@ -368,12 +435,14 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
+  /// sends the amount to the receiver address
   function _sendValue(address receiver, uint256 amount) internal virtual {
-    // solhint-disable-next-line avoid-low-level-calls
-    (bool success, ) = payable(receiver).call{ value: amount }("");
-    require(success, "unable to send value, recipient may have reverted");
+    payable(receiver).transfer(amount);
   }
 
+  /**
+   * @notice See - {_withdrawOwnerFee}
+   */
   function withdrawOwnerFeeEth(uint256 amount0, uint256 amount1)
     external
     virtual
@@ -383,6 +452,9 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _withdrawOwnerFee(amount0, amount1, true);
   }
 
+  /**
+   * @notice See - {_withdrawOwnerFee}
+   */
   function withdrawOwnerFee(uint256 amount0, uint256 amount1)
     external
     virtual
@@ -392,6 +464,12 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     _withdrawOwnerFee(amount0, amount1, false);
   }
 
+  /**
+   * @notice withdraws fees for owner
+   * @param amount0Raw - amount of native to receve. use MAX_UINT256 to get all available amount.
+   * @param amount1Raw - amount of ceros token to receve. use MAX_UINT256 to get all available amount.
+   * @param useEth - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _withdrawOwnerFee(
     uint256 amount0Raw,
     uint256 amount1Raw,
@@ -402,25 +480,27 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     if (amount0Raw == type(uint256).max) {
       amount0 = ownerFeeCollected.nativeFee;
     } else {
+      require(amount0Raw <= type(uint128).max, "unsafe typecasting");
       amount0 = uint128(amount0Raw);
     }
     if (amount1Raw == type(uint256).max) {
       amount1 = ownerFeeCollected.cerosFee;
     } else {
+      require(amount1Raw <= type(uint128).max, "unsafe typecasting");
       amount1 = uint128(amount1Raw);
     }
     if (amount0 > 0) {
       ownerFeeCollected.nativeFee -= amount0;
       if (useEth) {
-        nativeToken.withdraw(amount0);
+        INativeERC20(nativeToken).withdraw(amount0);
         _sendValue(msg.sender, amount0);
       } else {
-        nativeToken.transfer(msg.sender, amount0);
+        IERC20Upgradeable(nativeToken).safeTransfer(msg.sender, amount0);
       }
     }
     if (amount1 > 0) {
       ownerFeeCollected.cerosFee -= amount1;
-      cerosToken.transfer(msg.sender, amount1);
+      IERC20Upgradeable(cerosToken).safeTransfer(msg.sender, amount1);
     }
   }
 
@@ -447,14 +527,25 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
   }
 
+  /**
+   * @notice See - {_withdrawManagerFee}
+   */
   function withdrawManagerFee() external virtual onlyManager nonReentrant {
     _withdrawManagerFee(msg.sender, false);
   }
 
+  /**
+   * @notice See - {_withdrawManagerFee}
+   */
   function withdrawManagerFeeEth() external virtual onlyManager nonReentrant {
     _withdrawManagerFee(msg.sender, true);
   }
 
+  /**
+   * @notice withdraws fees for manager
+   * @param managerAddress - manager address to transfer the whole fees
+   * @param useNative - if 'true' then transfer native token amount by native coin else by wrapped
+   */
   function _withdrawManagerFee(address managerAddress, bool useNative) internal virtual {
     FeeAmounts memory feeRewards;
     FeeAmounts storage currentManagerRewardDebt = managerRewardDebt[managerAddress];
@@ -465,16 +556,16 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
       currentManagerRewardDebt.nativeFee += feeRewards.nativeFee;
       _claimedManagerFees.nativeFee += feeRewards.nativeFee;
       if (useNative) {
-        nativeToken.withdraw(feeRewards.nativeFee);
+        INativeERC20(nativeToken).withdraw(feeRewards.nativeFee);
         _sendValue(managerAddress, feeRewards.nativeFee);
       } else {
-        nativeToken.transfer(managerAddress, feeRewards.nativeFee);
+        IERC20Upgradeable(nativeToken).safeTransfer(managerAddress, feeRewards.nativeFee);
       }
     }
     if (feeRewards.cerosFee > 0) {
       currentManagerRewardDebt.cerosFee += feeRewards.cerosFee;
       _claimedManagerFees.cerosFee += feeRewards.cerosFee;
-      cerosToken.transfer(managerAddress, feeRewards.cerosFee);
+      IERC20Upgradeable(cerosToken).safeTransfer(managerAddress, feeRewards.cerosFee);
     }
   }
 
@@ -565,9 +656,12 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     emit ExcludedFromFee(value, exclude);
   }
 
+  /**
+   * @notice triggers the rebalance and stakes/unstakes the amounts of tokens to balance the pool(50/50)
+   */
   function triggerRebalanceAnkr() external virtual nonReentrant onlyManager {
     skim();
-    uint256 ratio = cerosToken.ratio();
+    uint256 ratio = ICerosToken(cerosToken).ratio();
     uint256 amountAInNative = nativeTokenAmount;
     uint256 amountBInNative = (cerosTokenAmount * 1e18) / ratio;
     uint256 wholeAmount = amountAInNative + amountBInNative;
@@ -584,28 +678,31 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     uint256 amount = (amountAInNative - amountBInNative) / 2;
     if (isStake) {
       nativeTokenAmount -= amount;
-      nativeToken.withdraw(amount);
+      INativeERC20(nativeToken).withdraw(amount);
       maticPool.stake{ value: amount }(false);
     } else {
       uint256 cerosAmt = (amount * ratio) / 1e18;
       uint256 commission = maticPool.unstakeCommission();
       cerosTokenAmount -= cerosAmt;
       nativeTokenAmount -= commission;
-      nativeToken.withdraw(commission);
+      INativeERC20(nativeToken).withdraw(commission);
       maticPool.unstake{ value: commission }(cerosAmt, false);
     }
   }
 
   function approveToMaticPool() external virtual {
-    cerosToken.approve(address(maticPool), type(uint256).max);
+    IERC20Upgradeable(cerosToken).safeApprove(address(maticPool), type(uint256).max);
   }
 
+  /**
+   * @notice adds the not registered tokens to the liquidity pool
+   */
   function skim() public virtual {
     uint256 contractBal = address(this).balance;
-    uint256 contractWNativeBal = nativeToken.balanceOf(address(this)) -
+    uint256 contractWNativeBal = INativeERC20(nativeToken).balanceOf(address(this)) -
       ownerFeeCollected.nativeFee -
       (managerFeeCollected.nativeFee - _claimedManagerFees.nativeFee);
-    uint256 contractCerosBal = cerosToken.balanceOf(address(this)) -
+    uint256 contractCerosBal = ICerosToken(cerosToken).balanceOf(address(this)) -
       ownerFeeCollected.cerosFee -
       (managerFeeCollected.cerosFee - _claimedManagerFees.cerosFee);
 
@@ -617,7 +714,7 @@ contract SwapPool is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpg
     }
 
     if (contractBal > nativeTokenAmount) {
-      nativeToken.deposit{ value: contractBal }();
+      INativeERC20(nativeToken).deposit{ value: contractBal }();
       nativeTokenAmount += contractBal;
     }
   }
