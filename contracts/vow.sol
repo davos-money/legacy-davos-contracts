@@ -46,6 +46,9 @@ contract Vow is Initializable{
 
     address public sikka;  // Sikka token
 
+    event File(bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed what, address data);
+
     // --- Init ---
     function initialize(address vat_, address _sikkaJoin, address multisig_) external initializer {
         wards[msg.sender] = 1;
@@ -65,6 +68,7 @@ contract Vow is Initializable{
     function file(bytes32 what, uint data) external auth {
         if (what == "hump") hump = data;
         else revert("Vow/file-unrecognized-param");
+        emit File(what, data);
     }
     function file(bytes32 what, address data) external auth {
         if (what == "multisig") multisig = data;
@@ -76,6 +80,7 @@ contract Vow is Initializable{
         else if (what == "sikka") sikka = data;
         else if (what == "vat") vat = VatLike(data);
         else revert("Vow/file-unrecognized-param");
+        emit File(what, data);
     }
 
     // Debt settlement
@@ -103,5 +108,10 @@ contract Vow is Initializable{
         require(live == 1, "Vow/not-live");
         live = 0;
         vat.heal(min(vat.sikka(address(this)), vat.sin(address(this))));
+    }
+
+    function uncage() external auth {
+        require(live == 0, "Vow/live");
+        live = 1;
     }
 }

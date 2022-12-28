@@ -70,6 +70,9 @@ contract Vat is VatLike, Initializable {
     uint256 public Line;  // Total Debt Ceiling  [rad]
     uint256 public live;  // Active Flag
 
+    event File(bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed ilk, bytes32 indexed what, uint256 data);
+
     // --- Init ---
     function initialize() public initializer {
         wards[msg.sender] = 1;
@@ -123,6 +126,7 @@ contract Vat is VatLike, Initializable {
         require(live == 1, "Vat/not-live");
         if (what == "Line") Line = data;
         else revert("Vat/file-unrecognized-param");
+        emit File(what, data);
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
         require(live == 1, "Vat/not-live");
@@ -130,9 +134,14 @@ contract Vat is VatLike, Initializable {
         else if (what == "line") ilks[ilk].line = data;
         else if (what == "dust") ilks[ilk].dust = data;
         else revert("Vat/file-unrecognized-param");
+        emit File(ilk, what, data);
     }
     function cage() external auth {
         live = 0;
+    }
+
+    function uncage() external auth {
+        live = 1;
     }
 
     // --- Fungibility ---

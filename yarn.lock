@@ -881,6 +881,11 @@
     proper-lockfile "^4.1.1"
     solidity-ast "^0.4.15"
 
+"@pythnetwork/pyth-sdk-solidity@^2.2.0":
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/@pythnetwork/pyth-sdk-solidity/-/pyth-sdk-solidity-2.2.0.tgz#e970dbb64f473789f5129fd8c93950731e5030d1"
+  integrity sha512-LsRMmaf9MTflGSymqOJMepFk/3R7DyxMOJfLDB5RDSieyiq+RJ5IYIYnXAFsMrqkjibOtVxARcortHtE9VWwhw==
+
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
   resolved "https://registry.npmjs.org/@resolver-engine/core/-/core-0.3.3.tgz"

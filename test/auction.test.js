@@ -122,7 +122,7 @@ xdescribe("Auction", () => {
     IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
 
     // Contracts deployment
-    rewards = await upgrades.deployProxy(IkkaRewards, [vat.address, ethUtils.parseEther('1').toString()], {initializer: "initialize"});
+    rewards = await upgrades.deployProxy(IkkaRewards, [vat.address, ethUtils.parseEther('1').toString(), 5], {initializer: "initialize"});
     await rewards.deployed();
 
     // Contracts Fetching

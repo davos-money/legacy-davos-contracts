@@ -62,12 +62,16 @@ contract Interaction is Initializable, IDao {
         whitelistOperator = usr;
     }
     function addToWhitelist(address[] memory usrs) external operatorOrWard {
-        for(uint256 i = 0; i < usrs.length; i++)
+        for(uint256 i = 0; i < usrs.length; i++) {
             whitelist[usrs[i]] = 1;
+            emit AddedToWhitelist(usrs[i]);
+        }
     }
     function removeFromWhitelist(address[] memory usrs) external operatorOrWard {
-        for(uint256 i = 0; i < usrs.length; i++)
+        for(uint256 i = 0; i < usrs.length; i++) {
             whitelist[usrs[i]] = 0;
+            emit RemovedFromWhitelist(usrs[i]);
+        }
     }
     modifier whitelisted(address participant) {
         if (whitelistMode == 1)
@@ -131,6 +135,7 @@ contract Interaction is Initializable, IDao {
         uint256 mat
     ) external auth {
         require(collaterals[token].live == 0, "Interaction/token-already-init");
+        require(ilk != bytes32(0), "Interaction/empty-ilk");
         vat.init(ilk);
         jug.init(ilk);
         spotter.file(ilk, "mat", mat);
@@ -148,7 +153,9 @@ contract Interaction is Initializable, IDao {
     }
 
     function setSikkaProvider(address token, address sikkaProvider) external auth {
+        require(sikkaProvider != address(0));
         sikkaProviders[token] = sikkaProvider;
+        emit ChangeSikkaProvider(sikkaProvider);
     }
 
     function removeCollateralType(address token) external auth {
@@ -221,6 +228,7 @@ contract Interaction is Initializable, IDao {
     function borrow(address token, uint256 sikkaAmount) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         require(collateralType.live == 1, "Interaction/inactive-collateral");
+        require(sikkaAmount > 0,"Interaction/invalid-sikkaAmount");
 
         drip(token);
         dropRewards(token, msg.sender);
@@ -248,6 +256,7 @@ contract Interaction is Initializable, IDao {
     // Burn user's SIKKA.
     // N.B. User collateral stays the same.
     function payback(address token, uint256 sikkaAmount) external returns (int256) {
+        require(sikkaAmount > 0,"Interaction/invalid-sikkaAmount");
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
 
@@ -331,6 +340,7 @@ contract Interaction is Initializable, IDao {
 
     function setRewards(address rewards) external auth {
         ikkaRewards = IRewards(rewards);
+        emit ChangeRewards(rewards);
     }
 
     //    /////////////////////////////////

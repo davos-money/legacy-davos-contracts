@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "../MasterVault/interfaces/IMasterVault.sol";
 import "../ceros/interfaces/ISwapPool.sol";
-import "../MasterVault/interfaces/IWETH.sol";
 import "../ceros/interfaces/ICertToken.sol";
 import "../ceros/interfaces/ICerosRouter.sol";
 import "./BaseStrategy.sol";
@@ -85,7 +84,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         require(amount > 0, "invalid amount");
         uint256 wethBalance = underlying.balanceOf(address(this));
         if(amount < wethBalance) {
-            underlying.transfer(address(vault), amount);
+            SafeERC20Upgradeable.safeTransfer(underlying, address(vault), amount);
             return amount;
         }
         
@@ -96,11 +95,11 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             uint256 withdrawAmount = wethBalance + value;
             if (amount < withdrawAmount) {
                 // transfer extra funds to feeRecipient 
-                underlying.transfer(feeRecipient, withdrawAmount - amount);
+                SafeERC20Upgradeable.safeTransfer(underlying, feeRecipient, withdrawAmount - amount);
             } else {
                 amount = withdrawAmount;
             }
-            underlying.transfer(address(vault), amount);
+            SafeERC20Upgradeable.safeTransfer(underlying, address(vault), amount);
             return amount;
         }
     }
@@ -125,7 +124,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, yield, true);
         if (enoughLiquidity && amountOut > 0) {
             amountOut = ISwapPool(_swapPool).swap(false, yield, address(this));
-            underlying.transfer(feeRecipient, amountOut);
+            SafeERC20Upgradeable.safeTransfer(underlying, feeRecipient, amountOut);
         }
     }
 

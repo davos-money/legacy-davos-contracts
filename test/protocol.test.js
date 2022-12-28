@@ -159,7 +159,7 @@ describe('sikka-protocol', () => {
                 masterVault.address,
                 remainingPaybackAmount.sub("100")
             )
-            expect(await interaction.borrowed(masterVault.address, signer1.address)).to.be.equal(100);
+            expect(await interaction.borrowed(masterVault.address, signer1.address)).to.be.equal(0);
 
 
             // <----------------------------------- release() ------------------------------------------->
@@ -570,7 +570,7 @@ async function deployInteraction(masterVault) {
     await clip.deployed();
     clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
 
-    rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
+    rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
     await rewards.deployed();
     rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
 

@@ -68,7 +68,7 @@ ReentrancyGuardUpgradeable
     {
         value = _masterVault.depositETH{value: msg.value}();
         // deposit ceToken as collateral
-        _provideCollateral(msg.sender, value);
+        value = _provideCollateral(msg.sender, value);
         emit Deposit(msg.sender, value);
         return value;
     }
@@ -84,9 +84,9 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         require(recipient != address(0));
-        _withdrawCollateral(msg.sender, amount);
-        realAmount = _masterVault.withdrawETH(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, amount);
+        realAmount = _withdrawCollateral(msg.sender, amount);
+        realAmount = _masterVault.withdrawETH(recipient, realAmount);
+        emit Withdrawal(msg.sender, recipient, realAmount);
         return realAmount;
     }
     /**
@@ -119,13 +119,13 @@ ReentrancyGuardUpgradeable
         require(account != address(0));
         _collateralToken.mint(account, value);
     }
-    function _provideCollateral(address account, uint256 amount) internal {
-        _dao.deposit(account, address(_ceToken), amount);
-        _collateralToken.mint(account, amount);
+    function _provideCollateral(address account, uint256 amount) internal returns (uint256 deposited) {
+        deposited = _dao.deposit(account, address(_ceToken), amount);
+        _collateralToken.mint(account, deposited);
     }
-    function _withdrawCollateral(address account, uint256 amount) internal {
-        _dao.withdraw(account, address(_ceToken), amount);
-        _collateralToken.burn(account, amount);
+    function _withdrawCollateral(address account, uint256 amount) internal returns (uint256 withdrawn) {
+        withdrawn = _dao.withdraw(account, address(_ceToken), amount);
+        _collateralToken.burn(account, withdrawn);
     }
     /**
      * PAUSABLE FUNCTIONALITY

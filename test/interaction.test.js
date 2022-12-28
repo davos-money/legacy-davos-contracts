@@ -190,7 +190,7 @@ describe("Interaction", function () {
         await clip.deployed();
         clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
 
-        rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
+        rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
         await rewards.deployed();
         rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
 

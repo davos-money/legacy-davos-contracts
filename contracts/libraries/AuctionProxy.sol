@@ -78,7 +78,7 @@ library AuctionProxy {
     uint256 sikkaBal = sikka.balanceOf(address(this));
     uint256 gemBal = collateral.gem.gem().balanceOf(address(this));
 
-    uint256 sikkaMaxAmount = FullMath.mulDiv(maxPrice, collateralAmount, RAY) + 1;
+    uint256 sikkaMaxAmount = FullMath.mulDiv(maxPrice, collateralAmount, RAY);
 
     sikka.transferFrom(msg.sender, address(this), sikkaMaxAmount);
     sikkaJoin.join(address(this), sikkaMaxAmount);

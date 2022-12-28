@@ -20,8 +20,14 @@ interface IMasterVault {
     event SwapPoolChanged(address swapPool);
     event StrategyAdded(address strategy, uint256 allocation);
     event StrategyMigrated(address oldStrategy, address newStrategy, uint256 newAllocation);
-    event DepositedToStrategy(address strategy, uint256 amount);
-    event WithdrawnFromStrategy(address strategy, uint256 value);
+    
+    // amount: asset that are deposited to strategy
+    // actualAmount: amount - strategyFee, if any
+    event DepositedToStrategy(address strategy, uint256 amount, uint256 actaulAmount);
+
+    // amount: asset that needs to be withdrawn from strategy
+    // actualAmount: amount - strategyFee, if any
+    event WithdrawnFromStrategy(address strategy, uint256 amount, uint256 actualAmount);
 
     function withdrawETH(address account, uint256 amount) external  returns (uint256);
     function depositETH() external payable returns (uint256);
