@@ -20,6 +20,7 @@
 pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 import "./interfaces/ISikka.sol";
 
 
@@ -140,7 +141,7 @@ contract Sikka is Initializable, ISikka {
         ));
 
         require(holder != address(0), "Sikka/invalid-address-0");
-        require(holder == ecrecover(digest, v, r, s), "Sikka/invalid-permit");
+        require(holder == ECDSAUpgradeable.recover(digest, v, r, s), "Sikka/invalid-permit");
         require(expiry == 0 || block.timestamp <= expiry, "Sikka/permit-expired");
         require(nonce == nonces[holder]++, "Sikka/invalid-nonce");
         uint wad = allowed ? type(uint256).max : 0;

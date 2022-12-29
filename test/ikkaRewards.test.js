@@ -9,6 +9,7 @@ describe('===IkkaRewards===', function () {
         rad = "000000000000000000000000000000000000000000000"; // 45 Decimals
 
     let collateral = ethers.utils.formatBytes32String("TEST");
+    let maxPools = 5;
 
     const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -72,7 +73,7 @@ describe('===IkkaRewards===', function () {
 
     describe('--- initialize()', function () {
         it('initialize', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             expect(await ikkarewards.poolLimit()).to.be.equal("100" + wad);
         });
     });
@@ -82,12 +83,12 @@ describe('===IkkaRewards===', function () {
             expect(await ikkarewards.wards(signer1.address)).to.be.equal("0");
         });
         it('reverts: Rewards/not-live', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.cage();
             await expect(ikkarewards.rely(signer1.address)).to.be.revertedWith("Rewards/not-live");
         });
         it('relies on address', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.rely(signer1.address);
             expect(await ikkarewards.wards(signer1.address)).to.be.equal("1");
         });
@@ -97,12 +98,12 @@ describe('===IkkaRewards===', function () {
             await expect(ikkarewards.deny(signer1.address)).to.be.revertedWith("Rewards/not-authorized");
         });
         it('reverts: Rewards/not-live', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.cage();
             await expect(ikkarewards.deny(NULL_ADDRESS)).to.be.revertedWith("Rewards/not-live");
         });
         it('denies an address', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.rely(signer1.address);
             expect(await ikkarewards.wards(signer1.address)).to.be.equal("1");
             await ikkarewards.deny(signer1.address);
@@ -111,14 +112,14 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- cage()', function () {
         it('disables the live flag', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.cage();
             expect(await ikkarewards.live()).to.be.equal("0");
         });
     });
     describe('--- uncage()', function () {
         it('enables the live flag', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkarewards.cage();
             expect(await ikkarewards.live()).to.be.equal("0");
 
@@ -128,13 +129,13 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- initPool()', function () {
         it('reverts: Reward/not-enough-reward-token', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await expect(ikkarewards.initPool(gem.address, collateral, "1" + ray)).to.be.revertedWith("Reward/not-enough-reward-token");
         });
         it('reverts: Reward/pool-existed', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray)
@@ -142,13 +143,13 @@ describe('===IkkaRewards===', function () {
             await expect(ikkarewards.initPool(gem.address, collateral, "1" + ray)).to.be.revertedWith("Reward/pool-existed");
         });
         it('reverts: Reward/invalid-token', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await expect(ikkarewards.initPool(NULL_ADDRESS, collateral, "1" + ray)).to.be.revertedWith("Reward/invalid-token");
         });
         it('inits a pool', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray);
@@ -157,12 +158,12 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- setIkkaToken()', function () {
         it('reverts: Reward/invalid-token', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await expect(ikkarewards.setIkkaToken(NULL_ADDRESS)).to.be.revertedWith("Reward/invalid-token");
         });
         it('sets ikka token address', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
 
@@ -171,13 +172,13 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- setRewardsMaxLimit()', function () {
         it('reverts: Reward/not-enough-reward-token', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await expect(ikkarewards.setRewardsMaxLimit("110" + wad)).to.be.revertedWith("Reward/not-enough-reward-token");
         });
         it('sets rewards max limit', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.setRewardsMaxLimit("100" + wad);
@@ -186,12 +187,12 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- setOracle()', function () {
         it('reverts: Reward/invalid-oracle', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await expect(ikkarewards.setOracle(NULL_ADDRESS)).to.be.revertedWith("Reward/invalid-oracle");
         });
         it('sets oracle', async function () {
-            await ikkarewards.initialize(vat.address, "100" + wad);
+            await ikkarewards.initialize(vat.address, "100" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkaoracle.initialize("1" + wad);
             await ikkarewards.setOracle(ikkaoracle.address);
@@ -200,33 +201,33 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- setRate()', function () {
         it('reverts: Reward/pool-existed', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray);
             await expect(ikkarewards.setRate(gem.address, "1" + ray)).to.be.revertedWith("Reward/pool-existed");
         });
         it('reverts: Reward/invalid-token', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray);
             await expect(ikkarewards.setRate(NULL_ADDRESS, "1" + ray)).to.be.revertedWith("Reward/invalid-token");
         });
         it('reverts: Reward/negative-rate', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await expect(ikkarewards.setRate(gem.address, "1" + wad)).to.be.revertedWith("Reward/negative-rate");
         });
         it('reverts: Reward/high-rate', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await expect(ikkarewards.setRate(gem.address, "3" + ray)).to.be.revertedWith("Reward/high-rate");
         });
         it('sets rate', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkatoken.initialize("90" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.setRate(gem.address, "1" + ray);
@@ -235,7 +236,7 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- ikkaPrice()', function () {
         it('returns ikka price', async function () {
-            await ikkarewards.initialize(vat.address, "50" + wad);
+            await ikkarewards.initialize(vat.address, "50" + wad, maxPools);
             await ikkarewards.setOracle(ikkaoracle.address);
             await ikkaoracle.initialize("2" + wad);
             expect(await ikkarewards.ikkaPrice()).to.be.equal("2" + wad);
@@ -243,7 +244,7 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- rewardsRate()', function () {
         it('returns token  rate', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray);
@@ -252,7 +253,7 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- drop()', function () {
         it('returns if rho is 0', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.drop(ikkatoken.address, deployer.address);
@@ -303,7 +304,7 @@ describe('===IkkaRewards===', function () {
             await interaction.drip(gem.address, {gasLimit: 200000});
 
             // Initialize IkkaRewards
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1000000000627937192491029810");
@@ -333,7 +334,7 @@ describe('===IkkaRewards===', function () {
     });
     describe('--- distributionApy()', function () {
         it('returns token APY', async function () {
-            await ikkarewards.initialize(vat.address, "40" + wad);
+            await ikkarewards.initialize(vat.address, "40" + wad, maxPools);
             await ikkatoken.initialize("100" + wad, ikkarewards.address);
             await ikkarewards.setIkkaToken(ikkatoken.address);
             await ikkarewards.initPool(gem.address, collateral, "1" + ray);

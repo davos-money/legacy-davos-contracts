@@ -21,6 +21,10 @@ interface IDao {
     event AuctionStarted(address indexed token, address user, uint256 amount, uint256 price);
     event AuctionFinished(address indexed token, address keeper,  uint256 amount);
     event Liquidation(address indexed user, address indexed collateral, uint256 amount, uint256 leftover);
+    event AddedToWhitelist(address indexed user);
+    event RemovedFromWhitelist(address indexed user);
+    event ChangeRewards(address rewards);
+    event ChangeSikkaProvider(address sikkaProvider);
 
       function deposit(
         address participant,

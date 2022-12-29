@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "../MasterVault/interfaces/IWETH.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "./IBaseStrategy.sol";
 
 abstract contract BaseStrategy is
@@ -13,11 +13,13 @@ OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable {
 
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
     address public strategist;
     address public destination;
     address public feeRecipient;
 
-    IWETH public underlying;
+    IERC20Upgradeable public underlying;
 
     bool public depositPaused;
 
@@ -29,14 +31,14 @@ ReentrancyGuardUpgradeable {
         address destinationAddr,
         address feeRecipientAddr,
         address underlyingToken
-    ) internal initializer {
+    ) internal onlyInitializing {
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         strategist = msg.sender;
         destination = destinationAddr;
         feeRecipient = feeRecipientAddr;
-        underlying = IWETH(underlyingToken);
+        underlying = IERC20Upgradeable(underlyingToken);
     }
 
     /**
@@ -81,4 +83,12 @@ ReentrancyGuardUpgradeable {
         feeRecipient = newFeeRecipient;
         emit UpdatedFeeRecipient(newFeeRecipient);
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[45] private __gap;
+
 }

@@ -50,6 +50,10 @@ contract Jug is Initializable, JugLike {
     address                  public vow;   // Debt Engine
     uint256                  public base;  // Global, per-second stability fee contribution [ray]
 
+    event File(bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed what, address data);
+    event File(bytes32 indexed ilk, bytes32 indexed what, uint256 data);
+
     // --- Init ---
     function initialize(address vat_) public initializer {
         wards[msg.sender] = 1;
@@ -88,14 +92,18 @@ contract Jug is Initializable, JugLike {
         require(block.timestamp == ilks[ilk].rho, "Jug/rho-not-updated");
         if (what == "duty") ilks[ilk].duty = data;
         else revert("Jug/file-unrecognized-param");
+        emit File(ilk, what, data);
+        
     }
     function file(bytes32 what, uint data) external auth {
         if (what == "base") base = data;
         else revert("Jug/file-unrecognized-param");
+        emit File(what, data);
     }
     function file(bytes32 what, address data) external auth {
         if (what == "vow") vow = data;
         else revert("Jug/file-unrecognized-param");
+        emit File(what, data);
     }
 
     // --- Stability Fee Collection ---

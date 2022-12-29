@@ -53,6 +53,7 @@ contract IkkaRewards is IRewards, Initializable {
 
     uint256 public rewardsPool;  // <Unused>
     uint256 public poolLimit;
+    uint256 public maxPools;
 
     // --- Modifiers ---
     modifier poolInit(address token) {
@@ -61,11 +62,12 @@ contract IkkaRewards is IRewards, Initializable {
     }
 
     // --- Init ---
-    function initialize(address vat_, uint256 poolLimit_ ) public initializer {
+    function initialize(address vat_, uint256 poolLimit_, uint256 maxPools_) public initializer {
         live = 1;
         wards[msg.sender] = 1;
         vat = VatLike(vat_);
         poolLimit = poolLimit_;
+        maxPools = maxPools_;
     }
 
     // --- Admin ---
@@ -75,6 +77,7 @@ contract IkkaRewards is IRewards, Initializable {
         require(token != address(0), "Reward/invalid-token");
         pools[token] = Ilk(rate, block.timestamp, ilk);
         poolsList.push(token);
+        require(poolsList.length <= maxPools, "Reward/maxPools-exceeded");
 
         emit PoolInited(token, rate);
     }
@@ -105,6 +108,10 @@ contract IkkaRewards is IRewards, Initializable {
         pool.rewardRate = newRate;
 
         emit RateChanged(token, newRate);
+    }
+    function setMaxPools(uint256 newMaxPools) external auth {
+        require(newMaxPools != 0, "Reward/invalid-maxPool");
+        maxPools = newMaxPools;
     }
 
     // --- View ---
@@ -172,9 +179,9 @@ contract IkkaRewards is IRewards, Initializable {
             i++;
         }
         claimedRewards[msg.sender] += amount;
-        IERC20Upgradeable(ikkaToken).safeTransfer(msg.sender, amount);
-
         poolLimit -= amount;
+        
+        IERC20Upgradeable(ikkaToken).safeTransfer(msg.sender, amount);
         emit Claimed(msg.sender, amount);
     }
 

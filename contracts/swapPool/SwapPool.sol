@@ -63,6 +63,8 @@ contract SwapPool is
     uint256 amountIn,
     uint256 amountOut
   );
+  event ThresholdChanged(uint256 newThreshold);
+  event MaticPoolChanged(address newMaticPool);
 
   uint24 public constant FEE_MAX = 100000;
 
@@ -337,6 +339,7 @@ contract SwapPool is
     address receiver,
     bool useEth
   ) internal virtual returns (uint256 amountOut) {
+    require(receiver != address(0), "invaid receiver address");
     uint256 ratio = ICerosToken(cerosToken).ratio();
     if (nativeToCeros) {
       if (useEth) {
@@ -635,10 +638,12 @@ contract SwapPool is
   function setThreshold(uint24 newThreshold) external virtual onlyManager {
     require(newThreshold < FEE_MAX / 2, "threshold shuold be less than 50%");
     threshold = newThreshold;
+    emit ThresholdChanged(newThreshold);
   }
 
   function setMaticPool(address newMaticPool) external virtual onlyOwner {
     maticPool = IMaticPool(newMaticPool);
+    emit MaticPoolChanged(newMaticPool);
   }
 
   function enableIntegratorLock(bool enable) external virtual onlyOwnerOrManager {
@@ -726,8 +731,9 @@ contract SwapPool is
       require(msg.sender == owner(), "Only owner can remove manager");
       if (managers_.contains(value)) {
         _withdrawManagerFee(value, false);
-        delete managerRewardDebt[value];
         success = managers_.remove(value);
+        require(success, "cannot remove manager");
+        delete managerRewardDebt[value];
       }
     } else if (utype == UserType.LIQUIDITY_PROVIDER) {
       require(managers_.contains(msg.sender), "Only manager can remove liquidity provider");

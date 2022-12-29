@@ -51,6 +51,10 @@ contract Spotter is Initializable, SpotLike {
       uint256 spot  // [ray]
     );
 
+    event File(bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed ilk, bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed ilk, bytes32 indexed what, address clip);
+
     // --- Init ---
     function initialize(address vat_) public initializer {
         wards[msg.sender] = 1;
@@ -79,16 +83,19 @@ contract Spotter is Initializable, SpotLike {
         require(live == 1, "Spotter/not-live");
         if (what == "pip") ilks[ilk].pip = PipLike(pip_);
         else revert("Spotter/file-unrecognized-param");
+        emit File(ilk, what, pip_);
     }
     function file(bytes32 what, uint data) external auth {
         require(live == 1, "Spotter/not-live");
         if (what == "par") par = data;
         else revert("Spotter/file-unrecognized-param");
+        emit File(what, data);
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
         require(live == 1, "Spotter/not-live");
         if (what == "mat") ilks[ilk].mat = data;
         else revert("Spotter/file-unrecognized-param");
+        emit File(ilk, what, data);
     }
 
     // --- Update value ---
@@ -101,5 +108,9 @@ contract Spotter is Initializable, SpotLike {
 
     function cage() external auth {
         live = 0;
+    }
+
+    function uncage() external auth {
+        live = 1;
     }
 }

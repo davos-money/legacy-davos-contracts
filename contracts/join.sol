@@ -74,6 +74,7 @@ contract GemJoin is Initializable, GemJoinLike {
     event Join(address indexed usr, uint256 wad);
     event Exit(address indexed usr, uint256 wad);
     event Cage();
+    event UnCage();
 
     // --- Init ---
     function initialize(address vat_, bytes32 ilk_, address gem_) public initializer {
@@ -89,6 +90,12 @@ contract GemJoin is Initializable, GemJoinLike {
         live = 0;
         emit Cage();
     }
+
+    function uncage() external auth {
+        live = 1;
+        emit UnCage();
+    }
+
     function join(address usr, uint wad) external auth {
         require(live == 1, "GemJoin/not-live");
         require(int(wad) >= 0, "GemJoin/overflow");

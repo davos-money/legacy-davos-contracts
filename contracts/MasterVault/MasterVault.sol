@@ -21,30 +21,36 @@ OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable
 {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
     /**
      * Variables
      */
-    uint256 public depositFee;
-    uint256 public maxDepositFee;
-    uint256 public withdrawalFee;
-    uint256 public maxWithdrawalFee;
-    
-    address public _provider;
-    mapping(address => bool) public manager;
     struct StrategyParams {
         bool active;
         uint256 allocation;
         uint256 debt;
     }
-    mapping (address => StrategyParams) public strategyParams;
-    address[] public strategies;
-    address public cerosStrategy;
-    address payable public feeReceiver;
-    uint256 public MAX_STRATEGIES;
-    uint256 public totalDebt;          // Amount of tokens that all strategies have borrowed
+
     IWaitingPool public waitingPool;
     ISwapPool public swapPool;
+    
+    address payable public feeReceiver;
+    address public _provider;
+    address public cerosStrategy;
+
+    uint256 public depositFee;
+    uint256 public maxDepositFee;
+    uint256 public withdrawalFee;
+    uint256 public maxWithdrawalFee;
+    uint256 public MAX_STRATEGIES;
+    uint256 public totalDebt;          // Amount of tokens that all strategies have borrowed
     uint256 public feeEarned;
+    address[] public strategies;
+
+    mapping(address => bool) public manager;
+    mapping (address => StrategyParams) public strategyParams;
+    
     /**
      * Modifiers
      */
@@ -139,6 +145,7 @@ ReentrancyGuardUpgradeable
     whenNotPaused
     onlyProvider 
     returns (uint256 shares) {
+        require(amount > 0, "invalid withdrawal amount");
         address src = msg.sender;
         shares = amount;
         _burn(src, shares);
@@ -206,15 +213,15 @@ ReentrancyGuardUpgradeable
     /// @param amount assets to deposit into strategy
     function _depositToStrategy(address strategy, uint256 amount) private returns (bool success){
         require(amount > 0, "invalid deposit amount");
-        IWETH weth = IWETH(asset());
+        require(strategyParams[strategy].active, "invalid strategy address");
         require(totalAssetInVault() >= amount, "insufficient balance");
         if (IBaseStrategy(strategy).canDeposit(amount)) {
-            weth.transfer(strategy, amount);
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset()), strategy, amount);
             uint256 value = IBaseStrategy(strategy).deposit(amount);
             if(value > 0) {
                 totalDebt += value;
                 strategyParams[strategy].debt += value;
-                emit DepositedToStrategy(strategy, amount);
+                emit DepositedToStrategy(strategy, amount, value);
                 return true;
             }
         }
@@ -223,7 +230,6 @@ ReentrancyGuardUpgradeable
     /// @dev deposits all the assets into the given strategy
     /// @param strategy address of the strategy
     function depositAllToStrategy(address strategy) public onlyManager {
-        require(strategyParams[strategy].active, "invalid strategy address");
         uint256 amount = totalAssetInVault();
         require(_depositToStrategy(strategy, amount));
     }
@@ -231,7 +237,6 @@ ReentrancyGuardUpgradeable
     /// @param strategy address of the strategy
     /// @param amount assets to deposit into strategy
     function depositToStrategy(address strategy, uint256 amount) public onlyManager {
-        require(strategyParams[strategy].active, "invalid strategy address");
         require(_depositToStrategy(strategy, amount));
     }
 
@@ -258,6 +263,7 @@ ReentrancyGuardUpgradeable
     ///       to be paid by the users only
     function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256) {
         require(amount > 0, "invalid withdrawal amount");
+        // check if strategy have debt >= amount(no need to check if strategy is active)
         require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
         uint256 value = IBaseStrategy(strategy).withdraw(amount);
         if(value > 0) {
@@ -267,7 +273,7 @@ ReentrancyGuardUpgradeable
                 "invalid withdrawn amount");
             totalDebt -= amount;
             strategyParams[strategy].debt -= amount;
-            emit WithdrawnFromStrategy(strategy, amount);
+            emit WithdrawnFromStrategy(strategy, amount, value);
         }
         return value;
     }
@@ -318,7 +324,7 @@ ReentrancyGuardUpgradeable
             return;
         }
         _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
-        _deactivateStrategy(strategy);
+        require(_deactivateStrategy(strategy), "cannot retire strategy");
     }
 
     /// @dev internal function to check strategy's debt and deactive it.
@@ -382,6 +388,7 @@ ReentrancyGuardUpgradeable
     /// @param newStrategy address of the new strategy 
     /// @param newAllocation percentage of total assets available in the contract
     ///                      that needs to be allocated to the new strategy
+    // NOTE: Assets will be allocated to new strategy when the allocate() function is triggered next time
     function migrateStrategy(address oldStrategy, address newStrategy, uint256 newAllocation) external onlyManager {
         require(oldStrategy != address(0));
         require(newStrategy != address(0));
@@ -408,6 +415,7 @@ ReentrancyGuardUpgradeable
             }
         }
         require(isValidStrategy, "invalid oldStrategy address");
+        require(_deactivateStrategy(oldStrategy),"cannot deactivate old strategy");
         require(_isValidAllocation(), "allocations cannot be more than 100%");
         emit StrategyMigrated(oldStrategy, newStrategy, newAllocation);
     }
@@ -447,6 +455,14 @@ ReentrancyGuardUpgradeable
             feeReceiver.transfer(feeEarned);
             feeEarned = 0;
         }
+    }
+
+    function pause() external onlyOwner whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external onlyOwner whenPaused {
+        _unpause();
     }
 
     /// @dev only owner can set new deposit fee
