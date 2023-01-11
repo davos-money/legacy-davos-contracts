@@ -137,6 +137,7 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
     event Join(address indexed usr, uint256 wad);
     event Exit(address indexed usr, uint256 wad);
     event Cage();
+    event Uncage();
 
     // --- Init ---
     function initialize(address vat_, address sikka_) public initializer {
@@ -148,6 +149,10 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
     function cage() external auth {
         live = 0;
         emit Cage();
+    }
+    function uncage() external auth {
+        live = 1;
+        emit Uncage();
     }
     uint constant ONE = 10 ** 27;
     function mul(uint x, uint y) internal pure returns (uint z) {
