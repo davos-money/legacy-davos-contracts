@@ -212,7 +212,7 @@ async function main() {
 
     let clip = await upgrades.deployProxy(this.Clip, [vat.address, spot.address, dog.address, _ilkCeMatic], {initializer: "initialize"});
     await clip.deployed();
-    clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
+    clipImp = await upgrades.erc1967.getImplementationAddress(clip.address);
     console.log("Clip            :", clip.address);
     console.log("ClipImp         :", clipImp);
 
