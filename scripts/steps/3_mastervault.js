@@ -13,8 +13,8 @@ async function main() {
     let { _aMATICc, _wMatic, _maxDepositFee, 
     _maxWithdrawalFee, _maxStrategies, _waitingPoolCap} = require(`../${hre.network.name}_config.json`);
 
-    let { cerosRouter } = require(`./mumbai_2addresses.json`);
-    let { swapPool} = require(`./mumbai_1addresses.json`);
+    let { cerosRouter } = require(`./${hre.network.name}_2addresses.json`);
+    let { swapPool} = require(`./${hre.network.name}_1addresses.json`);
 
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.WaitingPool = await hre.ethers.getContractFactory("WaitingPool");

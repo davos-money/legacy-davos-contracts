@@ -14,9 +14,9 @@ async function main() {
 
     let _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
 
-    let { dMatic} = require(`./mumbai_2addresses.json`);
-    let { masterVault} = require(`./mumbai_3addresses.json`);
-    let { vat, davosJoin, spot, davos} = require(`./mumbai_4addresses.json`);
+    let { dMatic} = require(`./${hre.network.name}_2addresses.json`);
+    let { masterVault} = require(`./${hre.network.name}_3addresses.json`);
+    let { vat, davosJoin, spot, davos} = require(`./${hre.network.name}_4addresses.json`);
 
     // Contracts Fetching
     this.DavosProvider = await hre.ethers.getContractFactory("DavosProvider");

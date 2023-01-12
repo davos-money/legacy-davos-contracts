@@ -16,7 +16,7 @@ async function main() {
         
     // External Addresses
     let { _aMATICc, _wMatic, _dex, _dexPairFee} = require(`../${hre.network.name}_config.json`);
-    let { swapPool, priceGetter} = require(`./mumbai_1addresses.json`);
+    let { swapPool, priceGetter} = require(`./${hre.network.name}_1addresses.json`);
 
     let ceaMATICc, ceVault, dMatic, cerosRouter;
 

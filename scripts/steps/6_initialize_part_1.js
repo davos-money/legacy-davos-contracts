@@ -70,11 +70,11 @@ async function main() {
     this.SwapPool = await ethers.getContractFactory("SwapPool");
     this.LP = await ethers.getContractFactory("LP");
 
-    let { swapPool, LP} = require(`./mumbai_1addresses.json`);
-    let { ceaMATICc, ceVault, dMatic, cerosRouter } = require(`./mumbai_2addresses.json`);
-    let { masterVault, waitingPool, cerosYieldStr} = require(`./mumbai_3addresses.json`);
-    let { vat, davos, spot, gemJoin, davosJoin, oracle} = require(`./mumbai_4addresses.json`);
-    let { jug, dog, clip, vow, davosProvider, rewards, interaction} = require(`./mumbai_5addresses.json`);
+    let { swapPool, LP} = require(`./${hre.network.name}_1addresses.json`);
+    let { ceaMATICc, ceVault, dMatic, cerosRouter } = require(`./${hre.network.name}_2addresses.json`);
+    let { masterVault, waitingPool, cerosYieldStr} = require(`./${hre.network.name}_3addresses.json`);
+    let { vat, davos, spot, gemJoin, davosJoin, oracle} = require(`./${hre.network.name}_4addresses.json`);
+    let { jug, dog, clip, vow, davosProvider, rewards, interaction} = require(`./${hre.network.name}_5addresses.json`);
 
     swapPool = await hre.ethers.getContractAt("SwapPool", swapPool);
     LP = await hre.ethers.getContractAt("LP", LP);

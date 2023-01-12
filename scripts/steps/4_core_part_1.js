@@ -17,7 +17,7 @@ async function main() {
     // External Addresses
     let { _chainId} = require(`../${hre.network.name}_config.json`);
 
-    let { masterVault} = require(`./mumbai_3addresses.json`);
+    let { masterVault} = require(`./${hre.network.name}_3addresses.json`);
 
     let _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
 
