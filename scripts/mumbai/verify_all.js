@@ -10,8 +10,8 @@ const {
     ceaMATICcImp,
     ceVault,
     ceVaultImp,
-    sMatic,
-    sMaticImp,
+    dMatic,
+    dMaticImp,
     cerosRouter,
     cerosRouterImp,
     masterVault,
@@ -24,10 +24,10 @@ const {
     vatImp,
     spot,
     spotImp,
-    sikka,
-    sikkaImp,
-    sikkaJoin,
-    sikkaJoinImp,
+    davos,
+    davosImp,
+    davosJoin,
+    davosJoinImp,
     gemJoin,
     gemJoinImp,
     jug,
@@ -43,8 +43,8 @@ const {
     abacusImp,
     rewards,
     rewardsImp,
-    ikkaToken,
-    ikkaTokenImp,
+    dgtToken,
+    dgtTokenImp,
     auctionProxy
 } = require('../' + network_file_name);
 
@@ -53,15 +53,15 @@ async function main() {
     // // Verify all implementations
     await hre.run("verify:verify", {address: ceaMATICcImp});
     await hre.run("verify:verify", {address: ceVaultImp});
-    await hre.run("verify:verify", {address: sMaticImp});
+    await hre.run("verify:verify", {address: dMaticImp});
     await hre.run("verify:verify", {address: cerosRouterImp});
     await hre.run("verify:verify", {address: masterVaultImp});
     await hre.run("verify:verify", {address: waitingPoolImp});
     await hre.run("verify:verify", {address: cerosYieldConverterStrategyImp});
     await hre.run("verify:verify", {address: vatImp});
     await hre.run("verify:verify", {address: spotImp});
-    await hre.run("verify:verify", {address: sikkaImp});
-    await hre.run("verify:verify", {address: sikkaJoinImp});
+    await hre.run("verify:verify", {address: davosImp});
+    await hre.run("verify:verify", {address: davosJoinImp});
     await hre.run("verify:verify", {address: gemJoinImp});
     await hre.run("verify:verify", {address: jugImp});
     await hre.run("verify:verify", {address: vowImp});
@@ -70,7 +70,7 @@ async function main() {
     await hre.run("verify:verify", {address: oracle});
     await hre.run("verify:verify", {address: abacusImp});
     await hre.run("verify:verify", {address: rewardsImp});
-    await hre.run("verify:verify", {address: ikkaTokenImp});   
+    await hre.run("verify:verify", {address: dgtTokenImp});   
 }
 
 main()

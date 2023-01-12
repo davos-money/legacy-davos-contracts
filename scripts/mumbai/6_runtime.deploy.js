@@ -9,32 +9,32 @@ async function main() {
     let vat,
         rewards,
         gemJoin,
-        sikkaJoin,
+        davosJoin,
         dog,
         jug,
         auctionProxy,
         interaction,
         spot,
-        sikka,
+        davos,
         clip,
         vow,
-        // sikkaProvider,
+        // davosProvider,
         masterVault,
         oracle,
         abacus;
     let _vat = "",
         _rewards = "",
         _gemJoin = "",
-        _sikkaJoin = "",
+        _davosJoin = "",
         _dog = "",
         _jug = "",
         _auctionProxy = "";
         _interaction = "",
         _spot = "",
-        _sikka = "",
+        _davos = "",
         _clip = "",
         _vow = "",
-        _sikkaProvider = "",
+        _davosProvider = "",
         _masterVault = "",
         _oracle = "",
         _abacus = "",
@@ -47,9 +47,9 @@ async function main() {
 
     // Contracts Attachments
     this.Vat = await hre.ethers.getContractFactory("Vat");
-    this.Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    this.Rewards = await hre.ethers.getContractFactory("DgtRewards");
     this.GemJoin = await hre.ethers.getContractFactory("GemJoin");
-    this.SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+    this.DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
     this.Dog = await hre.ethers.getContractFactory("Dog");
     this.Jug = await hre.ethers.getContractFactory("Jug");
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
@@ -61,10 +61,10 @@ async function main() {
       }
     });
     this.Spot = await hre.ethers.getContractFactory("Spotter");
-    this.Sikka = await hre.ethers.getContractFactory("Sikka");
+    this.Davos = await hre.ethers.getContractFactory("Davos");
     this.Clip = await hre.ethers.getContractFactory("Clipper");
     this.Vow = await hre.ethers.getContractFactory("Vow");
-    this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+    this.DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.Oracle = await hre.ethers.getContractFactory("Oracle");
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
@@ -72,15 +72,15 @@ async function main() {
     vat = await this.Vat.attach(_vat);
     rewards = await this.Rewards.attach(_rewards);
     gemJoin = await this.GemJoin.attach(_gemJoin);
-    sikkaJoin = await this.SikkaJoin.attach(_sikkaJoin);
+    davosJoin = await this.DavosJoin.attach(_davosJoin);
     dog = await this.Dog.attach(_dog);
     jug = await this.Jug.attach(_jug);
     interaction = await this.Interaction.attach(_interaction);
     spot = await this.Spot.attach(_spot);
-    sikka = await this.Sikka.attach(_sikka);
+    davos = await this.Davos.attach(_davos);
     clip = await this.Clip.attach(_clip);
     vow = await this.Vow.attach(_vow);
-    sikkaProvider = await this.SikkaProvider.attach(_sikkaProvider);
+    davosProvider = await this.DavosProvider.attach(_davosProvider);
     masterVault = await this.MasterVault.attach(_masterVault);
     oracle = await this.Oracle.attach(_oracle);
     abacus = await this.Abacus.attach(_abacus);
@@ -89,7 +89,7 @@ async function main() {
     console.log("Vat init...");
     await vat.rely(_gemJoin);
     await vat.rely(_spot);
-    await vat.rely(_sikkaJoin);
+    await vat.rely(_davosJoin);
     await vat.rely(_jug);
     await vat.rely(_dog);
     await vat.rely(_interaction);
@@ -104,11 +104,11 @@ async function main() {
     console.log("All init...");
     await rewards.rely(_interaction);
     await gemJoin.rely(_interaction);
-    await sikkaJoin.rely(_interaction);
+    await davosJoin.rely(_interaction);
     await dog.rely(_interaction);
     await jug.rely(_interaction);
     await clip.rely(_interaction);
-    await interaction.setSikkaProvider(_masterVault, _sikkaProvider);
+    await interaction.setDavosProvider(_masterVault, _davosProvider);
 
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,
     // 2.000000000000000000000000000 / 1.600000000000000000000000000 = 1.250000000000000000000000000 = mat
@@ -124,8 +124,8 @@ async function main() {
     await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR); // 10% Yearly
     await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
 
-    console.log("Sikka...");
-    await sikka.rely(sikkaJoin.address);
+    console.log("Davos...");
+    await davos.rely(davosJoin.address);
 
     console.log("Dog...");
     await dog.rely(clip.address);

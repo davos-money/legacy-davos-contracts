@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// clip.sol -- Sikka auction module 2.0
+/// clip.sol -- Davos auction module 2.0
 
 // Copyright (C) 2020-2022 Dai Foundation
 //
@@ -46,7 +46,7 @@ contract Clipper is Initializable, ClipperLike {
     VatLike public vat;   // Core CDP Engine
 
     DogLike     public dog;      // Liquidation module
-    address     public vow;      // Recipient of sikka raised in auctions
+    address     public vow;      // Recipient of davos raised in auctions
     SpotLike public spotter;  // Collateral price module
     Abacus  public calc;     // Current price calculator
 
@@ -217,7 +217,7 @@ contract Clipper is Initializable, ClipperLike {
     //
     // Where `val` is the collateral's unitary value in USD, `buf` is a
     // multiplicative factor to increase the starting price, and `par` is a
-    // reference per SIKKA.
+    // reference per DAVOS.
     function kick(
         uint256 tab,  // Debt                   [rad]
         uint256 lot,  // Collateral             [wad]
@@ -301,13 +301,13 @@ contract Clipper is Initializable, ClipperLike {
 
     // Buy up to `amt` of collateral from the auction indexed by `id`.
     // 
-    // Auctions will not collect more SIKKA than their assigned SIKKA target,`tab`;
-    // thus, if `amt` would cost more SIKKA than `tab` at the current price, the
-    // amount of collateral purchased will instead be just enough to collect `tab` SIKKA.
+    // Auctions will not collect more DAVOS than their assigned DAVOS target,`tab`;
+    // thus, if `amt` would cost more DAVOS than `tab` at the current price, the
+    // amount of collateral purchased will instead be just enough to collect `tab` DAVOS.
     //
     // To avoid partial purchases resulting in very small leftover auctions that will
     // never be cleared, any partial purchase must leave at least `Clipper.chost`
-    // remaining SIKKA target. `chost` is an asynchronously updated value equal to
+    // remaining DAVOS target. `chost` is an asynchronously updated value equal to
     // (Vat.dust * Dog.chop(ilk) / WAD) where the values are understood to be determined
     // by whatever they were when Clipper.upchost() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
@@ -319,7 +319,7 @@ contract Clipper is Initializable, ClipperLike {
     function take(
         uint256 id,           // Auction id
         uint256 amt,          // Upper limit on amount of collateral to buy  [wad]
-        uint256 max,          // Maximum acceptable price (SIKKA / collateral) [ray]
+        uint256 max,          // Maximum acceptable price (DAVOS / collateral) [ray]
         address who,          // Receiver of collateral and external call address
         bytes calldata data   // Data to pass in external call; if length 0, no call is done
     ) external auth lock isStopped(3) {
@@ -349,10 +349,10 @@ contract Clipper is Initializable, ClipperLike {
             // Purchase as much as possible, up to amt
             uint256 slice = min(lot, amt);  // slice <= lot
 
-            // SIKKA needed to buy a slice of this sale
+            // DAVOS needed to buy a slice of this sale
             owe = mul(slice, price);
 
-            // Don't collect more than tab of SIKKA
+            // Don't collect more than tab of DAVOS
             if (owe > tab) {
                 // Total debt will be paid
                 owe = tab;                  // owe' <= owe
@@ -387,10 +387,10 @@ contract Clipper is Initializable, ClipperLike {
                 ClipperCallee(who).clipperCall(msg.sender, owe, slice, data);
             }
 
-            // Get SIKKA from caller
+            // Get DAVOS from caller
             vat.move(msg.sender, vow, owe);
 
-            // Removes SIKKA out for liquidation from accumulator
+            // Removes DAVOS out for liquidation from accumulator
             dog_.digs(ilk, lot == 0 ? tab + owe : owe);
         }
 

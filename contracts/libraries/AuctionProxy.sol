@@ -5,10 +5,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 
 import "../interfaces/ClipperLike.sol";
 import "../interfaces/GemJoinLike.sol";
-import "../interfaces/SikkaJoinLike.sol";
+import "../interfaces/DavosJoinLike.sol";
 import "../interfaces/DogLike.sol";
 import "../interfaces/VatLike.sol";
-import "../ceros/interfaces/ISikkaProvider.sol";
+import "../ceros/interfaces/IDavosProvider.sol";
 import "../oracle/libraries/FullMath.sol";
 
 import { CollateralType } from  "../ceros/interfaces/IDao.sol";
@@ -22,44 +22,44 @@ library AuctionProxy {
   function startAuction(
     address user,
     address keeper,
-    IERC20Upgradeable sikka,
-    SikkaJoinLike sikkaJoin,
+    IERC20Upgradeable davos,
+    DavosJoinLike davosJoin,
     VatLike vat,
     DogLike dog,
-    ISikkaProvider sikkaProvider,
+    IDavosProvider davosProvider,
     CollateralType calldata collateral
   ) public returns (uint256 id) {
     ClipperLike _clip = ClipperLike(collateral.clip);
     _clip.upchost();
-    uint256 sikkaBal = sikka.balanceOf(address(this));
+    uint256 davosBal = davos.balanceOf(address(this));
     id = dog.bark(collateral.ilk, user, address(this));
 
-    sikkaJoin.exit(address(this), vat.sikka(address(this)) / RAY);
-    sikkaBal = sikka.balanceOf(address(this)) - sikkaBal;
-    sikka.transfer(keeper, sikkaBal);
+    davosJoin.exit(address(this), vat.davos(address(this)) / RAY);
+    davosBal = davos.balanceOf(address(this)) - davosBal;
+    davos.transfer(keeper, davosBal);
 
-    // Burn any derivative token (sMATIC incase of ceaMATICc collateral)
-    if (address(sikkaProvider) != address(0)) {
-      sikkaProvider.daoBurn(user, _clip.sales(id).lot);
+    // Burn any derivative token (dMATIC incase of ceaMATICc collateral)
+    if (address(davosProvider) != address(0)) {
+      davosProvider.daoBurn(user, _clip.sales(id).lot);
     }
   }
 
   function resetAuction(
     uint auctionId,
     address keeper,
-    IERC20Upgradeable sikka,
-    SikkaJoinLike sikkaJoin,
+    IERC20Upgradeable davos,
+    DavosJoinLike davosJoin,
     VatLike vat,
     CollateralType calldata collateral
   ) public {
     ClipperLike _clip = ClipperLike(collateral.clip);
-    uint256 sikkaBal = sikka.balanceOf(address(this));
+    uint256 davosBal = davos.balanceOf(address(this));
     _clip.redo(auctionId, keeper);
 
 
-    sikkaJoin.exit(address(this), vat.sikka(address(this)) / RAY);
-    sikkaBal = sikka.balanceOf(address(this)) - sikkaBal;
-    sikka.transfer(keeper, sikkaBal);
+    davosJoin.exit(address(this), vat.davos(address(this)) / RAY);
+    davosBal = davos.balanceOf(address(this)) - davosBal;
+    davos.transfer(keeper, davosBal);
   }
 
   // Returns lefover from auction
@@ -68,20 +68,20 @@ library AuctionProxy {
     uint256 collateralAmount,
     uint256 maxPrice,
     address receiverAddress,
-    IERC20Upgradeable sikka,
-    SikkaJoinLike sikkaJoin,
+    IERC20Upgradeable davos,
+    DavosJoinLike davosJoin,
     VatLike vat,
-    ISikkaProvider sikkaProvider,
+    IDavosProvider davosProvider,
     CollateralType calldata collateral
   ) public returns (uint256 leftover) {
     // Balances before
-    uint256 sikkaBal = sikka.balanceOf(address(this));
+    uint256 davosBal = davos.balanceOf(address(this));
     uint256 gemBal = collateral.gem.gem().balanceOf(address(this));
 
-    uint256 sikkaMaxAmount = FullMath.mulDiv(maxPrice, collateralAmount, RAY);
+    uint256 davosMaxAmount = FullMath.mulDiv(maxPrice, collateralAmount, RAY);
 
-    sikka.transferFrom(msg.sender, address(this), sikkaMaxAmount);
-    sikkaJoin.join(address(this), sikkaMaxAmount);
+    davos.transferFrom(msg.sender, address(this), davosMaxAmount);
+    davosJoin.join(address(this), davosMaxAmount);
 
     vat.hope(address(collateral.clip));
     address urn = ClipperLike(collateral.clip).sales(auctionId).usr; // Liquidated address
@@ -91,24 +91,24 @@ library AuctionProxy {
     leftover = vat.gem(collateral.ilk, urn) - leftover; // leftover
 
     collateral.gem.exit(address(this), vat.gem(collateral.ilk, address(this)));
-    sikkaJoin.exit(address(this), vat.sikka(address(this)) / RAY);
+    davosJoin.exit(address(this), vat.davos(address(this)) / RAY);
 
     // Balances rest
-    sikkaBal = sikka.balanceOf(address(this)) - sikkaBal;
+    davosBal = davos.balanceOf(address(this)) - davosBal;
     gemBal = collateral.gem.gem().balanceOf(address(this)) - gemBal;
-    sikka.transfer(receiverAddress, sikkaBal);
+    davos.transfer(receiverAddress, davosBal);
 
     vat.nope(address(collateral.clip));
 
-    if (address(sikkaProvider) != address(0)) {
-      IERC20Upgradeable(collateral.gem.gem()).safeTransfer(address(sikkaProvider), gemBal);
-      sikkaProvider.liquidation(receiverAddress, gemBal); // Burn router ceToken and mint amaticc to receiver
+    if (address(davosProvider) != address(0)) {
+      IERC20Upgradeable(collateral.gem.gem()).safeTransfer(address(davosProvider), gemBal);
+      davosProvider.liquidation(receiverAddress, gemBal); // Burn router ceToken and mint amaticc to receiver
 
       if (leftover != 0) {
         // Auction ended with leftover
         vat.flux(collateral.ilk, urn, address(this), leftover);
-        collateral.gem.exit(address(sikkaProvider), leftover); // Router (disc) gets the remaining ceamaticc
-        sikkaProvider.liquidation(urn, leftover); // Router burns them and gives amaticc remaining
+        collateral.gem.exit(address(davosProvider), leftover); // Router (disc) gets the remaining ceamaticc
+        davosProvider.liquidation(urn, leftover); // Router burns them and gives amaticc remaining
       }
     } else {
       IERC20Upgradeable(collateral.gem.gem()).safeTransfer(receiverAddress, gemBal);

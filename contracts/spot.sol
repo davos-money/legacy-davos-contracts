@@ -40,7 +40,7 @@ contract Spotter is Initializable, SpotLike {
     mapping (bytes32 => Ilk) public ilks;
 
     VatLike public vat;  // CDP Engine
-    uint256 public par;  // ref per sikka [ray]
+    uint256 public par;  // ref per davos [ray]
 
     uint256 public live;
 

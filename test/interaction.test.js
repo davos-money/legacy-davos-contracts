@@ -12,9 +12,9 @@ const {
 
 describe("Interaction", function () {
 
-    let collateral, _chainId, _mat, _ikkaRewardsPoolLimitInEth, _vat_Line, _vat_line,
+    let collateral, _chainId, _mat, _dgtRewardsPoolLimitInEth, _vat_Line, _vat_line,
         _spot_par, _dog_Hole, _dog_hole, _dog_chop, _abacus_tau, _clip_buf, _clip_tail,
-        _clip_cusp, _clip_chip, _clip_tip, _clip_stopped, _multisig, _vat_dust, sMatic;
+        _clip_cusp, _clip_chip, _clip_tip, _clip_stopped, _multisig, _vat_dust, dMatic;
         
     async function deploySwapPool() {
         const { MaxUint256 } = ethers.constants;
@@ -68,7 +68,7 @@ describe("Interaction", function () {
     async function init() {
 
         _mat = "1333333333333333333333333333";
-        _ikkaRewardsPoolLimitInEth = "100000000";
+        _dgtRewardsPoolLimitInEth = "100000000";
         _vat_Line = "5000000";
         _vat_line = "5000000";
         _vat_dust = "100";
@@ -107,23 +107,23 @@ describe("Interaction", function () {
         CeVault = await hre.ethers.getContractFactory("CeVault");
         AMATICb = await hre.ethers.getContractFactory("aMATICb");
         AMATICc = await hre.ethers.getContractFactory("aMATICc");
-        SMatic = await hre.ethers.getContractFactory("sMATIC");
+        DMatic = await hre.ethers.getContractFactory("dMATIC");
         CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
-        SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+        DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
         Vat = await hre.ethers.getContractFactory("Vat");
         Spot = await hre.ethers.getContractFactory("Spotter");
-        Sikka = await hre.ethers.getContractFactory("Sikka");
+        Davos = await hre.ethers.getContractFactory("Davos");
         GemJoin = await hre.ethers.getContractFactory("GemJoin");
-        SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+        DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
         Oracle = await hre.ethers.getContractFactory("Oracle"); 
         Jug = await hre.ethers.getContractFactory("Jug");
         Vow = await hre.ethers.getContractFactory("Vow");
         Dog = await hre.ethers.getContractFactory("Dog");
         Clip = await hre.ethers.getContractFactory("Clipper");
         Abacus = await hre.ethers.getContractFactory("LinearDecrease");
-        IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
-        IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
-        IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle"); 
+        DgtToken = await hre.ethers.getContractFactory("DgtToken");
+        DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
+        DgtOracle = await hre.ethers.getContractFactory("DgtOracle"); 
         AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
 
         const auctionProxy = await this.AuctionProxy.deploy();
@@ -142,9 +142,9 @@ describe("Interaction", function () {
         SwapPool = await ethers.getContractFactory("SwapPool");
         LP = await ethers.getContractFactory("LP");
 
-        sMatic = await upgrades.deployProxy(this.SMatic, [], {initializer: "initialize"});
-        await sMatic.deployed();
-        sMaticImp = await upgrades.erc1967.getImplementationAddress(sMatic.address);
+        dMatic = await upgrades.deployProxy(this.DMatic, [], {initializer: "initialize"});
+        await dMatic.deployed();
+        dMaticImp = await upgrades.erc1967.getImplementationAddress(dMatic.address);
 
         abacus = await upgrades.deployProxy(this.Abacus, [], {initializer: "initialize"});
         await abacus.deployed();
@@ -162,13 +162,13 @@ describe("Interaction", function () {
         await spot.deployed();
         spotImp = await upgrades.erc1967.getImplementationAddress(spot.address);
 
-        sikka = await upgrades.deployProxy(this.Sikka, [_chainId, "SIKKA", "5000000" + wad], {initializer: "initialize"});
-        await sikka.deployed();
-        sikkaImp = await upgrades.erc1967.getImplementationAddress(sikka.address);
+        davos = await upgrades.deployProxy(this.Davos, [_chainId, "DAVOS", "5000000" + wad], {initializer: "initialize"});
+        await davos.deployed();
+        davosImp = await upgrades.erc1967.getImplementationAddress(davos.address);
 
-        sikkaJoin = await upgrades.deployProxy(this.SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
-        await sikkaJoin.deployed();
-        sikkaJoinImp = await upgrades.erc1967.getImplementationAddress(sikkaJoin.address);
+        davosJoin = await upgrades.deployProxy(this.DavosJoin, [vat.address, davos.address], {initializer: "initialize"});
+        await davosJoin.deployed();
+        davosJoinImp = await upgrades.erc1967.getImplementationAddress(davosJoin.address);
 
         gemJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, collateralToken.address], {initializer: "initialize"});
         await gemJoin.deployed();
@@ -178,7 +178,7 @@ describe("Interaction", function () {
         await jug.deployed();
         jugImp = await upgrades.erc1967.getImplementationAddress(jug.address);
 
-        vow = await upgrades.deployProxy(this.Vow, [vat.address, sikkaJoin.address, _multisig], {initializer: "initialize"});
+        vow = await upgrades.deployProxy(this.Vow, [vat.address, davosJoin.address, _multisig], {initializer: "initialize"});
         await vow.deployed();
         vowImp = await upgrades.erc1967.getImplementationAddress(vow.address);
 
@@ -190,11 +190,11 @@ describe("Interaction", function () {
         await clip.deployed();
         clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
 
-        rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
+        rewards = await upgrades.deployProxy(this.DgtRewards, [vat.address, ether(_dgtRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
         await rewards.deployed();
         rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
 
-        interaction = await upgrades.deployProxy(this.Interaction, [vat.address, spot.address, sikka.address, sikkaJoin.address, jug.address, dog.address, rewards.address], 
+        interaction = await upgrades.deployProxy(this.Interaction, [vat.address, spot.address, davos.address, davosJoin.address, jug.address, dog.address, rewards.address], 
             {
                 initializer: "initialize",
                 unsafeAllowLinkedLibraries: true,
@@ -203,13 +203,13 @@ describe("Interaction", function () {
         await interaction.deployed();
         interactionImplAddress = await upgrades.erc1967.getImplementationAddress(interaction.address);
 
-        sikkaProvider = await upgrades.deployProxy(this.SikkaProvider, [sMatic.address, collateralToken.address, interaction.address], {initializer: "initialize"});
-        await sikkaProvider.deployed();
-        sikkaProviderImplementation = await upgrades.erc1967.getImplementationAddress(sikkaProvider.address);
+        davosProvider = await upgrades.deployProxy(this.DavosProvider, [dMatic.address, collateralToken.address, interaction.address], {initializer: "initialize"});
+        await davosProvider.deployed();
+        davosProviderImplementation = await upgrades.erc1967.getImplementationAddress(davosProvider.address);
 
         await vat.rely(gemJoin.address);
         await vat.rely(spot.address);
-        await vat.rely(sikkaJoin.address);
+        await vat.rely(davosJoin.address);
         await vat.rely(jug.address);
         await vat.rely(dog.address);
         await vat.rely(clip.address);
@@ -218,8 +218,8 @@ describe("Interaction", function () {
         await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad);
         await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + rad);
         
-        await sikka.rely(sikkaJoin.address);
-        await sikka.setSupplyCap("5000000" + wad);
+        await davos.rely(davosJoin.address);
+        await davos.setSupplyCap("5000000" + wad);
         
         await spot.rely(interaction.address);
         await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
@@ -228,8 +228,8 @@ describe("Interaction", function () {
         await rewards.rely(interaction.address);
         
         await gemJoin.rely(interaction.address);
-        await sikkaJoin.rely(interaction.address);
-        await sikkaJoin.rely(vow.address);
+        await davosJoin.rely(interaction.address);
+        await davosJoin.rely(vow.address);
         
         await dog.rely(interaction.address);
         await dog.rely(clip.address);
@@ -256,7 +256,7 @@ describe("Interaction", function () {
         await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
         
         await vow.rely(dog.address);
-        await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("sikka"), sikka.address);
+        await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("davos"), davos.address);
         
         await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau); // Price will reach 0 after this time
     }
@@ -331,7 +331,7 @@ describe("Interaction", function () {
 
         it("revert:: deposit(): should not let user deposit collateral directly to interaction", async function () {
             await setCollateralType();
-            await interaction.setSikkaProvider(collateralToken.address, sikkaProvider.address)
+            await interaction.setDavosProvider(collateralToken.address, davosProvider.address)
             const depositAmount = parseEther("1");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
             await expect(
@@ -339,7 +339,7 @@ describe("Interaction", function () {
                 signer1.address,
                 aMaticc.address,
                 depositAmount
-            )).to.be.revertedWith("Interaction/only sikka provider can deposit for this token");
+            )).to.be.revertedWith("Interaction/only davos provider can deposit for this token");
         });
 
         it("withdraw(): should let user withdraw", async function () {
@@ -368,7 +368,7 @@ describe("Interaction", function () {
             assert.equal(depositsAfter, depositsBefore - withdrawAmount); 
         });
 
-        it("revert:: withdraw(): Caller must be the same address as participant(!sikkaProvider)", async function () {
+        it("revert:: withdraw(): Caller must be the same address as participant(!davosProvider)", async function () {
             await setCollateralType();
             const depositAmount = parseEther("1");
             const withdrawAmount = parseEther("0.5");
@@ -391,7 +391,7 @@ describe("Interaction", function () {
             )).to.be.revertedWith("Interaction/Caller must be the same address as participant");
         });
 
-        it("revert:: withdraw(): Caller must be the same address as participant(!sikkaProvider)", async function () {
+        it("revert:: withdraw(): Caller must be the same address as participant(!davosProvider)", async function () {
             await setCollateralType();
             const depositAmount = parseEther("1");
             const withdrawAmount = parseEther("0.5");
@@ -406,13 +406,13 @@ describe("Interaction", function () {
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore.eq(depositAmount));
            
-            await interaction.setSikkaProvider(collateralToken.address, sikkaProvider.address)
+            await interaction.setDavosProvider(collateralToken.address, davosProvider.address)
             await expect(
                 interaction.connect(signer2).withdraw(
                 signer1.address,
                 aMaticc.address,
                 withdrawAmount
-            )).to.be.revertedWith("Interaction/Only sikka provider can call this function for this token");
+            )).to.be.revertedWith("Interaction/Only davos provider can call this function for this token");
         });
 
         it("borrow(): should let user borrow", async function () {
@@ -475,8 +475,8 @@ describe("Interaction", function () {
             await interaction.connect(signer1).borrow(aMaticc.address,borrowAmount);
             await interaction.borrowApr(collateralToken.address);
             
-            const estLiqPriceSikka = await interaction.estimatedLiquidationPriceSIKKA(collateralToken.address, signer1.address, borrowAmount);
-            expect(estLiqPriceSikka.gt(borrowAmount));
+            const estLiqPriceDavos = await interaction.estimatedLiquidationPriceDAVOS(collateralToken.address, signer1.address, borrowAmount);
+            expect(estLiqPriceDavos.gt(borrowAmount));
 
             const estimatedLiquidationPrice = await interaction.estimatedLiquidationPrice(collateralToken.address, signer1.address, borrowAmount);
             expect(estimatedLiquidationPrice.gt(borrowAmount));
@@ -497,8 +497,8 @@ describe("Interaction", function () {
             expect(depositTVL.eq(depositAmount));
 
             
-            const sikkaPrice = await interaction.sikkaPrice(collateralToken.address);
-            expect(sikkaPrice.eq(parseEther("1")));
+            const davosPrice = await interaction.davosPrice(collateralToken.address);
+            expect(davosPrice.eq(parseEther("1")));
             
             const collateralPrice = await interaction.collateralPrice(collateralToken.address);
             expect(collateralPrice.eq(parseEther("2")));
@@ -576,11 +576,11 @@ describe("Interaction", function () {
             )).to.be.revertedWith("Vat/not-safe")
         });
 
-        it("payback(): should let user payback outstanding debt(borrowed sikka)", async function () {
+        it("payback(): should let user payback outstanding debt(borrowed davos)", async function () {
             await setCollateralType();
             const depositAmount = parseEther("1000");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-            await sikka.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            await davos.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
 
             await expect(
                 interaction.connect(signer1).deposit(
@@ -624,7 +624,7 @@ describe("Interaction", function () {
             await setCollateralType();
             const depositAmount = parseEther("1000");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-            await sikka.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            await davos.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
 
             await expect(
                 interaction.connect(signer1).deposit(
@@ -765,8 +765,8 @@ describe("Interaction", function () {
             await vat.connect(signer2).hope(clip.address);
             await vat.connect(signer3).hope(clip.address);
         
-            await sikka.connect(signer2).approve(interaction.address, toWad("10000").toString());
-            await sikka.connect(signer3).approve(interaction.address, toWad("10000").toString());
+            await davos.connect(signer2).approve(interaction.address, toWad("10000").toString());
+            await davos.connect(signer3).approve(interaction.address, toWad("10000").toString());
         
             await advanceTime(1000);
         
@@ -915,20 +915,20 @@ describe("Interaction", function () {
         });
 
         it("setCores(): should let authorized account set core contracts", async function () {
-            await interaction.setCores(vat.address, spot.address, sikkaJoin.address, jug.address);
+            await interaction.setCores(vat.address, spot.address, davosJoin.address, jug.address);
         });
 
-        it("setSikkaApprove(): only authorized account can set core contracts", async function () {
+        it("setDavosApprove(): only authorized account can set core contracts", async function () {
             await expect(
                 interaction
                 .connect(signer1)
-                .setSikkaApprove()
+                .setDavosApprove()
             ).to.be.revertedWith("Interaction/not-authorized");
         });
 
-        it("setSikkaApprove(): should let authorized account set core contracts", async function () {
-            await interaction.setSikkaApprove();
-            let allowance = await sikka.allowance(interaction.address, sikkaJoin.address);
+        it("setDavosApprove(): should let authorized account set core contracts", async function () {
+            await interaction.setDavosApprove();
+            let allowance = await davos.allowance(interaction.address, davosJoin.address);
             expect(allowance.eq(ethers.constants.MaxUint256))
         });
 
@@ -969,7 +969,7 @@ describe("Interaction", function () {
 
         it("setRewards(): should let authorized account set core contracts", async function () {
             await interaction.setRewards(signer1.address);
-            assert.equal((await interaction.ikkaRewards()), signer1.address);
+            assert.equal((await interaction.dgtRewards()), signer1.address);
         });
     })
 });

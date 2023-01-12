@@ -1,7 +1,7 @@
 const { upgradeProxy , deployImplementatoin , verifyImpContract} = require("./utils/upgrade_utils");
 let { upgrades } = require("hardhat");
 
-const sikkaToken = "0x00658FC8ec685727F3F59d381B8Ad8f5E0FeDBc2";
+const davosToken = "0x00658FC8ec685727F3F59d381B8Ad8f5E0FeDBc2";
 const proxies = [
     // {
     //     name : "MasterVault",
@@ -59,7 +59,7 @@ const main = async () => {
     // deploy jar
     // this.Jar = await hre.ethers.getContractFactory("Jar");
 
-    // jar = await upgrades.deployProxy(this.Jar, ["Staked Sikka", "sSIKKA", sikkaToken, "604800", "0", "5"], {initializer: "initialize"});
+    // jar = await upgrades.deployProxy(this.Jar, ["Staked Davos", "sDAVOS", davosToken, "604800", "0", "5"], {initializer: "initialize"});
     // await jar.deployed();
     // jarImp = await upgrades.erc1967.getImplementationAddress(jar.address);
     // console.log("jar     : " + jar.address);

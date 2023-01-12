@@ -4,18 +4,18 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./sMath.sol";
+import "./dMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
 import "./interfaces/VatLike.sol";
-import "./interfaces/SikkaJoinLike.sol";
+import "./interfaces/DavosJoinLike.sol";
 import "./interfaces/GemJoinLike.sol";
 import "./interfaces/JugLike.sol";
 import "./interfaces/DogLike.sol";
 import "./interfaces/PipLike.sol";
 import "./interfaces/SpotLike.sol";
 import "./interfaces/IRewards.sol";
-import "./ceros/interfaces/ISikkaProvider.sol";
+import "./ceros/interfaces/IDavosProvider.sol";
 import "./ceros/interfaces/IDao.sol";
 
 import "./libraries/AuctionProxy.sol";
@@ -39,11 +39,11 @@ contract Interaction is Initializable, IDao {
 
     VatLike public vat;
     SpotLike public spotter;
-    IERC20Upgradeable public sikka;
-    SikkaJoinLike public sikkaJoin;
+    IERC20Upgradeable public davos;
+    DavosJoinLike public davosJoin;
     JugLike public jug;
     address public dog;
-    IRewards public ikkaRewards;
+    IRewards public dgtRewards;
 
     mapping(address => uint256) public deposits;
     mapping(address => CollateralType) public collaterals;
@@ -51,7 +51,7 @@ contract Interaction is Initializable, IDao {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    mapping(address => address) public sikkaProviders; // e.g. Auction purchase from ceamaticc to amaticc
+    mapping(address => address) public davosProviders; // e.g. Auction purchase from ceamaticc to amaticc
 
     uint256 public whitelistMode;
     address public whitelistOperator;
@@ -86,8 +86,8 @@ contract Interaction is Initializable, IDao {
     function initialize(
         address vat_,
         address spot_,
-        address sikka_,
-        address sikkaJoin_,
+        address davos_,
+        address davosJoin_,
         address jug_,
         address dog_,
         address rewards_
@@ -97,34 +97,34 @@ contract Interaction is Initializable, IDao {
 
         vat = VatLike(vat_);
         spotter = SpotLike(spot_);
-        sikka = IERC20Upgradeable(sikka_);
-        sikkaJoin = SikkaJoinLike(sikkaJoin_);
+        davos = IERC20Upgradeable(davos_);
+        davosJoin = DavosJoinLike(davosJoin_);
         jug = JugLike(jug_);
         dog = dog_;
-        ikkaRewards = IRewards(rewards_);
+        dgtRewards = IRewards(rewards_);
 
-        vat.hope(sikkaJoin_);
+        vat.hope(davosJoin_);
 
-        sikka.approve(sikkaJoin_, type(uint256).max);
+        davos.approve(davosJoin_, type(uint256).max);
     }
 
-    function setCores(address vat_, address spot_, address sikkaJoin_,
+    function setCores(address vat_, address spot_, address davosJoin_,
         address jug_) public auth {
         // Reset previous approval
-        sikka.approve(address(sikkaJoin), 0);
+        davos.approve(address(davosJoin), 0);
 
         vat = VatLike(vat_);
         spotter = SpotLike(spot_);
-        sikkaJoin = SikkaJoinLike(sikkaJoin_);
+        davosJoin = DavosJoinLike(davosJoin_);
         jug = JugLike(jug_);
 
-        vat.hope(sikkaJoin_);
+        vat.hope(davosJoin_);
 
-        sikka.approve(sikkaJoin_, type(uint256).max);
+        davos.approve(davosJoin_, type(uint256).max);
     }
 
-    function setSikkaApprove() public auth {
-        sikka.approve(address(sikkaJoin), type(uint256).max);
+    function setDavosApprove() public auth {
+        davos.approve(address(davosJoin), type(uint256).max);
     }
 
     function setCollateralType(
@@ -152,10 +152,10 @@ contract Interaction is Initializable, IDao {
         jug.file(collateralType.ilk, "duty", data);
     }
 
-    function setSikkaProvider(address token, address sikkaProvider) external auth {
-        require(sikkaProvider != address(0));
-        sikkaProviders[token] = sikkaProvider;
-        emit ChangeSikkaProvider(sikkaProvider);
+    function setDavosProvider(address token, address davosProvider) external auth {
+        require(davosProvider != address(0));
+        davosProviders[token] = davosProvider;
+        emit ChangeDavosProvider(davosProvider);
     }
 
     function removeCollateralType(address token) external auth {
@@ -186,10 +186,10 @@ contract Interaction is Initializable, IDao {
         CollateralType memory collateralType = collaterals[token];
         require(collateralType.live == 1, "Interaction/inactive-collateral");
 
-        if (sikkaProviders[token] != address(0)) {
+        if (davosProviders[token] != address(0)) {
             require(
-                msg.sender == sikkaProviders[token],
-                "Interaction/only sikka provider can deposit for this token"
+                msg.sender == davosProviders[token],
+                "Interaction/only davos provider can deposit for this token"
             );
         }
         require(dink <= uint256(type(int256).max), "Interaction/too-much-requested");
@@ -225,45 +225,45 @@ contract Interaction is Initializable, IDao {
     // }
     // }
 
-    function borrow(address token, uint256 sikkaAmount) external returns (uint256) {
+    function borrow(address token, uint256 davosAmount) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         require(collateralType.live == 1, "Interaction/inactive-collateral");
-        require(sikkaAmount > 0,"Interaction/invalid-sikkaAmount");
+        require(davosAmount > 0,"Interaction/invalid-davosAmount");
 
         drip(token);
         dropRewards(token, msg.sender);
 
         (, uint256 rate, , ,) = vat.ilks(collateralType.ilk);
-        int256 dart = int256(sikkaAmount * RAY / rate);
+        int256 dart = int256(davosAmount * RAY / rate);
         require(dart >= 0, "Interaction/too-much-requested");
-        if (uint256(dart) * rate < sikkaAmount * RAY) {
+        if (uint256(dart) * rate < davosAmount * RAY) {
             dart += 1; //ceiling
         }
         vat.frob(collateralType.ilk, msg.sender, msg.sender, msg.sender, 0, dart);
-        vat.move(msg.sender, address(this), sikkaAmount * RAY);
-        sikkaJoin.exit(msg.sender, sikkaAmount);
+        vat.move(msg.sender, address(this), davosAmount * RAY);
+        davosJoin.exit(msg.sender, davosAmount);
 
         (uint256 ink, uint256 art) = vat.urns(collateralType.ilk, msg.sender);
         uint256 liqPrice = liquidationPriceForDebt(collateralType.ilk, ink, art);
-        emit Borrow(msg.sender, token, ink, sikkaAmount, liqPrice);
+        emit Borrow(msg.sender, token, ink, davosAmount, liqPrice);
         return uint256(dart);
     }
 
     function dropRewards(address token, address usr) public {
-        ikkaRewards.drop(token, usr);
+        dgtRewards.drop(token, usr);
     }
 
-    // Burn user's SIKKA.
+    // Burn user's DAVOS.
     // N.B. User collateral stays the same.
-    function payback(address token, uint256 sikkaAmount) external returns (int256) {
-        require(sikkaAmount > 0,"Interaction/invalid-sikkaAmount");
+    function payback(address token, uint256 davosAmount) external returns (int256) {
+        require(davosAmount > 0,"Interaction/invalid-davosAmount");
         CollateralType memory collateralType = collaterals[token];
         // _checkIsLive(collateralType.live); Checking in the `drip` function
 
         (,uint256 rate,,,) = vat.ilks(collateralType.ilk);
         (,uint256 art) = vat.urns(collateralType.ilk, msg.sender);
         int256 dart;
-        uint256 realAmount = sikkaAmount;
+        uint256 realAmount = davosAmount;
         uint256 debt = rate * art;
         if (realAmount * RAY >= debt) { // Close CDP
             dart = int(art);
@@ -273,8 +273,8 @@ contract Interaction is Initializable, IDao {
             dart = int256(FullMath.mulDiv(realAmount, RAY, rate));
         }
 
-        IERC20Upgradeable(sikka).safeTransferFrom(msg.sender, address(this), realAmount);
-        sikkaJoin.join(msg.sender, realAmount);
+        IERC20Upgradeable(davos).safeTransferFrom(msg.sender, address(this), realAmount);
+        davosJoin.join(msg.sender, realAmount);
 
         require(dart >= 0, "Interaction/too-much-requested");
 
@@ -297,10 +297,10 @@ contract Interaction is Initializable, IDao {
     ) external returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
-        if (sikkaProviders[token] != address(0)) {
+        if (davosProviders[token] != address(0)) {
             require(
-                msg.sender == sikkaProviders[token],
-                "Interaction/Only sikka provider can call this function for this token"
+                msg.sender == davosProviders[token],
+                "Interaction/Only davos provider can call this function for this token"
             );
         } else {
             require(
@@ -339,7 +339,7 @@ contract Interaction is Initializable, IDao {
     }
 
     function setRewards(address rewards) external auth {
-        ikkaRewards = IRewards(rewards);
+        dgtRewards = IRewards(rewards);
         emit ChangeRewards(rewards);
     }
 
@@ -361,8 +361,8 @@ contract Interaction is Initializable, IDao {
         }
     }
 
-    // Returns the SIKKA price in $
-    function sikkaPrice(address token) external view returns (uint256) {
+    // Returns the DAVOS price in $
+    function davosPrice(address token) external view returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
 
@@ -385,7 +385,7 @@ contract Interaction is Initializable, IDao {
         return deposits[token] * collateralPrice(token) / WAD;
     }
 
-    // Total SIKKA borrowed by all users
+    // Total DAVOS borrowed by all users
     function collateralTVL(address token) external view returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
@@ -411,7 +411,7 @@ contract Interaction is Initializable, IDao {
         return ink;
     }
 
-    // Total borrowed SIKKA
+    // Total borrowed DAVOS
     function borrowed(address token, address usr) external view returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
@@ -428,7 +428,7 @@ contract Interaction is Initializable, IDao {
         }
     }
 
-    // Collateral minus borrowed. Basically free collateral (nominated in SIKKA)
+    // Collateral minus borrowed. Basically free collateral (nominated in DAVOS)
     function availableToBorrow(address token, address usr) external view returns (int256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
@@ -440,8 +440,8 @@ contract Interaction is Initializable, IDao {
         return (int256(collateral) - int256(debt)) / 1e27;
     }
 
-    // Collateral + `amount` minus borrowed. Basically free collateral (nominated in SIKKA)
-    // Returns how much sikka you can borrow if provide additional `amount` of collateral
+    // Collateral + `amount` minus borrowed. Basically free collateral (nominated in DAVOS)
+    // Returns how much davos you can borrow if provide additional `amount` of collateral
     function willBorrow(address token, address usr, int256 amount) external view returns (int256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
@@ -493,9 +493,9 @@ contract Interaction is Initializable, IDao {
         return liquidationPriceForDebt(collateralType.ilk, ink, art);
     }
 
-    // Price of aMATICc when user will be liquidated with additional amount of SIKKA borrowed/payback
-    //positive amount mean SIKKAs are being borrowed. So art(debt) will increase
-    function estimatedLiquidationPriceSIKKA(address token, address usr, int256 amount) external view returns (uint256) {
+    // Price of aMATICc when user will be liquidated with additional amount of DAVOS borrowed/payback
+    //positive amount mean DAVOSs are being borrowed. So art(debt) will increase
+    function estimatedLiquidationPriceDAVOS(address token, address usr, int256 amount) external view returns (uint256) {
         CollateralType memory collateralType = collaterals[token];
         _checkIsLive(collateralType.live);
 
@@ -519,7 +519,7 @@ contract Interaction is Initializable, IDao {
         _checkIsLive(collateralType.live);
 
         (uint256 duty,) = jug.ilks(collateralType.ilk);
-        uint256 principal = sMath.rpow((jug.base() + duty), YEAR, RAY);
+        uint256 principal = dMath.rpow((jug.base() + duty), YEAR, RAY);
         return (principal - RAY) / (10 ** 7);
     }
 
@@ -531,12 +531,12 @@ contract Interaction is Initializable, IDao {
         dropRewards(token, user);
         CollateralType memory collateral = collaterals[token];
         (uint256 ink,) = vat.urns(collateral.ilk, user);
-        ISikkaProvider provider = ISikkaProvider(sikkaProviders[token]);
+        IDavosProvider provider = IDavosProvider(davosProviders[token]);
         uint256 auctionAmount = AuctionProxy.startAuction(
             user,
             keeper,
-            sikka,
-            sikkaJoin,
+            davos,
+            davosJoin,
             vat,
             DogLike(dog),
             provider,
@@ -555,21 +555,21 @@ contract Interaction is Initializable, IDao {
         address receiverAddress
     ) external {
         CollateralType memory collateral = collaterals[token];
-        ISikkaProvider sikkaProvider = ISikkaProvider(sikkaProviders[token]);
+        IDavosProvider davosProvider = IDavosProvider(davosProviders[token]);
         uint256 leftover = AuctionProxy.buyFromAuction(
             auctionId,
             collateralAmount,
             maxPrice,
             receiverAddress,
-            sikka,
-            sikkaJoin,
+            davos,
+            davosJoin,
             vat,
-            sikkaProvider,
+            davosProvider,
             collateral
         );
 
         address urn = ClipperLike(collateral.clip).sales(auctionId).usr; // Liquidated address
-        dropRewards(address(sikka), urn);
+        dropRewards(address(davos), urn);
 
         emit Liquidation(urn, token, collateralAmount, leftover);
     }
@@ -587,11 +587,11 @@ contract Interaction is Initializable, IDao {
     }
 
     function resetAuction(address token, uint256 auctionId, address keeper) external {
-        AuctionProxy.resetAuction(auctionId, keeper, sikka, sikkaJoin, vat, collaterals[token]);
+        AuctionProxy.resetAuction(auctionId, keeper, davos, davosJoin, vat, collaterals[token]);
     }
 
     function totalPegLiquidity() external view returns (uint256) {
-        return IERC20Upgradeable(sikka).totalSupply();
+        return IERC20Upgradeable(davos).totalSupply();
     }
 
     function _checkIsLive(uint256 live) internal pure {

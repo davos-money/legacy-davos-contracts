@@ -24,7 +24,7 @@ interface IDao {
     event AddedToWhitelist(address indexed user);
     event RemovedFromWhitelist(address indexed user);
     event ChangeRewards(address rewards);
-    event ChangeSikkaProvider(address sikkaProvider);
+    event ChangeDavosProvider(address davosProvider);
 
       function deposit(
         address participant,

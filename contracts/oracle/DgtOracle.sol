@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "../interfaces/PipLike.sol";
 
-contract IkkaOracle is PipLike, OwnableUpgradeable  {
+contract DgtOracle is PipLike, OwnableUpgradeable  {
 
     event PriceChanged(uint256 newPrice);
 
@@ -28,7 +28,7 @@ contract IkkaOracle is PipLike, OwnableUpgradeable  {
     }
 
     function changePriceToken(uint256 price_) external {
-        require(msg.sender == _owner, "IkkaOracle/forbidden");
+        require(msg.sender == _owner, "DgtOracle/forbidden");
         price = price_;
         emit PriceChanged(price);
     }

@@ -38,32 +38,32 @@ describe('===Jar===', function () {
         [deployer, signer1, signer2, signer3, multisig] = await ethers.getSigners();
 
         // Contract factory
-        this.SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+        this.DavosJoin = await ethers.getContractFactory("DavosJoin");
         this.Vat = await ethers.getContractFactory("Vat");
-        this.Sikka = await ethers.getContractFactory("Sikka");
+        this.Davos = await ethers.getContractFactory("Davos");
         this.Jar = await ethers.getContractFactory("Jar");
 
         // Contract deployment
-        sikkajoin = await this.SikkaJoin.connect(deployer).deploy();
-        await sikkajoin.deployed();
+        davosjoin = await this.DavosJoin.connect(deployer).deploy();
+        await davosjoin.deployed();
         vat = await this.Vat.connect(deployer).deploy();
         await vat.deployed();
-        sikka = await this.Sikka.connect(deployer).deploy();
-        await sikka.deployed();
+        davos = await this.Davos.connect(deployer).deploy();
+        await davos.deployed();
         jar = await this.Jar.connect(deployer).deploy();
         await jar.deployed();
 
 
         // Initialize
-        await sikkajoin.initialize(vat.address, sikka.address);
-        await sikka.initialize(97, "SIKKA", "5000" + wad);
-        await jar.initialize("sSikka", "sSIKKA", sikka.address, 10, 0, 5);
+        await davosjoin.initialize(vat.address, davos.address);
+        await davos.initialize(97, "DAVOS", "5000" + wad);
+        await jar.initialize("sDavos", "sDAVOS", davos.address, 10, 0, 5);
         
         await vat.initialize();
         await vat.init(collateral);
-        await vat.rely(sikkajoin.address);
-        await sikka.rely(sikkajoin.address);
-        await vat.hope(sikkajoin.address);
+        await vat.rely(davosjoin.address);
+        await davos.rely(davosjoin.address);
+        await vat.hope(davosjoin.address);
 
         await vat.connect(deployer)["file(bytes32,uint256)"](await ethers.utils.formatBytes32String("Line"), "5000" + rad);
         await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, await ethers.utils.formatBytes32String("line"), "5000" + rad);  
@@ -73,10 +73,10 @@ describe('===Jar===', function () {
         await vat.slip(collateral, deployer.address, "100" + wad);
         await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, "100" + wad, 0);
         await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, 0, "2500" + wad);
-        await sikkajoin.exit(deployer.address,"100" + wad);
-        await sikkajoin.exit(signer1.address, "400" + wad);
-        await sikkajoin.exit(signer2.address, "800" + wad);
-        await sikkajoin.exit(signer3.address, "1200" + wad);
+        await davosjoin.exit(deployer.address,"100" + wad);
+        await davosjoin.exit(signer1.address, "400" + wad);
+        await davosjoin.exit(signer2.address, "800" + wad);
+        await davosjoin.exit(signer3.address, "1200" + wad);
     });
 
     describe('--- Setters', function () {
@@ -98,13 +98,13 @@ describe('===Jar===', function () {
     describe('--- Extract Dust and Cage', function () {
         it('checks extracting dust', async function () {
             // Extract Dust
-            expect(await sikka.balanceOf(jar.address)).to.be.equal("0");
-            await sikka.transfer(jar.address, "10" + wad);
-            expect(await sikka.balanceOf(jar.address)).to.be.equal("10" + wad);
+            expect(await davos.balanceOf(jar.address)).to.be.equal("0");
+            await davos.transfer(jar.address, "10" + wad);
+            expect(await davos.balanceOf(jar.address)).to.be.equal("10" + wad);
             await jar.extractDust();
-            expect(await sikka.balanceOf(jar.address)).to.be.equal("0");
+            expect(await davos.balanceOf(jar.address)).to.be.equal("0");
 
-            await sikka.connect(deployer).approve(jar.address, "10" + wad)
+            await davos.connect(deployer).approve(jar.address, "10" + wad)
             await jar.connect(deployer).replenish("10" + wad, true);
             await expect(jar.extractDust()).to.be.revertedWith("Jar/in-distribution");
         });
@@ -154,8 +154,8 @@ describe('===Jar===', function () {
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 1]);
 
-                vat.connect(signer1).hope(sikkajoin.address);
-                await sikka.connect(signer1).approve(jar.address, "50" + wad);
+                vat.connect(signer1).hope(davosjoin.address);
+                await davos.connect(signer1).approve(jar.address, "50" + wad);
                 await jar.connect(signer1).join("50" + wad); 
 
                 await network.provider.send("evm_mine"); // PreJoin
@@ -163,17 +163,17 @@ describe('===Jar===', function () {
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 10]);
 
-                await sikka.connect(deployer).approve(jar.address, "10" + wad)
+                await davos.connect(deployer).approve(jar.address, "10" + wad)
                 await jar.connect(deployer).replenish("10" + wad, true);
 
                 await network.provider.send("evm_mine"); // 0th second
 
-                expect(await sikka.balanceOf(jar.address)).to.be.equal("60" + wad);
+                expect(await davos.balanceOf(jar.address)).to.be.equal("60" + wad);
 
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 5]);
 
-                await sikka.connect(signer2).approve(jar.address, "100" + wad);
+                await davos.connect(signer2).approve(jar.address, "100" + wad);
                 await jar.connect(signer2).join("100" + wad);
 
                 await network.provider.send("evm_mine"); // 5th
@@ -183,7 +183,7 @@ describe('===Jar===', function () {
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 15]);
                                 
-                await sikka.connect(deployer).approve(jar.address, "10" + wad)
+                await davos.connect(deployer).approve(jar.address, "10" + wad)
                 await jar.connect(deployer).replenish("10" + wad, true);
 
                 await network.provider.send("evm_mine"); // 0th
@@ -194,7 +194,7 @@ describe('===Jar===', function () {
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 15]);
                                 
-                await sikka.connect(deployer).approve(jar.address, "10" + wad)
+                await davos.connect(deployer).approve(jar.address, "10" + wad)
                 await jar.connect(deployer).replenish("10" + wad, true);
 
                 await jar.connect(signer2).exit("50" + wad);
@@ -216,13 +216,13 @@ describe('===Jar===', function () {
                 expect(await jar.rewards(signer1.address)).to.equal("0");
                 expect(await jar.rewards(signer2.address)).to.equal("0");
 
-                expect(await sikka.balanceOf(signer1.address)).to.be.equal("414999999999999999950");
-                expect(await sikka.balanceOf(signer2.address)).to.be.equal("814999999999999999900");
+                expect(await davos.balanceOf(signer1.address)).to.be.equal("414999999999999999950");
+                expect(await davos.balanceOf(signer2.address)).to.be.equal("814999999999999999900");
 
                 tau = (await ethers.provider.getBlock()).timestamp;
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 10]);
 
-                await sikka.connect(deployer).approve(jar.address, "30" + wad)
+                await davos.connect(deployer).approve(jar.address, "30" + wad)
                 await jar.connect(deployer).replenish("10" + wad, true);
                 await jar.connect(deployer).replenish("10" + wad, false);
 
@@ -234,10 +234,10 @@ describe('===Jar===', function () {
                 await network.provider.send("evm_setNextBlockTimestamp", [tau + 10]);
 
                 await jar.setExitDelay("5");
-                await sikka.connect(deployer).approve(jar.address, "30" + wad)
+                await davos.connect(deployer).approve(jar.address, "30" + wad)
                 await jar.connect(deployer).replenish("10" + wad, true);
 
-                await sikka.connect(signer1).approve(jar.address, "10" + wad);
+                await davos.connect(signer1).approve(jar.address, "10" + wad);
                 await jar.connect(signer1).join("10" + wad);
 
                 await network.provider.send("evm_mine"); // 0th 

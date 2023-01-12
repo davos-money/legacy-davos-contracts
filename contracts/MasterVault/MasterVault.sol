@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "../ceros/interfaces/ICerosRouter.sol";
-import "../ceros/interfaces/ISikkaProvider.sol";
+import "../ceros/interfaces/IDavosProvider.sol";
 import "../ceros/interfaces/ICertToken.sol";
 import "../ceros/interfaces/IDao.sol";
 import "../ceros/interfaces/IPriceGetter.sol";

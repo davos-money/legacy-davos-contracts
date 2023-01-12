@@ -11,44 +11,44 @@ async function main() {
         masterVault = "";
 
     // Contracts Fetching
-    this.IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
-    this.IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
-    this.IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle");
+    this.DgtToken = await hre.ethers.getContractFactory("DgtToken");
+    this.DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
+    this.DgtOracle = await hre.ethers.getContractFactory("DgtOracle");
 
     // Contracts deployment
-    const rewards = await upgrades.deployProxy(this.IkkaRewards, [vat, ether("100000000").toString()], {initializer: "initialize"});
+    const rewards = await upgrades.deployProxy(this.DgtRewards, [vat, ether("100000000").toString()], {initializer: "initialize"});
     await rewards.deployed();
     let rewardsImplementation = await upgrades.erc1967.getImplementationAddress(rewards.address);
     console.log("Rewards             :", rewards.address);
     console.log("Imp                 :", rewardsImplementation);
 
-    const ikkaToken = await this.IkkaToken.deploy(ether("100000000").toString(), rewards.address);
-    await ikkaToken.deployed();
-    console.log("ikkaToken           :", ikkaToken.address);
+    const dgtToken = await this.DgtToken.deploy(ether("100000000").toString(), rewards.address);
+    await dgtToken.deployed();
+    console.log("dgtToken           :", dgtToken.address);
     
-    const ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, ["100000000000000000"], {initializer: "initialize"}); // 0.1
-    await ikkaOracle.deployed();
-    let ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
-    console.log("ikkaOracle          :", ikkaOracle.address);
-    console.log("Imp                 :", ikkaOracleImplementation);
+    const dgtOracle = await upgrades.deployProxy(this.DgtOracle, ["100000000000000000"], {initializer: "initialize"}); // 0.1
+    await dgtOracle.deployed();
+    let dgtOracleImplementation = await upgrades.erc1967.getImplementationAddress(dgtOracle.address);
+    console.log("dgtOracle          :", dgtOracle.address);
+    console.log("Imp                 :", dgtOracleImplementation);
 
-    await ikkaToken.rely(rewards.address);
-    await rewards.setIkkaToken(ikkaToken.address);
+    await dgtToken.rely(rewards.address);
+    await rewards.setDgtToken(dgtToken.address);
     await rewards.initPool(masterVault, ilkCeMatic, "1000000001847694957439350500", {gasLimit: 2000000}); //6%
-    await rewards.setOracle(ikkaOracle.address);
+    await rewards.setOracle(dgtOracle.address);
 
     console.log("Verifying Rewards...");
 
     // Verify implementations
     await hre.run("verify:verify", {
-        address: ikkaToken.address,
+        address: dgtToken.address,
         constructorArguments: ["200000000000000000000", rewards.address]
     });
     await hre.run("verify:verify", {
         address: rewardsImplementation,
     });
     await hre.run("verify:verify", {
-        address: ikkaOracleImplementation,
+        address: dgtOracleImplementation,
     });
 
     // Verify proxies
@@ -59,7 +59,7 @@ async function main() {
         ],
     });
     await hre.run("verify:verify", {
-        address: ikkaOracle.address,
+        address: dgtOracle.address,
         constructorArguments: [
             "100000000000000000"
         ],

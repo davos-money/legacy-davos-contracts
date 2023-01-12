@@ -209,7 +209,7 @@ describe('===Vat===', function () {
             await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, 0, "15" + wad);
 
             await vat.move(deployer.address, signer1.address, "1" + rad);
-            expect(await vat.sikka(signer1.address)).to.be.equal("1" + rad);
+            expect(await vat.davos(signer1.address)).to.be.equal("1" + rad);
         });
     });
     describe('--- frob()', function () {
@@ -310,7 +310,7 @@ describe('===Vat===', function () {
             await vat.connect(signer1).frob(collateral, signer1.address, signer1.address, signer1.address, "1" + wad, 0);
             await vat.connect(signer1).frob(collateral, signer1.address, signer1.address, signer1.address, 0, "20" + wad);
             expect(await (await vat.urns(collateral, signer1.address)).ink).to.be.equal("1" + wad);
-            expect(await vat.sikka(signer1.address)).to.be.equal("20" + rad);
+            expect(await vat.davos(signer1.address)).to.be.equal("20" + rad);
         });
     });
     describe('--- fork()', function () {
@@ -438,12 +438,12 @@ describe('===Vat===', function () {
         });
     });
     describe('--- suck()', function () {
-        it('sucks more sikka for an address for sin on another', async function () {
+        it('sucks more davos for an address for sin on another', async function () {
             await vat.initialize();
             await vat.init(collateral);
 
             await vat.suck(deployer.address, signer1.address, "10" + rad);
-            expect(await vat.sikka(signer1.address)).to.be.equal("10" + rad);
+            expect(await vat.davos(signer1.address)).to.be.equal("10" + rad);
             expect(await vat.vice()).to.be.equal("10" + rad);
         });
     });
@@ -453,11 +453,11 @@ describe('===Vat===', function () {
             await vat.init(collateral);
 
             await vat.suck(deployer.address, deployer.address, "10" + rad);
-            expect(await vat.sikka(deployer.address)).to.be.equal("10" + rad);
+            expect(await vat.davos(deployer.address)).to.be.equal("10" + rad);
             expect(await vat.vice()).to.be.equal("10" + rad);
 
             await vat.heal("10" + rad);
-            expect(await vat.sikka(signer1.address)).to.be.equal(0);
+            expect(await vat.davos(signer1.address)).to.be.equal(0);
             expect(await vat.vice()).to.be.equal(0);
         });
     });

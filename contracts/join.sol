@@ -20,10 +20,10 @@
 pragma solidity ^0.8.10;
 
 import "./interfaces/GemJoinLike.sol";
-import "./interfaces/SikkaJoinLike.sol";
+import "./interfaces/DavosJoinLike.sol";
 import "./interfaces/GemLike.sol";
 import "./interfaces/VatLike.sol";
-import "./interfaces/ISikka.sol";
+import "./interfaces/IDavos.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -36,7 +36,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
       - `GemJoin`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
       - `ETHJoin`: For native Ether.
-      - `SikkaJoin`: For connecting internal Sikka balances to an external
+      - `DavosJoin`: For connecting internal Davos balances to an external
                    `DSToken` implementation.
     In practice, adapter implementations will be varied and specific to
     individual collateral types, accounting for different transfer
@@ -111,7 +111,7 @@ contract GemJoin is Initializable, GemJoinLike {
     }
 }
 
-contract SikkaJoin is Initializable, SikkaJoinLike {
+contract DavosJoin is Initializable, DavosJoinLike {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth {
@@ -123,12 +123,12 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
         emit Deny(usr);
     }
     modifier auth {
-        require(wards[msg.sender] == 1, "SikkaJoin/not-authorized");
+        require(wards[msg.sender] == 1, "DavosJoin/not-authorized");
         _;
     }
 
     VatLike public vat;      // CDP Engine
-    ISikka public sikka;  // Stablecoin Token
+    IDavos public davos;  // Stablecoin Token
     uint    public live;     // Active Flag
 
     // Events
@@ -140,11 +140,11 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
     event Uncage();
 
     // --- Init ---
-    function initialize(address vat_, address sikka_) public initializer {
+    function initialize(address vat_, address davos_) public initializer {
         wards[msg.sender] = 1;
         live = 1;
         vat = VatLike(vat_);
-        sikka = ISikka(sikka_);
+        davos = IDavos(davos_);
     }
     function cage() external auth {
         live = 0;
@@ -162,13 +162,13 @@ contract SikkaJoin is Initializable, SikkaJoinLike {
     }
     function join(address usr, uint wad) external auth {
         vat.move(address(this), usr, mul(ONE, wad));
-        sikka.burn(msg.sender, wad);
+        davos.burn(msg.sender, wad);
         emit Join(usr, wad);
     }
     function exit(address usr, uint wad) external auth {
-        require(live == 1, "SikkaJoin/not-live");
+        require(live == 1, "DavosJoin/not-live");
         vat.move(msg.sender, address(this), mul(ONE, wad));
-        sikka.mint(usr, wad);
+        davos.mint(usr, wad);
         emit Exit(usr, wad);
     }
 }

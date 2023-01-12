@@ -8,14 +8,14 @@ async function main() {
     let ilkCeaMATICc = ethers.utils.formatBytes32String("ceaMATICc");
     let _vat = "",
         _spot = "",
-        _sikka = "",
-        _sikkaJoin = "",
+        _davos = "",
+        _davosJoin = "",
         _jug = "",
         _dog = "",
         _rewards = "";
 
     // Contracts Fetching
-    this.Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    this.Rewards = await hre.ethers.getContractFactory("DgtRewards");
     let rewards = this.Rewards.attach(_rewards);
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
     const auctionProxy = await this.AuctionProxy.deploy();
@@ -30,8 +30,8 @@ async function main() {
     const interaction = await upgrades.deployProxy(this.Interaction, [
         _vat,
         _spot,
-        _sikka,
-        _sikkaJoin,
+        _davos,
+        _davosJoin,
         _jug,
         _dog,
         rewards.address
@@ -63,8 +63,8 @@ async function main() {
         constructorArguments: [
             _vat,
             _spot,
-            _sikka,
-            _sikkaJoin,
+            _davos,
+            _davosJoin,
             _jug,
             _dog,
             rewards.address,

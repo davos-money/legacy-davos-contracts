@@ -12,9 +12,9 @@ async function main() {
     // Contracts Fetching
     this.Vat = await hre.ethers.getContractFactory("Vat");
     this.Spot = await hre.ethers.getContractFactory("Spotter");
-    this.Sikka = await hre.ethers.getContractFactory("Sikka");
+    this.Davos = await hre.ethers.getContractFactory("Davos");
     this.GemJoin = await hre.ethers.getContractFactory("GemJoin");
-    this.SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+    this.DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
     this.Jug = await hre.ethers.getContractFactory("Jug");
     this.Vow = await hre.ethers.getContractFactory("Vow");
     this.Dog = await hre.ethers.getContractFactory("Dog");
@@ -33,13 +33,13 @@ async function main() {
     await spot.deployed();
     console.log("Spot           :", spot.address);
 
-    const sikka = await this.Sikka.deploy(80001, "SIKKA");
-    await sikka.deployed();
-    console.log("Sikka          :", sikka.address);
+    const davos = await this.Davos.deploy(80001, "DAVOS");
+    await davos.deployed();
+    console.log("Davos          :", davos.address);
 
-    const sikkaJoin = await this.SikkaJoin.deploy(vat.address, sikka.address);
-    await sikkaJoin.deployed();
-    console.log("SikkaJoin      :", sikkaJoin.address);
+    const davosJoin = await this.DavosJoin.deploy(vat.address, davos.address);
+    await davosJoin.deployed();
+    console.log("DavosJoin      :", davosJoin.address);
 
     const ceaMATICcJoin = await this.GemJoin.deploy(vat.address, ilkCeMatic, masterVault);
     await ceaMATICcJoin.deployed();
@@ -69,7 +69,7 @@ async function main() {
     await abacus.deployed();
     console.log("Abacus         :", abacus.address);
 
-    console.log("Verifying Sikka...");
+    console.log("Verifying Davos...");
 
     // Verify implementations
     await hre.run("verify:verify", {
@@ -80,12 +80,12 @@ async function main() {
         constructorArguments: [vat.address],
     });
     await hre.run("verify:verify", {
-        address: sikka.address,
-        constructorArguments: [80001, "SIKKA"],
+        address: davos.address,
+        constructorArguments: [80001, "DAVOS"],
     });
     await hre.run("verify:verify", {
-        address: sikkaJoin.address,
-        constructorArguments: [vat.address, sikka.address],
+        address: davosJoin.address,
+        constructorArguments: [vat.address, davos.address],
     });
     await hre.run("verify:verify", {
         address: ceaMATICcJoin.address,

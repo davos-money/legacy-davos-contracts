@@ -25,7 +25,7 @@ async function main() {
     // console.log(upgraded)
 
     // Contracts deployment and initialization
-    colander = await upgrades.deployProxy(this.Colander, ["Colander Pool Token", "cSIKKA", _stablecoin, _interaction, _spotter, _dex, ethers.constants.AddressZero], {initializer: "initialize"});
+    colander = await upgrades.deployProxy(this.Colander, ["Colander Pool Token", "cDAVOS", _stablecoin, _interaction, _spotter, _dex, ethers.constants.AddressZero], {initializer: "initialize"});
     await colander.deployed();
     let colanderImplementation = await upgrades.erc1967.getImplementationAddress(colander.address);
     console.log("Colander   : " + colander.address);
@@ -56,7 +56,7 @@ async function main() {
     await hre.run("verify:verify", {
         address: colander.address,
         constructorArguments: [
-            "Colander Pool Token", "cSIKKA", _stablecoin, _interaction, _spotter, _dex, colanderRewards.address
+            "Colander Pool Token", "cDAVOS", _stablecoin, _interaction, _spotter, _dex, colanderRewards.address
         ],
     });
     await hre.run("verify:verify", {

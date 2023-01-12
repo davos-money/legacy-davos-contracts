@@ -12,10 +12,10 @@ const { parseEther } = require("ethers/lib/utils");
 
 let owner, staker_1, staker_2,
     amount_1, amount_2,
-    amaticc, amaticb, wmatic, sMatic, sikka, ce_Amaticc_join, collateral, clip,
+    amaticc, amaticb, wmatic, dMatic, davos, ce_Amaticc_join, collateral, clip,
     ce_vault, ce_token, interaction, pool, h_provider, ce_rot, vat, _ilkCeMatic;
 
-describe('Sikka Provider', () => {
+describe('Davos Provider', () => {
     before(async function () {
         await init();
     });
@@ -30,15 +30,15 @@ describe('Sikka Provider', () => {
                     amount_2.toString()
                 );
             
-            // check sMatic Minter role
-            await sMatic.changeMinter(intermediary.address);
+            // check dMatic Minter role
+            await dMatic.changeMinter(intermediary.address);
             await expect(
                 h_provider.connect(staker_1).provide({ value: amount_2.toString() })
             )
             .to.be.revertedWith("Minter: not allowed");
-            await sMatic.changeMinter(sikkaProvider.address);
-            const minter = await sMatic.getMinter();
-            expect(minter).to.be.equal(sikkaProvider.address);
+            await dMatic.changeMinter(davosProvider.address);
+            const minter = await dMatic.getMinter();
+            expect(minter).to.be.equal(davosProvider.address);
             
             console.log(`------- balance after staker_1 provided(${amount_2.toString()} MATIC) -------`);
             await printBalances();
@@ -146,17 +146,17 @@ describe('Sikka Provider', () => {
             // check allowances for new Dao
         });
         it("dao token(non-transferable)", async () => {
-            await sMatic.changeMinter(staker_1.address);
+            await dMatic.changeMinter(staker_1.address);
             await expect(
-                sMatic.connect(staker_1).mint(ZERO_ADDRESS, parseEther("1"))
+                dMatic.connect(staker_1).mint(ZERO_ADDRESS, parseEther("1"))
                 ).to.be.revertedWith("ERC20: mint to the zero address");
-            await sMatic.connect(staker_1).mint(staker_2.address, parseEther("1"));
+            await dMatic.connect(staker_1).mint(staker_2.address, parseEther("1"));
 
             await expect(
-                sMatic.connect(staker_1).burn(ZERO_ADDRESS, parseEther("1"))
+                dMatic.connect(staker_1).burn(ZERO_ADDRESS, parseEther("1"))
             ).to.be.revertedWith("ERC20: burn from the zero address");
             await expect(
-                sMatic.connect(staker_1).burn(staker_2.address, parseEther("2"))
+                dMatic.connect(staker_1).burn(staker_2.address, parseEther("2"))
             ).to.be.revertedWith("ERC20: burn amount exceeds balance");
         });
     });
@@ -169,13 +169,13 @@ async function init() {
     amount_1 = toBN('10000000020000000000');
     amount_2 = toBN('20000000020000000000');
 
-    const Sikka = await ethers.getContractFactory("Sikka");
+    const Davos = await ethers.getContractFactory("Davos");
     const Vat = await ethers.getContractFactory("Vat");
     const Dog = await ethers.getContractFactory("Dog");
     const Spot = await ethers.getContractFactory("Spotter");
 
-    // /* sikkaJoin */
-    const SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+    // /* davosJoin */
+    const DavosJoin = await ethers.getContractFactory("DavosJoin");
     const GemJoin = await ethers.getContractFactory("GemJoin");
     
     // /* jug */
@@ -185,7 +185,7 @@ async function init() {
     const Oracle = await ethers.getContractFactory("MaticOracle");
     const Abacus = await ethers.getContractFactory("LinearDecrease");
 
-    let [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, sMatic] = await deployMasterVault()
+    let [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, dMatic] = await deployMasterVault()
 
     // wmatic = wNative;
     amaticc = cerosToken;
@@ -198,11 +198,11 @@ async function init() {
     spot = await upgrades.deployProxy(Spot, [vat.address], {initializer: "initialize"});
     await spot.deployed();
 
-    sikka = await upgrades.deployProxy(Sikka, [0, "SIKKA", "100000000" + wad], {initializer: "initialize"});
-    await sikka.deployed();
+    davos = await upgrades.deployProxy(Davos, [0, "DAVOS", "100000000" + wad], {initializer: "initialize"});
+    await davos.deployed();
 
-    sikkaJoin = await upgrades.deployProxy(SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
-    await sikkaJoin.deployed();
+    davosJoin = await upgrades.deployProxy(DavosJoin, [vat.address, davos.address], {initializer: "initialize"});
+    await davosJoin.deployed();
 
     _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
     collateral = ethers.utils.formatBytes32String("ceMATIC");
@@ -213,7 +213,7 @@ async function init() {
     jug = await upgrades.deployProxy(Jug, [vat.address], {initializer: "initialize"});
     await jug.deployed();
 
-    vow = await upgrades.deployProxy(Vow, [vat.address, sikkaJoin.address, deployer.address], {initializer: "initialize"});
+    vow = await upgrades.deployProxy(Vow, [vat.address, davosJoin.address, deployer.address], {initializer: "initialize"});
     await vow.deployed();
 
     dog = await upgrades.deployProxy(Dog, [vat.address], {initializer: "initialize"});
@@ -229,14 +229,14 @@ async function init() {
     await abacus.deployed();
 
     // Contracts Fetching
-    IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
+    DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
 
     // Contracts deployment
-    rewards = await upgrades.deployProxy(IkkaRewards, [vat.address, ethUtils.parseEther('1').toString(), 5], {initializer: "initialize"});
+    rewards = await upgrades.deployProxy(DgtRewards, [vat.address, ethUtils.parseEther('1').toString(), 5], {initializer: "initialize"});
     await rewards.deployed();
 
     // Contracts Fetching
-    Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    Rewards = await hre.ethers.getContractFactory("DgtRewards");
     rewards = Rewards.attach(rewards.address);
     AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
     let auctionProxy = await AuctionProxy.deploy();
@@ -250,8 +250,8 @@ async function init() {
     interaction = await upgrades.deployProxy(Interaction, [
         vat.address,
         spot.address,
-        sikka.address,
-        sikkaJoin.address,
+        davos.address,
+        davosJoin.address,
         jug.address,
         dog.address,
         rewards.address
@@ -268,39 +268,39 @@ async function init() {
     await spot.rely(interaction.address);
 
     // Contracts Fetching
-    SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
     MasterVault = await hre.ethers.getContractFactory("MasterVault");
 
-    sikkaProvider = await upgrades.deployProxy(SikkaProvider, [sMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
-    await sikkaProvider.deployed();
+    davosProvider = await upgrades.deployProxy(DavosProvider, [dMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
+    await davosProvider.deployed();
 
     masterVault = MasterVault.attach(masterVault.address);
-    sMatic = await SMatic.attach(sMatic.address);
-    await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address);
+    dMatic = await DMatic.attach(dMatic.address);
+    await dMatic.changeMinter(davosProvider.address);
+    await masterVault.changeProvider(davosProvider.address);
     
     await vat.rely(interaction.address);
     await ceaMATICcJoin.rely(interaction.address);
-    await sikkaJoin.rely(interaction.address);
-    await sikkaJoin.rely(vow.address);
+    await davosJoin.rely(interaction.address);
+    await davosJoin.rely(vow.address);
     await dog.rely(interaction.address);
     await jug.rely(interaction.address);
     await clip.rely(interaction.address);
     await vat.rely(ceaMATICcJoin.address)
     await vat.rely(spot.address)
-    await vat.rely(sikkaJoin.address)
+    await vat.rely(davosJoin.address)
     await vat.rely(jug.address)
     await vat.rely(dog.address)
     await vat.rely(clip.address)
-    await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address);
+    await interaction.setDavosProvider(masterVault.address, davosProvider.address);
     await interaction.setCollateralType(masterVault.address, ceaMATICcJoin.address, _ilkCeMatic, clip.address, "1333333333333333333333333333");
 
     /* ceVault */
     ce_vault = ce_Vault;
     ce_rot = cerosRouter;
-    h_provider = sikkaProvider;
+    h_provider = davosProvider;
 }
 
 async function deployMasterVault() {
@@ -326,7 +326,7 @@ async function deployMasterVault() {
     CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     CeVault = await hre.ethers.getContractFactory("CeVault");
     PriceGetter = await hre.ethers.getContractFactory("PriceGetter");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     
     // Deploy Contracts
     wMatic = await Token.attach(wMaticAddress);
@@ -348,8 +348,8 @@ async function deployMasterVault() {
     await cerosRouter.deployed();
     cerosRouterImp = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
 
-    sMatic = await upgrades.deployProxy(SMatic, [], {initializer: "initialize"});
-    await sMatic.deployed();
+    dMatic = await upgrades.deployProxy(DMatic, [], {initializer: "initialize"});
+    await dMatic.deployed();
 
     await ceaMATICc.changeVault(ceVault.address);
     await ceVault.changeRouter(cerosRouter.address);
@@ -379,7 +379,7 @@ async function deployMasterVault() {
     );
     await cerosStrategy.deployed();
     
-    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, sMatic];
+    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, dMatic];
 }
 
 async function deploySwapPool() {
@@ -433,16 +433,16 @@ async function printBalances() {
     console.log(`balance of staker_1 in aMATICc: ${(await amaticc.balanceOf(staker_1.address)).toString()}`);
     // aMATICc balance of ce_vault
     console.log(`balance of ce_vault in aMATICc: ${(await amaticc.balanceOf(ce_vault.address)).toString()}`);
-    // sMATIC balance of staker_1
-    console.log(`balance of staker_1 in sMATIC: ${(await sMatic.balanceOf(staker_1.address)).toString()}`);
-    // sMATIC supply
-    console.log(`supply sMATIC: ${(await sMatic.totalSupply()).toString()}`);
+    // dMATIC balance of staker_1
+    console.log(`balance of staker_1 in dMATIC: ${(await dMatic.balanceOf(staker_1.address)).toString()}`);
+    // dMATIC supply
+    console.log(`supply dMATIC: ${(await dMatic.totalSupply()).toString()}`);
     // ceToken balance of staker_1
     console.log(`balance of staker_1 in ceToken: ${(await ceaMATICc.balanceOf(staker_1.address)).toString()}`);
     // ceToken supply
     console.log(`supply ceToken: ${(await ceaMATICc.totalSupply()).toString()}`);
     // Available rewards
     console.log(`yield for staker_1: ${(await ce_vault.getYieldFor(staker_1.address)).toString()}`);
-    console.log(`yield for sikka: ${(await ce_vault.getYieldFor(h_provider.address)).toString()}`);
+    console.log(`yield for davos: ${(await ce_vault.getYieldFor(h_provider.address)).toString()}`);
     console.log(`current ratio: ${(await amaticc.ratio()).toString()}`);
 }

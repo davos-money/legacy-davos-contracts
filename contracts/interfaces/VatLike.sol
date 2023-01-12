@@ -26,7 +26,7 @@ interface VatLike {
 
     function gem(bytes32, address) external view returns (uint256);
 
-    function sikka(address) external view returns (uint256);
+    function davos(address) external view returns (uint256);
 
     function urns(bytes32, address) external view returns (uint256, uint256);
 

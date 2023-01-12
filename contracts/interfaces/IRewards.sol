@@ -9,9 +9,9 @@ interface IRewards {
 
     event PoolInited(address token, uint256 rate);
 
-    event IkkaTokenChanged(address newToken);
+    event DgtTokenChanged(address newToken);
 
-    event IkkaOracleChanged(address newOracle);
+    event DgtOracleChanged(address newOracle);
 
     event RateChanged(address token, uint256 newRate);
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// vow.sol -- Sikka settlement module
+/// vow.sol -- Davos settlement module
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -23,7 +23,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "./interfaces/VatLike.sol";
-import "./interfaces/SikkaJoinLike.sol";
+import "./interfaces/DavosJoinLike.sol";
 
 contract Vow is Initializable{
     // --- Auth ---
@@ -39,23 +39,23 @@ contract Vow is Initializable{
     VatLike public vat;          // CDP Engine
     address public multisig;     // Surplus multisig 
 
-    address public sikkaJoin; // Stablecoin address
+    address public davosJoin; // Stablecoin address
     uint256 public hump;    // Surplus buffer      [rad]
 
     uint256 public live;  // Active Flag
 
-    address public sikka;  // Sikka token
+    address public davos;  // Davos token
 
     event File(bytes32 indexed what, uint256 data);
     event File(bytes32 indexed what, address data);
 
     // --- Init ---
-    function initialize(address vat_, address _sikkaJoin, address multisig_) external initializer {
+    function initialize(address vat_, address _davosJoin, address multisig_) external initializer {
         wards[msg.sender] = 1;
         vat = VatLike(vat_);
-        sikkaJoin = _sikkaJoin;
+        davosJoin = _davosJoin;
         multisig = multisig_;
-        vat.hope(sikkaJoin);
+        vat.hope(davosJoin);
         live = 1;
     }
 
@@ -72,12 +72,12 @@ contract Vow is Initializable{
     }
     function file(bytes32 what, address data) external auth {
         if (what == "multisig") multisig = data;
-        else if (what == "sikkajoin") { 
-            vat.nope(sikkaJoin);
-            sikkaJoin = data;
-            vat.hope(sikkaJoin);
+        else if (what == "davosjoin") { 
+            vat.nope(davosJoin);
+            davosJoin = data;
+            vat.hope(davosJoin);
         }
-        else if (what == "sikka") sikka = data;
+        else if (what == "davos") davos = data;
         else if (what == "vat") vat = VatLike(data);
         else revert("Vow/file-unrecognized-param");
         emit File(what, data);
@@ -85,29 +85,29 @@ contract Vow is Initializable{
 
     // Debt settlement
     function heal(uint rad) external {
-        require(rad <= vat.sikka(address(this)), "Vow/insufficient-surplus");
+        require(rad <= vat.davos(address(this)), "Vow/insufficient-surplus");
         require(rad <= vat.sin(address(this)), "Vow/insufficient-debt");
         vat.heal(rad);
     }
 
     // Feed stablecoin to vow
     function feed(uint wad) external {
-        IERC20Upgradeable(sikka).transferFrom(msg.sender, address(this), wad);
-        IERC20Upgradeable(sikka).approve(sikkaJoin, wad);
-        SikkaJoinLike(sikkaJoin).join(address(this), wad);
+        IERC20Upgradeable(davos).transferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(davos).approve(davosJoin, wad);
+        DavosJoinLike(davosJoin).join(address(this), wad);
     }
     // Send surplus to multisig
     function flap() external {
-        require(vat.sikka(address(this)) >= vat.sin(address(this)) + hump, "Vow/insufficient-surplus");
-        uint rad = vat.sikka(address(this)) - (vat.sin(address(this)) + hump);
+        require(vat.davos(address(this)) >= vat.sin(address(this)) + hump, "Vow/insufficient-surplus");
+        uint rad = vat.davos(address(this)) - (vat.sin(address(this)) + hump);
         uint wad = rad / 1e27;
-        SikkaJoinLike(sikkaJoin).exit(multisig, wad);
+        DavosJoinLike(davosJoin).exit(multisig, wad);
     }
 
     function cage() external auth {
         require(live == 1, "Vow/not-live");
         live = 0;
-        vat.heal(min(vat.sikka(address(this)), vat.sin(address(this))));
+        vat.heal(min(vat.davos(address(this)), vat.sin(address(this))));
     }
 
     function uncage() external auth {

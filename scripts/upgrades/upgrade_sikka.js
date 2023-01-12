@@ -3,23 +3,23 @@ const { upgradeProxy , deployImplementatoin , verifyImpContract} = require("./ut
 const { _chainId } = require(`../${hre.network.name}_config.json`);
 
 const main = async () => {
-    let sikkaProxy;
+    let davosProxy;
     if (hre.network.name == "polygon") {
-        sikkaProxy = "0x00658FC8ec685727F3F59d381B8Ad8f5E0FeDBc2";
+        davosProxy = "0x00658FC8ec685727F3F59d381B8Ad8f5E0FeDBc2";
     } else if (hre.network.name == "mumbai") {
-        sikkaProxy = "0xf268aEEAbcf96F97C928B81d662430B7659e752e";
+        davosProxy = "0xf268aEEAbcf96F97C928B81d662430B7659e752e";
     }
     
     // deploy Implementation
-    const impAddress = await deployImplementatoin("Sikka");
+    const impAddress = await deployImplementatoin("Davos");
 
     // upgrade Proxy
-    await upgradeProxy(sikkaProxy, impAddress);
+    await upgradeProxy(davosProxy, impAddress);
 
     // update_domainSeparator
-    let Sikka = await hre.ethers.getContractFactory("Sikka");
-    let sikka = await Sikka.attach(sikkaProxy);
-    await (await sikka.updateDomainSeparator(_chainId)).wait();
+    let Davos = await hre.ethers.getContractFactory("Davos");
+    let davos = await Davos.attach(davosProxy);
+    await (await davos.updateDomainSeparator(_chainId)).wait();
 
     console.log("Verifying Imp contract...")
     await verifyImpContract(impAddress);

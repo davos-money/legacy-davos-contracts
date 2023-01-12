@@ -38,10 +38,10 @@ xdescribe("Auction", () => {
   let abacus;
   let vat;
   let spot;
-  let sikka;
+  let davos;
   let amaticc;
   let amaticcJoin;
-  let sikkaJoin;
+  let davosJoin;
   let jug;
   let oracle;
   let clip;
@@ -58,13 +58,13 @@ xdescribe("Auction", () => {
     amount_1 = toBN('10000000020000000000');
     amount_2 = toBN('20000000020000000000');
 
-    const Sikka = await ethers.getContractFactory("Sikka");
+    const Davos = await ethers.getContractFactory("Davos");
     const Vat = await ethers.getContractFactory("Vat");
     const Dog = await ethers.getContractFactory("Dog");
     const Spot = await ethers.getContractFactory("Spotter");
 
-    // /* sikkaJoin */
-    const SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+    // /* davosJoin */
+    const DavosJoin = await ethers.getContractFactory("DavosJoin");
     const GemJoin = await ethers.getContractFactory("GemJoin");
     
     // /* jug */
@@ -74,7 +74,7 @@ xdescribe("Auction", () => {
     const Oracle = await ethers.getContractFactory("Oracle");
     const Abacus = await ethers.getContractFactory("LinearDecrease");
 
-    let [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, sMatic] = await deployMasterVault()
+    let [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, dMatic] = await deployMasterVault()
 
     // wmatic = wNative;
     amaticc = cerosToken;
@@ -87,11 +87,11 @@ xdescribe("Auction", () => {
     spot = await upgrades.deployProxy(Spot, [vat.address], {initializer: "initialize"});
     await spot.deployed();
 
-    sikka = await upgrades.deployProxy(Sikka, [0, "SIKKA", "100000000" + wad], {initializer: "initialize"});
-    await sikka.deployed();
+    davos = await upgrades.deployProxy(Davos, [0, "DAVOS", "100000000" + wad], {initializer: "initialize"});
+    await davos.deployed();
 
-    sikkaJoin = await upgrades.deployProxy(SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
-    await sikkaJoin.deployed();
+    davosJoin = await upgrades.deployProxy(DavosJoin, [vat.address, davos.address], {initializer: "initialize"});
+    await davosJoin.deployed();
 
     _ilkCeMatic = ethers.utils.formatBytes32String("aMATICc");
     collateral = ethers.utils.formatBytes32String("aMATICc");
@@ -102,7 +102,7 @@ xdescribe("Auction", () => {
     jug = await upgrades.deployProxy(Jug, [vat.address], {initializer: "initialize"});
     await jug.deployed();
 
-    vow = await upgrades.deployProxy(Vow, [vat.address, sikkaJoin.address, deployer.address], {initializer: "initialize"});
+    vow = await upgrades.deployProxy(Vow, [vat.address, davosJoin.address, deployer.address], {initializer: "initialize"});
     await vow.deployed();
 
     dog = await upgrades.deployProxy(Dog, [vat.address], {initializer: "initialize"});
@@ -119,14 +119,14 @@ xdescribe("Auction", () => {
     await abacus.deployed();
 
     // Contracts Fetching
-    IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
+    DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
 
     // Contracts deployment
-    rewards = await upgrades.deployProxy(IkkaRewards, [vat.address, ethUtils.parseEther('1').toString(), 5], {initializer: "initialize"});
+    rewards = await upgrades.deployProxy(DgtRewards, [vat.address, ethUtils.parseEther('1').toString(), 5], {initializer: "initialize"});
     await rewards.deployed();
 
     // Contracts Fetching
-    Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    Rewards = await hre.ethers.getContractFactory("DgtRewards");
     rewards = Rewards.attach(rewards.address);
     AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
     let auctionProxy = await AuctionProxy.deploy();
@@ -140,8 +140,8 @@ xdescribe("Auction", () => {
     interaction = await upgrades.deployProxy(Interaction, [
         vat.address,
         spot.address,
-        sikka.address,
-        sikkaJoin.address,
+        davos.address,
+        davosJoin.address,
         jug.address,
         dog.address,
         rewards.address
@@ -158,18 +158,18 @@ xdescribe("Auction", () => {
     await spot.rely(interaction.address);
 
     // Contracts Fetching
-    SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
     MasterVault = await hre.ethers.getContractFactory("MasterVault");
 
-    sikkaProvider = await upgrades.deployProxy(SikkaProvider, [sMatic.address, amaticc.address, interaction.address], {initializer: "initialize"});
-    await sikkaProvider.deployed();
+    davosProvider = await upgrades.deployProxy(DavosProvider, [dMatic.address, amaticc.address, interaction.address], {initializer: "initialize"});
+    await davosProvider.deployed();
 
     masterVault = MasterVault.attach(masterVault.address);
-    sMatic = await SMatic.attach(sMatic.address);
-    await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address);
+    dMatic = await DMatic.attach(dMatic.address);
+    await dMatic.changeMinter(davosProvider.address);
+    await masterVault.changeProvider(davosProvider.address);
     
     await vat.rely(interaction.address);
     await amaticcJoin.rely(interaction.address);
@@ -178,21 +178,21 @@ xdescribe("Auction", () => {
     await clip.rely(interaction.address);
     await vat.rely(amaticcJoin.address)
     await vat.rely(spot.address)
-    await vat.rely(sikkaJoin.address)
+    await vat.rely(davosJoin.address)
     await vat.rely(jug.address)
     await vat.rely(dog.address)
     await vat.rely(clip.address)
-    await sikka.rely(sikkaJoin.address)
-    await sikkaJoin.rely(interaction.address);
-    await sikkaJoin.rely(vow.address);
+    await davos.rely(davosJoin.address)
+    await davosJoin.rely(interaction.address);
+    await davosJoin.rely(vow.address);
     
-    // await interaction.setSikkaProvider(amaticc.address, sikkaProvider.address);
+    // await interaction.setDavosProvider(amaticc.address, davosProvider.address);
     // await interaction.setCollateralType(masterVault.address, amaticcJoin.address, _ilkCeMatic, clip.address, "1333333333333333333333333333");
 
     /* ceVault */
     ce_vault = ce_Vault;
     ce_rot = cerosRouter;
-    h_provider = sikkaProvider;
+    h_provider = davosProvider;
   }
 
   async function deployMasterVault() {
@@ -218,7 +218,7 @@ xdescribe("Auction", () => {
     CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     CeVault = await hre.ethers.getContractFactory("CeVault");
     PriceGetter = await hre.ethers.getContractFactory("PriceGetter");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     
     // Deploy Contracts
     wMatic = await Token.attach(wMaticAddress);
@@ -240,8 +240,8 @@ xdescribe("Auction", () => {
     await cerosRouter.deployed();
     cerosRouterImp = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
 
-    sMatic = await upgrades.deployProxy(SMatic, [], {initializer: "initialize"});
-    await sMatic.deployed();
+    dMatic = await upgrades.deployProxy(DMatic, [], {initializer: "initialize"});
+    await dMatic.deployed();
 
     await ceaMATICc.changeVault(ceVault.address);
     await ceVault.changeRouter(cerosRouter.address);
@@ -271,7 +271,7 @@ xdescribe("Auction", () => {
     );
     await cerosStrategy.deployed();
     
-    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, sMatic];
+    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, dMatic];
   }
 
   async function deploySwapPool() {
@@ -321,18 +321,18 @@ xdescribe("Auction", () => {
   const deployContracts = async () => {
     const Vat = await ethers.getContractFactory("Vat");
     const Spot = await ethers.getContractFactory("Spotter");
-    const Sikka = await ethers.getContractFactory("Sikka");
+    const Davos = await ethers.getContractFactory("Davos");
     const AMATICC = await ethers.getContractFactory("aMATICc");
     const GemJoin = await ethers.getContractFactory("GemJoin");
-    const SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+    const DavosJoin = await ethers.getContractFactory("DavosJoin");
     const Jug = await ethers.getContractFactory("Jug");
     const Oracle = await ethers.getContractFactory("Oracle"); // Mock Oracle
     const Dog = await ethers.getContractFactory("Dog");
     const Clipper = await ethers.getContractFactory("Clipper");
     const LinearDecrease = await ethers.getContractFactory("LinearDecrease");
     const Vow = await ethers.getContractFactory("Vow");
-    const IkkaToken = await ethers.getContractFactory("IkkaToken");
-    const IkkaRewards = await ethers.getContractFactory("IkkaRewards");
+    const DgtToken = await ethers.getContractFactory("DgtToken");
+    const DgtRewards = await ethers.getContractFactory("DgtRewards");
     this.AuctionProxy = await ethers.getContractFactory("AuctionProxy");
     auctionProxy = await this.AuctionProxy.connect(deployer).deploy();
     await auctionProxy.deployed();
@@ -354,20 +354,20 @@ xdescribe("Auction", () => {
     spot = await Spot.connect(deployer).deploy(vat.address);
     await spot.deployed();
 
-    const rewards = await IkkaRewards.connect(deployer).deploy(vat.address);
+    const rewards = await DgtRewards.connect(deployer).deploy(vat.address);
     await rewards.deployed();
-    const ikkaToken = await IkkaToken.connect(deployer).deploy(ether("100000000").toString(), rewards.address);
-    await ikkaToken.deployed();
+    const dgtToken = await DgtToken.connect(deployer).deploy(ether("100000000").toString(), rewards.address);
+    await dgtToken.deployed();
 
-    await ikkaToken.rely(rewards.address);
-    await rewards.setIkkaToken(ikkaToken.address);
+    await dgtToken.rely(rewards.address);
+    await rewards.setDgtToken(dgtToken.address);
     await rewards.initPool(collateral, "1000000001847694957439350500"); //6%
 
-    // Sikka module
-    sikka = await Sikka.connect(deployer).deploy(97);
-    await sikka.deployed(); // Stable Coin
-    sikkaJoin = await SikkaJoin.connect(deployer).deploy(vat.address, sikka.address);
-    await sikkaJoin.deployed();
+    // Davos module
+    davos = await Davos.connect(deployer).deploy(97);
+    await davos.deployed(); // Stable Coin
+    davosJoin = await DavosJoin.connect(deployer).deploy(vat.address, davos.address);
+    await davosJoin.deployed();
 
     // Collateral module
     amaticc = await AMATICC.connect(deployer).deploy();
@@ -411,8 +411,8 @@ xdescribe("Auction", () => {
       [
         vat.address,
         spot.address,
-        sikka.address,
-        sikkaJoin.address,
+        davos.address,
+        davosJoin.address,
         jug.address,
         dog.address,
         rewards.address,
@@ -431,7 +431,7 @@ xdescribe("Auction", () => {
   };
 
   const configureVat = async () => {
-    await vat.connect(deployer).rely(sikkaJoin.address);
+    await vat.connect(deployer).rely(davosJoin.address);
     await vat.connect(deployer).rely(spot.address);
     await vat.connect(deployer).rely(jug.address);
     await vat.connect(deployer).rely(interaction.address);
@@ -439,7 +439,7 @@ xdescribe("Auction", () => {
     await vat.connect(deployer).rely(clip.address);
     await vat
       .connect(deployer)
-      ["file(bytes32,uint256)"](toBytes32("Line"), toRad("20000")); // Normalized SIKKA
+      ["file(bytes32,uint256)"](toBytes32("Line"), toRad("20000")); // Normalized DAVOS
     await vat
       .connect(deployer)
       ["file(bytes32,bytes32,uint256)"](
@@ -477,9 +477,9 @@ xdescribe("Auction", () => {
     await spot.connect(deployer).poke(collateral);
   };
 
-  const configureSIKKA = async () => {
-    // Initialize SIKKA Module
-    await sikka.connect(deployer).rely(sikkaJoin.address);
+  const configureDAVOS = async () => {
+    // Initialize DAVOS Module
+    await davos.connect(deployer).rely(davosJoin.address);
   };
 
   const configureDog = async () => {
@@ -583,7 +583,7 @@ xdescribe("Auction", () => {
     await configureOracles();
     await configureVat();
     await configureSpot();
-    await configureSIKKA();
+    await configureDAVOS();
     await configureDog();
     await configureClippers();
     await configureVow();
@@ -607,8 +607,8 @@ xdescribe("Auction", () => {
     let s1Balance = await amaticc.balanceOf(signer1.address);
     expect(s1Balance).to.equal(toWad("9000"));
     
-    let s1SIKKABalance = await sikka.balanceOf(signer1.address);
-    expect(s1SIKKABalance).to.equal("0");
+    let s1DAVOSBalance = await davos.balanceOf(signer1.address);
+    expect(s1DAVOSBalance).to.equal("0");
 
     let free = await interaction
       .connect(signer1)
@@ -619,8 +619,8 @@ xdescribe("Auction", () => {
       .locked(amaticc.address, signer1.address);
     expect(locked).to.equal(toWad("1000"));
 
-    // Locking collateral and borrowing SIKKA
-    // We want to draw 60 SIKKA == `dart`
+    // Locking collateral and borrowing DAVOS
+    // We want to draw 60 DAVOS == `dart`
     // Maximum available for borrow = (1000 * 400) * 0.8 = 320000
     let dart = toWad("70");
     await interaction.connect(signer1).borrow(amaticc.address, dart);
@@ -633,8 +633,8 @@ xdescribe("Auction", () => {
       .connect(signer1)
       .locked(amaticc.address, signer1.address);
     expect(locked).to.equal(dink);
-    s1SIKKABalance = await sikka.balanceOf(signer1.address);
-    expect(s1SIKKABalance).to.equal(dart);
+    s1DAVOSBalance = await davos.balanceOf(signer1.address);
+    expect(s1DAVOSBalance).to.equal(dart);
 
     // User locked 1000 aMATICc with price 400 and rate 0.8 == 320000$ collateral worth
     // Borrowed 70$ => available should equal to 320000 - 70 = 319930.
@@ -728,14 +728,14 @@ xdescribe("Auction", () => {
     await vat.connect(signer2).hope(clip.address);
     await vat.connect(signer3).hope(clip.address);
 
-    await sikka
+    await davos
       .connect(signer2)
-      .approve(sikkaJoin.address, ethers.constants.MaxUint256);
-    await sikka
+      .approve(davosJoin.address, ethers.constants.MaxUint256);
+    await davos
       .connect(signer3)
-      .approve(sikkaJoin.address, ethers.constants.MaxUint256);
-    await sikkaJoin.connect(signer2).join(signer2.address, toWad("5000").toString());
-    await sikkaJoin.connect(signer3).join(signer3.address, toWad("5000").toString());
+      .approve(davosJoin.address, ethers.constants.MaxUint256);
+    await davosJoin.connect(signer2).join(signer2.address, toWad("5000").toString());
+    await davosJoin.connect(signer3).join(signer3.address, toWad("5000").toString());
 
     await clip
       .connect(signer2)
@@ -789,8 +789,8 @@ xdescribe("Auction", () => {
     await vat.connect(signer2).hope(clip.address);
     await vat.connect(signer3).hope(clip.address);
 
-    await sikka.connect(signer2).approve(interaction.address, toWad("700").toString());
-    await sikka.connect(signer3).approve(interaction.address, toWad("700").toString());
+    await davos.connect(signer2).approve(interaction.address, toWad("700").toString());
+    await davos.connect(signer3).approve(interaction.address, toWad("700").toString());
 
     await advanceTime(1000);
 

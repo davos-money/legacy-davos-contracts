@@ -13,15 +13,15 @@ const {
     advanceTime,
 } = require("./helpers/utils");
 
-let owner, signer1, sikka, clip, interaction, auctionProxy, vat, _ilkCeMatic;
+let owner, signer1, davos, clip, interaction, auctionProxy, vat, _ilkCeMatic;
 
-let swapPool, wNative, cerosToken, masterVault, ceaMATICc, cerosRouter, sMatic, sikkaProvider;
+let swapPool, wNative, cerosToken, masterVault, ceaMATICc, cerosRouter, dMatic, davosProvider;
 
-let _chainId, _mat, _ikkaRewardsPoolLimitInEth, _vat_Line, _vat_line,
+let _chainId, _mat, _dgtRewardsPoolLimitInEth, _vat_Line, _vat_line,
     _spot_par, _dog_Hole, _dog_hole, _dog_chop, _abacus_tau, _clip_buf, _clip_tail,
     _clip_cusp, _clip_chip, _clip_tip, _clip_stopped, _multisig, _vat_dust;
 
-describe('sikka-protocol', () => {
+describe('davos-protocol', () => {
     const networkSnapshotter = new NetworkSnapshotter();
 
     before(async function () {
@@ -45,23 +45,23 @@ describe('sikka-protocol', () => {
             
             // signer1 provides 10 Matic
             const depositAmount = parseEther("10");
-            const signer1_sMaticBalanceBefore = await getTokenBalance(signer1.address, sMatic.address);
+            const signer1_dMaticBalanceBefore = await getTokenBalance(signer1.address, dMatic.address);
             let swapFee = (depositAmount.mul(await swapPool.stakeFee())).div(await swapPool.FEE_MAX());
             
             // swapFee will be charged for deposits so actualDeposit amount is:
             const actualDeposit = depositAmount.sub(swapFee);
             await expect(
-                sikkaProvider.connect(signer1).provide({ value: depositAmount.toString() })
+                davosProvider.connect(signer1).provide({ value: depositAmount.toString() })
             )
-            .to.emit(sikkaProvider, "Deposit")
+            .to.emit(davosProvider, "Deposit")
             .withArgs(
                 signer1.address,
                 actualDeposit.toString()
             );
 
-            // signer1 receives sMatic in return eq. to depositAmount - swapFee(Matic --> aMaticc)
-            const signer1_sMaticBalanceAfter = await getTokenBalance(signer1.address, sMatic.address);
-            expect(signer1_sMaticBalanceAfter).to.be.equal(signer1_sMaticBalanceBefore.add(depositAmount).sub(swapFee));
+            // signer1 receives dMatic in return eq. to depositAmount - swapFee(Matic --> aMaticc)
+            const signer1_dMaticBalanceAfter = await getTokenBalance(signer1.address, dMatic.address);
+            expect(signer1_dMaticBalanceAfter).to.be.equal(signer1_dMaticBalanceBefore.add(depositAmount).sub(swapFee));
 
             // wMatic balance of MasterVault should match the depositAmount
             const masterVault_wMatic_balance = await getTokenBalance(masterVault.address, wNative.address);
@@ -133,10 +133,10 @@ describe('sikka-protocol', () => {
             // <----------------------------------- payback() ------------------------------------------->
 
 
-            // approve sikka token for interaction contract
-            await sikka.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            // approve davos token for interaction contract
+            await davos.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
 
-            // cannot leave dust(set to 10 sikka) 
+            // cannot leave dust(set to 10 davos) 
             const invalidPaybackAmount = borrowAmount.sub(parseEther("1"))
             await expect(
                 interaction.connect(signer1).payback(
@@ -169,14 +169,14 @@ describe('sikka-protocol', () => {
             
             // cannot withdraw more than locked
             await expect(
-                sikkaProvider.connect(signer1).release(signer1.address, actualDeposit.add("1000"))
+                davosProvider.connect(signer1).release(signer1.address, actualDeposit.add("1000"))
             ).to.be.rejectedWith("");
 
             // release actual deposited amount
             await expect(
-                sikkaProvider.connect(signer1).release(signer1.address,actualDeposit.toString())
+                davosProvider.connect(signer1).release(signer1.address,actualDeposit.toString())
             )
-            .to.emit(sikkaProvider, "Withdrawal")
+            .to.emit(davosProvider, "Withdrawal")
             .withArgs(
                 signer1.address,
                 signer1.address,
@@ -218,9 +218,9 @@ describe('sikka-protocol', () => {
             // <--------------------------- Signer 1,2 & 3 provides() ------------------------------->
             
             
-            await sikkaProvider.connect(signer1).provide( {value: dink1} );
-            await sikkaProvider.connect(signer2).provide( {value: dink2} );
-            await sikkaProvider.connect(signer3).provide( {value: dink3} );
+            await davosProvider.connect(signer1).provide( {value: dink1} );
+            await davosProvider.connect(signer2).provide( {value: dink2} );
+            await davosProvider.connect(signer3).provide( {value: dink3} );
             
             const dart1 = toWad("1000").toString();
             const dart2 = toWad("5000").toString();
@@ -252,8 +252,8 @@ describe('sikka-protocol', () => {
             await vat.connect(signer2).hope(clip.address);
             await vat.connect(signer3).hope(clip.address);
         
-            await sikka.connect(signer2).approve(interaction.address, toWad("10000").toString());
-            await sikka.connect(signer3).approve(interaction.address, toWad("10000").toString());
+            await davos.connect(signer2).approve(interaction.address, toWad("10000").toString());
+            await davos.connect(signer3).approve(interaction.address, toWad("10000").toString());
         
             await advanceTime(1000);
         
@@ -304,11 +304,11 @@ async function getTokenBalance(account, token) {
 async function init() {
     [owner, intermediary, bc_operator, signer1, staker_2, operator] = await ethers.getSigners();
 
-    [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, sMatic] = await deployMasterVault()
+    [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ce_Vault , cerosRouter, dMatic] = await deployMasterVault()
 
     interaction = await deployInteraction(masterVault);
 
-    sikkaProvider = await deploySikkaProvider(sMatic, masterVault, interaction)
+    davosProvider = await deployDavosProvider(dMatic, masterVault, interaction)
 }
 
 async function deployMasterVault() {
@@ -330,7 +330,7 @@ async function deployMasterVault() {
     CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     CeVault = await hre.ethers.getContractFactory("CeVault");
     PriceGetter = await hre.ethers.getContractFactory("PriceGetter");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     
     // Deploy Contracts
     wMatic = await Token.attach(wMaticAddress);
@@ -348,8 +348,8 @@ async function deployMasterVault() {
     await cerosRouter.deployed();
     cerosRouterImp = await upgrades.erc1967.getImplementationAddress(cerosRouter.address);
 
-    sMatic = await upgrades.deployProxy(SMatic, [], {initializer: "initialize"});
-    await sMatic.deployed();
+    dMatic = await upgrades.deployProxy(DMatic, [], {initializer: "initialize"});
+    await dMatic.deployed();
 
     await ceaMATICc.changeVault(ceVault.address);
     await ceVault.changeRouter(cerosRouter.address);
@@ -380,7 +380,7 @@ async function deployMasterVault() {
     );
     await cerosStrategy.deployed();
     
-    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, sMatic];
+    return [swapPool, wNative, cerosToken, masterVault, ceaMATICc , ceVault , cerosRouter, dMatic];
 }
 
 async function deploySwapPool() {
@@ -430,7 +430,7 @@ async function deploySwapPool() {
 async function deployInteraction(masterVault) {
 
     _mat = "1333333333333333333333333333";
-    _ikkaRewardsPoolLimitInEth = "100000000";
+    _dgtRewardsPoolLimitInEth = "100000000";
     _vat_Line = "5000000";
     _vat_line = "5000000";
     _vat_dust = "10";
@@ -449,7 +449,7 @@ async function deployInteraction(masterVault) {
 
 
     // _mat = "1333333333333333333333333333";
-    // _ikkaRewardsPoolLimitInEth = "100000000";
+    // _dgtRewardsPoolLimitInEth = "100000000";
     // _vat_Line = "5000000";
     // _vat_line = "5000000";
     // _vat_dust = "100";
@@ -487,23 +487,23 @@ async function deployInteraction(masterVault) {
     CeVault = await hre.ethers.getContractFactory("CeVault");
     AMATICb = await hre.ethers.getContractFactory("aMATICb");
     AMATICc = await hre.ethers.getContractFactory("aMATICc");
-    SMatic = await hre.ethers.getContractFactory("sMATIC");
+    DMatic = await hre.ethers.getContractFactory("dMATIC");
     CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
-    SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+    DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
     Vat = await hre.ethers.getContractFactory("Vat");
     Spot = await hre.ethers.getContractFactory("Spotter");
-    Sikka = await hre.ethers.getContractFactory("Sikka");
+    Davos = await hre.ethers.getContractFactory("Davos");
     GemJoin = await hre.ethers.getContractFactory("GemJoin");
-    SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+    DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
     Oracle = await hre.ethers.getContractFactory("Oracle"); 
     Jug = await hre.ethers.getContractFactory("Jug");
     Vow = await hre.ethers.getContractFactory("Vow");
     Dog = await hre.ethers.getContractFactory("Dog");
     Clip = await hre.ethers.getContractFactory("Clipper");
     Abacus = await hre.ethers.getContractFactory("LinearDecrease");
-    IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
-    IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
-    IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle"); 
+    DgtToken = await hre.ethers.getContractFactory("DgtToken");
+    DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
+    DgtOracle = await hre.ethers.getContractFactory("DgtOracle"); 
     AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
 
     auctionProxy = await this.AuctionProxy.deploy();
@@ -522,9 +522,9 @@ async function deployInteraction(masterVault) {
     SwapPool = await ethers.getContractFactory("SwapPool");
     LP = await ethers.getContractFactory("LP");
 
-    sMatic = await upgrades.deployProxy(this.SMatic, [], {initializer: "initialize"});
-    await sMatic.deployed();
-    sMaticImp = await upgrades.erc1967.getImplementationAddress(sMatic.address);
+    dMatic = await upgrades.deployProxy(this.DMatic, [], {initializer: "initialize"});
+    await dMatic.deployed();
+    dMaticImp = await upgrades.erc1967.getImplementationAddress(dMatic.address);
 
     abacus = await upgrades.deployProxy(this.Abacus, [], {initializer: "initialize"});
     await abacus.deployed();
@@ -542,13 +542,13 @@ async function deployInteraction(masterVault) {
     await spot.deployed();
     spotImp = await upgrades.erc1967.getImplementationAddress(spot.address);
 
-    sikka = await upgrades.deployProxy(this.Sikka, [_chainId, "SIKKA", "5000000" + wad], {initializer: "initialize"});
-    await sikka.deployed();
-    sikkaImp = await upgrades.erc1967.getImplementationAddress(sikka.address);
+    davos = await upgrades.deployProxy(this.Davos, [_chainId, "DAVOS", "5000000" + wad], {initializer: "initialize"});
+    await davos.deployed();
+    davosImp = await upgrades.erc1967.getImplementationAddress(davos.address);
 
-    sikkaJoin = await upgrades.deployProxy(this.SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
-    await sikkaJoin.deployed();
-    sikkaJoinImp = await upgrades.erc1967.getImplementationAddress(sikkaJoin.address);
+    davosJoin = await upgrades.deployProxy(this.DavosJoin, [vat.address, davos.address], {initializer: "initialize"});
+    await davosJoin.deployed();
+    davosJoinImp = await upgrades.erc1967.getImplementationAddress(davosJoin.address);
 
     gemJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, masterVault.address], {initializer: "initialize"});
     await gemJoin.deployed();
@@ -558,7 +558,7 @@ async function deployInteraction(masterVault) {
     await jug.deployed();
     jugImp = await upgrades.erc1967.getImplementationAddress(jug.address);
 
-    vow = await upgrades.deployProxy(this.Vow, [vat.address, sikkaJoin.address, _multisig], {initializer: "initialize"});
+    vow = await upgrades.deployProxy(this.Vow, [vat.address, davosJoin.address, _multisig], {initializer: "initialize"});
     await vow.deployed();
     vowImp = await upgrades.erc1967.getImplementationAddress(vow.address);
 
@@ -570,11 +570,11 @@ async function deployInteraction(masterVault) {
     await clip.deployed();
     clipImp = await upgrades.erc1967.getImplementationAddress(dog.address);
 
-    rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
+    rewards = await upgrades.deployProxy(this.DgtRewards, [vat.address, ether(_dgtRewardsPoolLimitInEth).toString(), 5], {initializer: "initialize"});
     await rewards.deployed();
     rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
 
-    interaction = await upgrades.deployProxy(this.Interaction, [vat.address, spot.address, sikka.address, sikkaJoin.address, jug.address, dog.address, rewards.address], 
+    interaction = await upgrades.deployProxy(this.Interaction, [vat.address, spot.address, davos.address, davosJoin.address, jug.address, dog.address, rewards.address], 
         {
             initializer: "initialize",
             unsafeAllowLinkedLibraries: true,
@@ -583,13 +583,13 @@ async function deployInteraction(masterVault) {
     await interaction.deployed();
     interactionImplAddress = await upgrades.erc1967.getImplementationAddress(interaction.address);
 
-    sikkaProvider = await upgrades.deployProxy(this.SikkaProvider, [sMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
-    await sikkaProvider.deployed();
-    sikkaProviderImplementation = await upgrades.erc1967.getImplementationAddress(sikkaProvider.address);
+    davosProvider = await upgrades.deployProxy(this.DavosProvider, [dMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
+    await davosProvider.deployed();
+    davosProviderImplementation = await upgrades.erc1967.getImplementationAddress(davosProvider.address);
 
     await vat.rely(gemJoin.address);
     await vat.rely(spot.address);
-    await vat.rely(sikkaJoin.address);
+    await vat.rely(davosJoin.address);
     await vat.rely(jug.address);
     await vat.rely(dog.address);
     await vat.rely(clip.address);
@@ -598,8 +598,8 @@ async function deployInteraction(masterVault) {
     await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad);
     await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + rad);
     
-    await sikka.rely(sikkaJoin.address);
-    await sikka.setSupplyCap("5000000" + wad);
+    await davos.rely(davosJoin.address);
+    await davos.setSupplyCap("5000000" + wad);
     
     await spot.rely(interaction.address);
     await spot["file(bytes32,bytes32,address)"](_ilkCeMatic, ethers.utils.formatBytes32String("pip"), oracle.address);
@@ -608,8 +608,8 @@ async function deployInteraction(masterVault) {
     await rewards.rely(interaction.address);
     
     await gemJoin.rely(interaction.address);
-    await sikkaJoin.rely(interaction.address);
-    await sikkaJoin.rely(vow.address);
+    await davosJoin.rely(interaction.address);
+    await davosJoin.rely(vow.address);
     
     await dog.rely(interaction.address);
     await dog.rely(clip.address);
@@ -636,7 +636,7 @@ async function deployInteraction(masterVault) {
     await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
     
     await vow.rely(dog.address);
-    await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("sikka"), sikka.address);
+    await vow["file(bytes32,address)"](ethers.utils.formatBytes32String("davos"), davos.address);
     
     await abacus.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("tau"), _abacus_tau); // Price will reach 0 after this time
 
@@ -647,17 +647,17 @@ async function deployInteraction(masterVault) {
     return interaction;
 }
 
-async function deploySikkaProvider(sMatic, masterVault, interaction) {
+async function deployDavosProvider(dMatic, masterVault, interaction) {
     // Contracts Fetching
-    SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+    DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
 
-    let sikkaProvider = await upgrades.deployProxy(SikkaProvider, [sMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
-    await sikkaProvider.deployed();
+    let davosProvider = await upgrades.deployProxy(DavosProvider, [dMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
+    await davosProvider.deployed();
 
-    await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address);
+    await dMatic.changeMinter(davosProvider.address);
+    await masterVault.changeProvider(davosProvider.address);
     
-    await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address);
-    await sikkaProvider.changeProxy(interaction.address);
-    return sikkaProvider;
+    await interaction.setDavosProvider(masterVault.address, davosProvider.address);
+    await davosProvider.changeProxy(interaction.address);
+    return davosProvider;
 }

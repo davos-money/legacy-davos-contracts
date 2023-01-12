@@ -4,7 +4,7 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract IkkaToken is ERC20PausableUpgradeable {
+contract DGTToken is ERC20PausableUpgradeable {
 
     event MintedRewardsSupply(address rewardsContract, uint256 amount);
 
@@ -13,20 +13,20 @@ contract IkkaToken is ERC20PausableUpgradeable {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth {
-        require(usr != address(0), "IkkaToken/invalid-address");
+        require(usr != address(0), "DgtToken/invalid-address");
         wards[usr] = 1;
     }
     function deny(address usr) external auth {
-        require(usr != address(0), "IkkaToken/invalid-address");
+        require(usr != address(0), "DgtToken/invalid-address");
         wards[usr] = 0;
     }
     modifier auth {
-        require(wards[msg.sender] == 1, "IkkaToken/not-authorized");
+        require(wards[msg.sender] == 1, "DgtToken/not-authorized");
         _;
     }
 
     function initialize(uint256 rewardsSupply_, address rewards_) public initializer {
-        __ERC20_init_unchained("Ikka Reward token", "IKKA");
+        __ERC20_init_unchained("Dgt Reward token", "DGT");
         __ERC20Pausable_init();
         wards[msg.sender] = 1;
         rewards = rewards_;
@@ -36,7 +36,7 @@ contract IkkaToken is ERC20PausableUpgradeable {
     }
 
     function mint(address _to, uint256 _amount) external auth returns(bool) {
-        require(_to != rewards, "IkkaToken/rewards-oversupply");
+        require(_to != rewards, "DgtToken/rewards-oversupply");
         _mint(_to, _amount);
         return true;
     }

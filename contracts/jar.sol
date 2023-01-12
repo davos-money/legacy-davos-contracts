@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// jar.sol -- Sikka distribution farming
+/// jar.sol -- Davos distribution farming
 
 // Copyright (C) 2022
 //
@@ -26,8 +26,8 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 
 /*
    "Put rewards in the jar and close it".
-   This contract lets you deposit SIKKAs from sikka.sol and earn
-   SIKKA rewards. The SIKKA rewards are deposited into this contract
+   This contract lets you deposit DAVOSs from davos.sol and earn
+   DAVOS rewards. The DAVOS rewards are deposited into this contract
    and distributed over a timeline. Users can redeem rewards
    after exit delay.
 */
@@ -56,13 +56,13 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
     uint public spread;          // Distribution time     [sec]
     uint public endTime;         // Time "now" + spread   [sec]
     uint public rate;            // Emission per second   [wad]
-    uint public tps;             // SIKKA tokens per share  [wad]
+    uint public tps;             // DAVOS tokens per share  [wad]
     uint public lastUpdate;      // Last tps update       [sec]
     uint public exitDelay;       // User unstake delay    [sec]
     uint public flashLoanDelay;  // Anti flash loan time  [sec]
-    address public SIKKA;        // The SIKKA Stable Coin
+    address public DAVOS;        // The DAVOS Stable Coin
 
-    mapping(address => uint) public tpsPaid;      // SIKKA per share paid
+    mapping(address => uint) public tpsPaid;      // DAVOS per share paid
     mapping(address => uint) public rewards;      // Accumulated rewards
     mapping(address => uint) public withdrawn;    // Capital withdrawn
     mapping(address => uint) public unstakeTime;  // Time of Unstake
@@ -85,13 +85,13 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
     event UnCage();
 
     // --- Init ---
-    function initialize(string memory _name, string memory _symbol, address _sikkaToken, uint _spread, uint _exitDelay, uint _flashLoanDelay) external initializer {
+    function initialize(string memory _name, string memory _symbol, address _davosToken, uint _spread, uint _exitDelay, uint _flashLoanDelay) external initializer {
         __ReentrancyGuard_init();
         wards[msg.sender] = 1;
         decimals = 18;
         name = _name;
         symbol = _symbol;
-        SIKKA = _sikkaToken;
+        DAVOS = _davosToken;
         spread = _spread;
         exitDelay = _exitDelay;
         flashLoanDelay = _flashLoanDelay;
@@ -148,7 +148,7 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
         lastUpdate = block.timestamp;
         endTime = block.timestamp + timeline;
 
-        IERC20Upgradeable(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(DAVOS).safeTransferFrom(msg.sender, address(this), wad);
         emit Replenished(wad);
     }
     function setSpread(uint _spread) external authOrOperator {
@@ -170,9 +170,9 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
     }
     function extractDust() external auth {
         require(block.timestamp >= endTime, "Jar/in-distribution");
-        uint dust = IERC20Upgradeable(SIKKA).balanceOf(address(this)) - totalSupply;
+        uint dust = IERC20Upgradeable(DAVOS).balanceOf(address(this)) - totalSupply;
         if (dust != 0) {
-            IERC20Upgradeable(SIKKA).safeTransfer(msg.sender, dust);
+            IERC20Upgradeable(DAVOS).safeTransfer(msg.sender, dust);
         }
     }
     function cage() external auth {
@@ -193,7 +193,7 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
         totalSupply += wad;
         stakeTime[msg.sender] = block.timestamp + flashLoanDelay;
 
-        IERC20Upgradeable(SIKKA).safeTransferFrom(msg.sender, address(this), wad);
+        IERC20Upgradeable(DAVOS).safeTransferFrom(msg.sender, address(this), wad);
         emit Join(msg.sender, wad);
     }
     function exit(uint256 wad) external update(msg.sender) nonReentrant {
@@ -230,7 +230,7 @@ contract Jar is Initializable, ReentrancyGuardUpgradeable {
             if (_amount > 0) {
                 rewards[accounts[i]] = 0;
                 withdrawn[accounts[i]] = 0;
-                IERC20Upgradeable(SIKKA).safeTransfer(accounts[i], _amount);
+                IERC20Upgradeable(DAVOS).safeTransfer(accounts[i], _amount);
             }
         }
        

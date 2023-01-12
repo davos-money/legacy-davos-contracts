@@ -56,20 +56,30 @@ module.exports = {
             url: "http://127.0.0.1:8545/",
             timeout: 10000000
         },
+        mumbai: {
+            url: process.env.MUMBAI_URL,
+            chainId: 80001,
+            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
+        },
         polygon: {
-            url: process.env.ANKR_POLYGON_URL,
+            url: process.env.POLYGON_URL,
             chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
-        mumbai: {
-            url: process.env.ANKR_MUMBAI_URL,
-            chainId: 80001,
+        avalanche_testnet: {
+            url: process.env.AVALANCHE_TESTNET_URL,
+            chainId: 43113,
+            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
+        },
+        avalanche: {
+            url: process.env.AVALANCHE_MAINNET_URL,
+            chainId: 43114,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
         },
     },
 
     etherscan: {
-        apiKey: process.env.POLYGON_API_KEY
+        apiKey: process.env.SCAN_API_KEY
     },
 
     mocha: {

@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "./sMath.sol";
+import "./dMath.sol";
 import "./oracle/libraries/FullMath.sol";
 
 import "./interfaces/VatLike.sol";
@@ -11,12 +11,12 @@ import "./interfaces/IRewards.sol";
 import "./interfaces/PipLike.sol";
 
 /*
-   "Distribute Ikka Tokens to Borrowers".
-   Borrowers of Sikka token against collaterals are incentivized 
-   to get Ikka Tokens.
+   "Distribute Dgt Tokens to Borrowers".
+   Borrowers of Davos token against collaterals are incentivized 
+   to get Dgt Tokens.
 */
 
-contract IkkaRewards is IRewards, Initializable {
+contract DGTRewards is IRewards, Initializable {
     // --- Wrapper ---
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -48,7 +48,7 @@ contract IkkaRewards is IRewards, Initializable {
     address[] public poolsList;
 
     VatLike public vat;
-    address public ikkaToken;
+    address public dgtToken;
     PipLike public oracle;
 
     uint256 public rewardsPool;  // <Unused>
@@ -72,7 +72,7 @@ contract IkkaRewards is IRewards, Initializable {
 
     // --- Admin ---
     function initPool(address token, bytes32 ilk, uint256 rate) external auth {
-        require(IERC20Upgradeable(ikkaToken).balanceOf(address(this)) >= poolLimit, "Reward/not-enough-reward-token");
+        require(IERC20Upgradeable(dgtToken).balanceOf(address(this)) >= poolLimit, "Reward/not-enough-reward-token");
         require(pools[token].rho == 0, "Reward/pool-existed");
         require(token != address(0), "Reward/invalid-token");
         pools[token] = Ilk(rate, block.timestamp, ilk);
@@ -81,14 +81,14 @@ contract IkkaRewards is IRewards, Initializable {
 
         emit PoolInited(token, rate);
     }
-    function setIkkaToken(address ikkaToken_) external auth {
-        require(ikkaToken_ != address(0), "Reward/invalid-token");
-        ikkaToken = ikkaToken_;
+    function setDgtToken(address dgtToken_) external auth {
+        require(dgtToken_ != address(0), "Reward/invalid-token");
+        dgtToken = dgtToken_;
 
-        emit IkkaTokenChanged(ikkaToken);
+        emit DgtTokenChanged(dgtToken);
     }
     function setRewardsMaxLimit(uint256 newLimit) external auth {
-        require(IERC20Upgradeable(ikkaToken).balanceOf(address(this)) >= newLimit, "Reward/not-enough-reward-token");
+        require(IERC20Upgradeable(dgtToken).balanceOf(address(this)) >= newLimit, "Reward/not-enough-reward-token");
         poolLimit = newLimit;
 
         emit RewardsLimitChanged(poolLimit);
@@ -97,7 +97,7 @@ contract IkkaRewards is IRewards, Initializable {
         require(oracle_ != address(0), "Reward/invalid-oracle");
         oracle = PipLike(oracle_);
 
-        emit IkkaOracleChanged(address(oracle));
+        emit DgtOracleChanged(address(oracle));
     }
     function setRate(address token, uint256 newRate) external auth {
         require(pools[token].rho == 0, "Reward/pool-existed");
@@ -115,8 +115,8 @@ contract IkkaRewards is IRewards, Initializable {
     }
 
     // --- View ---
-    function ikkaPrice() public view returns(uint256) {
-        // 1 SIKKA is ikkaPrice() ikkas
+    function dgtPrice() public view returns(uint256) {
+        // 1 DAVOS is dgtPrice() dgts
         (bytes32 price, bool has) = oracle.peek();
         if (has) {
             return uint256(price);
@@ -129,7 +129,7 @@ contract IkkaRewards is IRewards, Initializable {
     }
     function distributionApy(address token) public view returns(uint256) {
         // Yearly api in percents with 18 decimals
-        return (sMath.rpow(pools[token].rewardRate, YEAR, RAY) - RAY) / 10 ** 7;
+        return (dMath.rpow(pools[token].rewardRate, YEAR, RAY) - RAY) / 10 ** 7;
     }
     function pendingRewards(address usr) public view returns(uint256) {
         uint256 i = 0;
@@ -154,9 +154,9 @@ contract IkkaRewards is IRewards, Initializable {
         if (last == 0) {
             return 0;
         }
-        uint256 rate = sMath.rpow(pools[token].rewardRate, block.timestamp - last, RAY);
+        uint256 rate = dMath.rpow(pools[token].rewardRate, block.timestamp - last, RAY);
         uint256 rewards = FullMath.mulDiv(rate, art, 10 ** 27) - art;                     // $ amount
-        return FullMath.mulDiv(rewards, ikkaPrice(), 10 ** 18);                           // Ikka Tokens
+        return FullMath.mulDiv(rewards, dgtPrice(), 10 ** 18);                           // Dgt Tokens
     }
 
     // --- Externals ---
@@ -181,7 +181,7 @@ contract IkkaRewards is IRewards, Initializable {
         claimedRewards[msg.sender] += amount;
         poolLimit -= amount;
         
-        IERC20Upgradeable(ikkaToken).safeTransfer(msg.sender, amount);
+        IERC20Upgradeable(dgtToken).safeTransfer(msg.sender, amount);
         emit Claimed(msg.sender, amount);
     }
 

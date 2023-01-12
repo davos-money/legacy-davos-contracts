@@ -15,20 +15,20 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
 
     let vat,
         spot,
-        sikka,
+        davos,
         amaticc,
         amaticcJoin,
         amaticc2,
         amaticcJoin2,
-        sikkaJoin,
+        davosJoin,
         jug,
         dog,
         clipAMATICC,
         rewards,
-        ikka,
+        dgt,
         oracle,
         oracle2,
-        ikkaOracle,
+        dgtOracle,
         auctionProxy;
 
     let interaction;
@@ -52,10 +52,10 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
 
         this.Vat = await ethers.getContractFactory("Vat");
         this.Spot = await ethers.getContractFactory("Spotter");
-        this.Sikka = await ethers.getContractFactory("Sikka");
+        this.Davos = await ethers.getContractFactory("Davos");
         this.AMATICC = await ethers.getContractFactory("aMATICc");
         this.GemJoin = await ethers.getContractFactory("GemJoin");
-        this.SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+        this.DavosJoin = await ethers.getContractFactory("DavosJoin");
         this.Jug = await ethers.getContractFactory("Jug");
         this.Oracle = await ethers.getContractFactory("Oracle"); // Mock Oracle
         this.Dog = await ethers.getContractFactory("Dog");
@@ -63,9 +63,9 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         this.Abaci = await ethers.getContractFactory("LinearDecrease");
         this.Vow = await ethers.getContractFactory("Vow");
         this.AuctionProxy = await ethers.getContractFactory("AuctionProxy");
-        this.Ikka = await ethers.getContractFactory("IkkaToken");
+        this.Dgt = await ethers.getContractFactory("DgtToken");
         const MaticOracle = await ethers.getContractFactory('MaticOracle');
-        const IkkaRewards = await ethers.getContractFactory('IkkaRewards');
+        const DgtRewards = await ethers.getContractFactory('DgtRewards');
 
 
         // Core module
@@ -75,11 +75,11 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         spot = await this.Spot.connect(deployer).deploy(vat.address);
         await spot.deployed();
 
-        // Sikka module
-        sikka = await this.Sikka.connect(deployer).deploy(97, "testSIKKA");
-        await sikka.deployed(); // Stable Coin
-        sikkaJoin = await this.SikkaJoin.connect(deployer).deploy(vat.address, sikka.address);
-        await sikkaJoin.deployed();
+        // Davos module
+        davos = await this.Davos.connect(deployer).deploy(97, "testDAVOS");
+        await davos.deployed(); // Stable Coin
+        davosJoin = await this.DavosJoin.connect(deployer).deploy(vat.address, davos.address);
+        await davosJoin.deployed();
 
         const aMATICb = artifacts.require("aMATICb");
         amaticb = await aMATICb.new();
@@ -112,12 +112,12 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         clipAMATICC = await this.ClipAMATICC.connect(deployer).deploy(vat.address, spot.address, dog.address, collateral);
         await clipAMATICC.deployed();
 
-        ikkaOracle = await MaticOracle.connect(deployer).deploy();
-        await ikkaOracle.initialize("100000000000000000");
-        rewards = await IkkaRewards.connect(deployer).deploy();
+        dgtOracle = await MaticOracle.connect(deployer).deploy();
+        await dgtOracle.initialize("100000000000000000");
+        rewards = await DgtRewards.connect(deployer).deploy();
         await rewards.initialize(vat.address, ether("100000000").toString());
-        ikka = await this.Ikka.connect(deployer).deploy(ether("100000000").toString(), rewards.address);
-        await ikka.deployed();
+        dgt = await this.Dgt.connect(deployer).deploy(ether("100000000").toString(), rewards.address);
+        await dgt.deployed();
 
         auctionProxy = await this.AuctionProxy.connect(deployer).deploy();
         await auctionProxy.deployed();
@@ -132,8 +132,8 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         await interaction.initialize(
             vat.address,
             spot.address,
-            sikka.address,
-            sikkaJoin.address,
+            davos.address,
+            davosJoin.address,
             jug.address,
             dog.address,
             rewards.address,
@@ -142,9 +142,9 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         /** Initial Setup -------- **/
         //////////////////////////////
 
-        await ikka.connect(deployer).rely(rewards.address);
-        await rewards.connect(deployer).setIkkaToken(ikka.address);
-        await rewards.connect(deployer).setOracle(ikkaOracle.address);
+        await dgt.connect(deployer).rely(rewards.address);
+        await rewards.connect(deployer).setDgtToken(dgt.address);
+        await rewards.connect(deployer).setOracle(dgtOracle.address);
         await rewards.connect(deployer).initPool(amaticc.address, collateral, "1000000001847694957439350500"); //6%
         await rewards.connect(deployer).rely(interaction.address);
         await jug.connect(deployer).rely(interaction.address);
@@ -158,7 +158,7 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         // Initialize Core Module
         // await vat.connect(deployer).init(collateral);
         // await vat.connect(deployer).rely(amaticcJoin.address);
-        await vat.connect(deployer).rely(sikkaJoin.address);
+        await vat.connect(deployer).rely(davosJoin.address);
         await vat.connect(deployer).rely(spot.address);
         await vat.connect(deployer).rely(jug.address);
         await vat.connect(deployer).rely(interaction.address);
@@ -167,7 +167,7 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         await vat.connect(deployer).rely(amaticcJoin2.address);
 
         // await vat.connect(deployer).rely(jug.address);
-        await vat.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), "20000" + rad); // Normalized SIKKA
+        await vat.connect(deployer)["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), "20000" + rad); // Normalized DAVOS
         await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, ethers.utils.formatBytes32String("line"), "2000" + rad);
         // await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, ethers.utils.formatBytes32String("spot"), "500" + rad);
         await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, ethers.utils.formatBytes32String("dust"), "100000000000000000" + ray); //0.1 rad
@@ -187,8 +187,8 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         await spot.connect(deployer).poke(collateral2);
 
 
-        // Initialize SIKKA Module
-        await sikka.connect(deployer).rely(sikkaJoin.address);
+        // Initialize DAVOS Module
+        await davos.connect(deployer).rely(davosJoin.address);
 
         // Stability fees
         //calculate base rate
@@ -219,7 +219,7 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         await amaticcJoin.connect(deployer).rely(interaction.address);
         await amaticcJoin2.connect(deployer).rely(interaction.address);
         await clipAMATICC.connect(deployer).rely(interaction.address);
-        await sikkaJoin.connect(deployer).rely(interaction.address);
+        await davosJoin.connect(deployer).rely(interaction.address);
 
         expect(await(await jug.base()).toString()).to.be.equal(BR);
         expect(await(await(await jug.ilks(collateral)).duty).toString()).to.be.equal("0");
@@ -274,29 +274,29 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         let s1Balance = (await amaticc.balanceOf(signer1.address)).toString();
         expect(s1Balance).to.equal(ether("4998").toString());
 
-        let s1SIKKABalance = (await sikka.balanceOf(signer1.address)).toString();
-        expect(s1SIKKABalance).to.equal("0");
+        let s1DAVOSBalance = (await davos.balanceOf(signer1.address)).toString();
+        expect(s1DAVOSBalance).to.equal("0");
 
         let free = await interaction.connect(signer1).free(amaticc.address, signer1.address);
         expect(free.toString()).to.equal("0");
         let locked = await interaction.connect(signer1).locked(amaticc.address, signer1.address);
         expect(locked.toString()).to.equal(ether("2").toString());
 
-        // Locking collateral and borrowing SIKKA
-        // We want to draw 60 SIKKA == `dart`
+        // Locking collateral and borrowing DAVOS
+        // We want to draw 60 DAVOS == `dart`
         // Maximum available for borrow = (2 * 400 ) * 0.8 = 640
         let dart = ether("60").toString();
         await interaction.connect(signer1).borrow(amaticc.address, dart);
 
-        s1SIKKABalance = (await sikka.balanceOf(signer1.address)).toString();
-        expect(s1SIKKABalance).to.equal(dart);
+        s1DAVOSBalance = (await davos.balanceOf(signer1.address)).toString();
+        expect(s1DAVOSBalance).to.equal(dart);
 
         free = await interaction.connect(signer1).free(amaticc.address, signer1.address);
         expect(free.toString()).to.equal("0");
         locked = await interaction.connect(signer1).locked(amaticc.address, signer1.address);
         expect(locked.toString()).to.equal(dink);
-        s1SIKKABalance = (await sikka.balanceOf(signer1.address)).toString();
-        expect(s1SIKKABalance).to.equal(dart);
+        s1DAVOSBalance = (await davos.balanceOf(signer1.address)).toString();
+        expect(s1DAVOSBalance).to.equal(dart);
 
         // User locked 2 aMATICc with price 400 and rate 0.8 == 640$ collateral worth
         // Borrowed 60$ => available should equal to 640 - 60 = 580.
@@ -325,13 +325,13 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
 
     // 100 MATIC -> Ankr
     // 100 aMATICc <-- Ankr 7%
-    // 100 aMATICc --> Ikka
-    // XXX DAI <-- Ikka (mint)
+    // 100 aMATICc --> Dgt
+    // XXX DAI <-- Dgt (mint)
     // DAI -> Jar contract (modified MakerDAO Pot) 10%
     // jar is similar to pot but pot has no rewards limit and the interest is based on the percentage of deposit
     // jar has rewards limit and interest is based on percentage share of deposits from fixed emission
-    // DAI*(1 + fees%) --> Ikka
-    // MKR token <-- Ikka (amount of MKR == stability fee)
+    // DAI*(1 + fees%) --> Dgt
+    // MKR token <-- Dgt (amount of MKR == stability fee)
 
     it('payback and withdraw', async function() {
         //deposit&borrow
@@ -343,14 +343,14 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
 
         let s1Balance = (await amaticc.balanceOf(signer1.address)).toString();
         expect(s1Balance).to.equal(ether("4998").toString());
-        let s1SIKKABalance = (await sikka.balanceOf(signer1.address)).toString();
-        expect(s1SIKKABalance).to.equal(dart);
+        let s1DAVOSBalance = (await davos.balanceOf(signer1.address)).toString();
+        expect(s1DAVOSBalance).to.equal(dart);
 
-        await sikka.connect(signer1).approve(interaction.address, dart);
+        await davos.connect(signer1).approve(interaction.address, dart);
         await interaction.connect(signer1).payback(amaticc.address, dart);
 
-        s1SIKKABalance = (await sikka.balanceOf(signer1.address)).toString();
-        expect(s1SIKKABalance).to.equal("0");
+        s1DAVOSBalance = (await davos.balanceOf(signer1.address)).toString();
+        expect(s1DAVOSBalance).to.equal("0");
         // let ilk = await vat.connect(signer1).ilks(collateral);
         // console.log(ilk);
 
@@ -365,7 +365,7 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         );
         expect(willBeAvailable.toString()).to.equal(ether("960").toString());
 
-        // SIKKA are burned, now we have to withdraw collateral
+        // DAVOS are burned, now we have to withdraw collateral
         // We will always withdraw all available collateral
         s1Balance = (await amaticc.balanceOf(signer1.address)).toString();
         expect(s1Balance).to.equal(ether("4998").toString());
@@ -405,7 +405,7 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         // await network.provider.send("evm_increaseTime", [86400]); // Jump 1 Day
         // await interaction.drip(amaticc.address, {from: signer1.address});
 
-        await sikka.connect(signer2).approve(interaction.address, dart);
+        await davos.connect(signer2).approve(interaction.address, dart);
         await interaction.connect(signer2).payback(amaticc.address, dart);
 
         borrowed2 = await interaction.connect(signer2).borrowed(amaticc.address, signer2.address);
@@ -440,8 +440,8 @@ xdescribe('===INTERACTION-Multicollateral===', function () {
         expect(totalPending.toString()).to.equal("120000235026811392660");
 
         await rewards.connect(signer1).claim(ether("60").toString());
-        let ikkaBalance = await ikka.balanceOf(signer1.address);
-        expect(ikkaBalance.toString()).to.equal(ether("60").toString());
+        let dgtBalance = await dgt.balanceOf(signer1.address);
+        expect(dgtBalance.toString()).to.equal(ether("60").toString());
 
         totalPending = await rewards.pendingRewards(signer1.address);
         expect(totalPending.toString()).to.equal("60000238943925136690");

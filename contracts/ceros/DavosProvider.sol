@@ -8,11 +8,11 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IDex.sol";
 import "./interfaces/IDao.sol";
 import "./interfaces/ICerosRouter.sol";
-import "./interfaces/ISikkaProvider.sol";
+import "./interfaces/IDavosProvider.sol";
 import "./interfaces/ICertToken.sol";
 import "../MasterVault/interfaces/IMasterVault.sol";
-contract SikkaProvider is
-ISikkaProvider,
+contract DavosProvider is
+IDavosProvider,
 OwnableUpgradeable,
 PausableUpgradeable,
 ReentrancyGuardUpgradeable
@@ -23,7 +23,7 @@ ReentrancyGuardUpgradeable
     // Tokens
     // address private _certToken;
     address public _ceToken;
-    ICertToken public _collateralToken; // (default sMATIC)
+    ICertToken public _collateralToken; // (default dMATIC)
     IMasterVault public _masterVault;
     IDao public _dao;
     address public _proxy;

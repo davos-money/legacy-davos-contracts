@@ -13,9 +13,9 @@
     "_waitingPoolCap" : 10,
     
     "_mat" : "1333333333333333333333333333",
-    "_ikkaRewardsPoolLimitInEth" : "100000000",
-    "_ikkaTokenRewardsSupplyinEth" : "100000000",
-    "_ikkaOracleInitialPriceInWei" : "100000000000000000",
+    "_dgtRewardsPoolLimitInEth" : "100000000",
+    "_dgtTokenRewardsSupplyinEth" : "100000000",
+    "_dgtOracleInitialPriceInWei" : "100000000000000000",
     "_rewardsRate" : "1000000001847694957439350500",
     "_vat_Line" : "5000000",
     "_vat_line" : "5000000",

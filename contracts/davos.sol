@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// sikka.sol -- sikka Stablecoin ERC-20 Token
+/// davos.sol -- davos Stablecoin ERC-20 Token
 
 // Copyright (C) 2017, 2018, 2019 dbrock, rain, mrchico
 
@@ -21,25 +21,25 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
-import "./interfaces/ISikka.sol";
+import "./interfaces/IDavos.sol";
 
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Sikka is Initializable, ISikka {
+contract Davos is Initializable, IDavos {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address guy) external auth { wards[guy] = 1; }
     function deny(address guy) external auth { wards[guy] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "Sikka/not-authorized");
+        require(wards[msg.sender] == 1, "Davos/not-authorized");
         _;
     }
 
     // --- ERC20 Data ---
-    string  public constant name     = "Sikka";
+    string  public constant name     = "Davos";
     string  public symbol;
     string  public constant version  = "1";
     uint8   public constant decimals = 18;
@@ -76,11 +76,11 @@ contract Sikka is Initializable, ISikka {
         return transferFrom(msg.sender, dst, wad);
     }
     function transferFrom(address src, address dst, uint wad) public returns (bool) {
-        require(src != address(0), "Sikka/transfer-from-zero-address");
-        require(dst != address(0), "Sikka/transfer-to-zero-address");
-        require(balanceOf[src] >= wad, "Sikka/insufficient-balance");
+        require(src != address(0), "Davos/transfer-from-zero-address");
+        require(dst != address(0), "Davos/transfer-to-zero-address");
+        require(balanceOf[src] >= wad, "Davos/insufficient-balance");
         if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
-            require(allowance[src][msg.sender] >= wad, "Sikka/insufficient-allowance");
+            require(allowance[src][msg.sender] >= wad, "Davos/insufficient-allowance");
             allowance[src][msg.sender] -= wad;
         }
         balanceOf[src] -= wad;
@@ -89,17 +89,17 @@ contract Sikka is Initializable, ISikka {
         return true;
     }
     function mint(address usr, uint wad) external auth {
-        require(usr != address(0), "Sikka/mint-to-zero-address");
-        require(totalSupply + wad <= supplyCap, "Sikka/cap-reached");
+        require(usr != address(0), "Davos/mint-to-zero-address");
+        require(totalSupply + wad <= supplyCap, "Davos/cap-reached");
         balanceOf[usr] += wad;
         totalSupply    += wad;
         emit Transfer(address(0), usr, wad);
     }
     function burn(address usr, uint wad) external {
-        require(usr != address(0), "Sikka/burn-from-zero-address");
-        require(balanceOf[usr] >= wad, "Sikka/insufficient-balance");
+        require(usr != address(0), "Davos/burn-from-zero-address");
+        require(balanceOf[usr] >= wad, "Davos/insufficient-balance");
         if (usr != msg.sender && allowance[usr][msg.sender] != type(uint256).max) {
-            require(allowance[usr][msg.sender] >= wad, "Sikka/insufficient-allowance");
+            require(allowance[usr][msg.sender] >= wad, "Davos/insufficient-allowance");
             allowance[usr][msg.sender] -= wad;
         }
         balanceOf[usr] -= wad;
@@ -140,10 +140,10 @@ contract Sikka is Initializable, ISikka {
                                      allowed))
         ));
 
-        require(holder != address(0), "Sikka/invalid-address-0");
-        require(holder == ECDSAUpgradeable.recover(digest, v, r, s), "Sikka/invalid-permit");
-        require(expiry == 0 || block.timestamp <= expiry, "Sikka/permit-expired");
-        require(nonce == nonces[holder]++, "Sikka/invalid-nonce");
+        require(holder != address(0), "Davos/invalid-address-0");
+        require(holder == ECDSAUpgradeable.recover(digest, v, r, s), "Davos/invalid-permit");
+        require(expiry == 0 || block.timestamp <= expiry, "Davos/permit-expired");
+        require(nonce == nonces[holder]++, "Davos/invalid-nonce");
         uint wad = allowed ? type(uint256).max : 0;
         allowance[holder][spender] = wad;
         emit Approval(holder, spender, wad);
@@ -154,8 +154,8 @@ contract Sikka is Initializable, ISikka {
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "Sikka/approve-from-zero-address");
-        require(spender != address(0), "Sikka/approve-to-zero-address");
+        require(owner != address(0), "Davos/approve-from-zero-address");
+        require(spender != address(0), "Davos/approve-to-zero-address");
 
         allowance[owner][spender] = amount;
         emit Approval(owner, spender, amount);
@@ -170,7 +170,7 @@ contract Sikka is Initializable, ISikka {
     function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         address owner = msg.sender;
         uint256 currentAllowance = allowance[owner][spender];
-        require(currentAllowance >= subtractedValue, "Sikka/decreased-allowance-below-zero");
+        require(currentAllowance >= subtractedValue, "Davos/decreased-allowance-below-zero");
         unchecked {
             _approve(owner, spender, currentAllowance - subtractedValue);
         }
@@ -178,7 +178,7 @@ contract Sikka is Initializable, ISikka {
     }
 
     function setSupplyCap(uint256 wad) public auth {
-        require(wad >= totalSupply, "Sikka/more-supply-than-cap");
+        require(wad >= totalSupply, "Davos/more-supply-than-cap");
         uint256 oldCap = supplyCap;
         supplyCap = wad;
         emit SupplyCapSet(oldCap, supplyCap);

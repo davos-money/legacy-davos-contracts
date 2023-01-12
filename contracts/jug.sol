@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// jug.sol -- Sikka Lending Rate
+/// jug.sol -- Davos Lending Rate
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -23,7 +23,7 @@ pragma solidity ^0.8.10;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-import "./sMath.sol";
+import "./dMath.sol";
 import "./interfaces/JugLike.sol";
 import "./interfaces/VatLike.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -77,7 +77,7 @@ contract Jug is Initializable, JugLike {
         unchecked {
             z = x * y;
             require(y == 0 || z / y == x);
-            z = z / sMath.ONE;
+            z = z / dMath.ONE;
         }
     }
 
@@ -85,7 +85,7 @@ contract Jug is Initializable, JugLike {
     function init(bytes32 ilk) external auth {
         Ilk storage i = ilks[ilk];
         require(i.duty == 0, "Jug/ilk-already-init");
-        i.duty = sMath.ONE;
+        i.duty = dMath.ONE;
         i.rho  = block.timestamp;
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
@@ -110,7 +110,7 @@ contract Jug is Initializable, JugLike {
     function drip(bytes32 ilk) external returns (uint rate) {
         require(block.timestamp >= ilks[ilk].rho, "Jug/invalid-now");
         (, uint prev,,,) = vat.ilks(ilk);
-        rate = _rmul(sMath.rpow(_add(base, ilks[ilk].duty), block.timestamp - ilks[ilk].rho, sMath.ONE), prev);
+        rate = _rmul(dMath.rpow(_add(base, ilks[ilk].duty), block.timestamp - ilks[ilk].rho, dMath.ONE), prev);
         vat.fold(ilk, vow, _diff(rate, prev));
         ilks[ilk].rho = block.timestamp;
     }

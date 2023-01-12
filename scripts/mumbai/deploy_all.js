@@ -9,7 +9,7 @@ async function main() {
     // External Addresses
     let { _aMATICc, _wMatic, _dex, _dexPairFee, _swapPool, _priceGetter, _chainId, _maxDepositFee, 
     _maxWithdrawalFee, _maxStrategies, _cerosStrategyAllocatoin, _waitingPoolCap, _mat, 
-    _ikkaRewardsPoolLimitInEth, _ikkaTokenRewardsSupplyinEth, _ikkaOracleInitialPriceInWei, 
+    _dgtRewardsPoolLimitInEth, _dgtTokenRewardsSupplyinEth, _dgtOracleInitialPriceInWei, 
     _rewardsRate, _vat_Line, _vat_line, _vat_dust, _spot_par, _jug_base, _dog_Hole, _dog_hole,
     _dog_chop, _abacus_tau, _clip_buf, _clip_tail, _clip_cusp, _clip_chip, _clip_tip, _clip_stopped } = require(`../${hre.network.name}_config.json`)
     
@@ -20,14 +20,14 @@ async function main() {
     let _ilkCeMatic = ethers.utils.formatBytes32String("ceMATIC");
     let ceaMATICc, 
         ceVault,  
-        sMatic, 
+        dMatic, 
         cerosRouter;
     // Contracts Fetching
     this.CeaMATICc = await hre.ethers.getContractFactory("CeToken");
     this.CeVault = await hre.ethers.getContractFactory("CeVault");
     this.AMATICb = await hre.ethers.getContractFactory("aMATICb");
     this.AMATICc = await hre.ethers.getContractFactory("aMATICc");
-    this.SMatic = await hre.ethers.getContractFactory("sMATIC");
+    this.DMatic = await hre.ethers.getContractFactory("dMATIC");
     this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
 
     // Contracts deployment and initialization
@@ -43,11 +43,11 @@ async function main() {
     console.log("ceVault    : " + ceVault.address);
     console.log("imp        : " + ceVaultImp);
 
-    sMatic = await upgrades.deployProxy(this.SMatic, [], {initializer: "initialize"});
-    await sMatic.deployed();
-    sMaticImp = await upgrades.erc1967.getImplementationAddress(sMatic.address);
-    console.log("sMatic     : " + sMatic.address);
-    console.log("imp        : " + sMaticImp);
+    dMatic = await upgrades.deployProxy(this.DMatic, [], {initializer: "initialize"});
+    await dMatic.deployed();
+    dMaticImp = await upgrades.erc1967.getImplementationAddress(dMatic.address);
+    console.log("dMatic     : " + dMatic.address);
+    console.log("imp        : " + dMaticImp);
 
     cerosRouter = await upgrades.deployProxy(this.CerosRouter, [_aMATICc, _wMatic, ceaMATICc.address, ceVault.address, _dex, _dexPairFee, _swapPool, _priceGetter], {initializer: "initialize"}, {gasLimit: 2000000});
     await cerosRouter.deployed();
@@ -95,9 +95,9 @@ async function main() {
     // Contracts Fetching
     this.Vat = await hre.ethers.getContractFactory("Vat");
     this.Spot = await hre.ethers.getContractFactory("Spotter");
-    this.Sikka = await hre.ethers.getContractFactory("Sikka");
+    this.Davos = await hre.ethers.getContractFactory("Davos");
     this.GemJoin = await hre.ethers.getContractFactory("GemJoin");
-    this.SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+    this.DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
     this.Jug = await hre.ethers.getContractFactory("Jug");
     this.Vow = await hre.ethers.getContractFactory("Vow");
     this.Dog = await hre.ethers.getContractFactory("Dog");
@@ -118,17 +118,17 @@ async function main() {
     console.log("Spot           :", spot.address);
     console.log("SpotImp         :", spotImp)
 
-    let sikka = await upgrades.deployProxy(this.Sikka, [_chainId, "SIKKA"], {initializer: "initialize"});
-    await sikka.deployed();
-    sikkaImp = await upgrades.erc1967.getImplementationAddress(sikka.address);
-    console.log("sikka           :", sikka.address);
-    console.log("sikkaImp         :", sikkaImp);
+    let davos = await upgrades.deployProxy(this.Davos, [_chainId, "DAVOS"], {initializer: "initialize"});
+    await davos.deployed();
+    davosImp = await upgrades.erc1967.getImplementationAddress(davos.address);
+    console.log("davos           :", davos.address);
+    console.log("davosImp         :", davosImp);
 
-    let sikkaJoin = await upgrades.deployProxy(this.SikkaJoin, [vat.address, sikka.address], {initializer: "initialize"});
-    await sikkaJoin.deployed();
-    sikkaJoinImp = await upgrades.erc1967.getImplementationAddress(sikkaJoin.address);
-    console.log("SikkaJoin      :", sikkaJoin.address);
-    console.log("SikkaJoinImp         :", sikkaJoinImp)
+    let davosJoin = await upgrades.deployProxy(this.DavosJoin, [vat.address, davos.address], {initializer: "initialize"});
+    await davosJoin.deployed();
+    davosJoinImp = await upgrades.erc1967.getImplementationAddress(davosJoin.address);
+    console.log("DavosJoin      :", davosJoin.address);
+    console.log("DavosJoinImp         :", davosJoinImp)
 
     let ceaMATICcJoin = await upgrades.deployProxy(this.GemJoin, [vat.address, _ilkCeMatic, masterVault.address], {initializer: "initialize"});
     await ceaMATICcJoin.deployed();
@@ -142,7 +142,7 @@ async function main() {
     console.log("Jug            :", jug.address);
     console.log("JugImp         :", jugImp);
 
-    let vow = await upgrades.deployProxy(this.Vow, [vat.address, sikkaJoin.address, deployer.address], {initializer: "initialize"});
+    let vow = await upgrades.deployProxy(this.Vow, [vat.address, davosJoin.address, deployer.address], {initializer: "initialize"});
     await vow.deployed();
     vowImp = await upgrades.erc1967.getImplementationAddress(vow.address);
     console.log("Vow            :", vow.address);
@@ -179,47 +179,47 @@ async function main() {
     console.log("Abacus         :", abacus.address);
     console.log("AbacusImp         :", abacusImp);
 
-    console.log("Verifying Sikka...");
+    console.log("Verifying Davos...");
 
     // Contracts Fetching
-    this.IkkaToken = await hre.ethers.getContractFactory("IkkaToken");
-    this.IkkaRewards = await hre.ethers.getContractFactory("IkkaRewards");
-    this.IkkaOracle = await hre.ethers.getContractFactory("IkkaOracle");
+    this.DgtToken = await hre.ethers.getContractFactory("DgtToken");
+    this.DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
+    this.DgtOracle = await hre.ethers.getContractFactory("DgtOracle");
 
     // Contracts deployment
-    let rewards = await upgrades.deployProxy(this.IkkaRewards, [vat.address, ether(_ikkaRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
+    let rewards = await upgrades.deployProxy(this.DgtRewards, [vat.address, ether(_dgtRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
     await rewards.deployed();
     rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
     console.log("Rewards             :", rewards.address);
     console.log("Imp                 :", rewardsImp);
 
-    let ikkaToken = await upgrades.deployProxy(this.IkkaToken, [ether(_ikkaTokenRewardsSupplyinEth).toString(), rewards.address], {initializer: "initialize"});
-    await ikkaToken.deployed();
-    ikkaTokenImp = await upgrades.erc1967.getImplementationAddress(ikkaToken.address);
-    console.log("ikkaToken           :", ikkaToken.address);
-    console.log("Imp                 :", ikkaTokenImp);
+    let dgtToken = await upgrades.deployProxy(this.DgtToken, [ether(_dgtTokenRewardsSupplyinEth).toString(), rewards.address], {initializer: "initialize"});
+    await dgtToken.deployed();
+    dgtTokenImp = await upgrades.erc1967.getImplementationAddress(dgtToken.address);
+    console.log("dgtToken           :", dgtToken.address);
+    console.log("Imp                 :", dgtTokenImp);
     
-    let ikkaOracle = await upgrades.deployProxy(this.IkkaOracle, [_ikkaOracleInitialPriceInWei], {initializer: "initialize"}) // 0.1
-    await ikkaOracle.deployed();
-    ikkaOracleImplementation = await upgrades.erc1967.getImplementationAddress(ikkaOracle.address);
-    console.log("ikkaOracle          :", ikkaOracle.address);
-    console.log("Imp                 :", ikkaOracleImplementation);
+    let dgtOracle = await upgrades.deployProxy(this.DgtOracle, [_dgtOracleInitialPriceInWei], {initializer: "initialize"}) // 0.1
+    await dgtOracle.deployed();
+    dgtOracleImplementation = await upgrades.erc1967.getImplementationAddress(dgtOracle.address);
+    console.log("dgtOracle          :", dgtOracle.address);
+    console.log("Imp                 :", dgtOracleImplementation);
 
-    await ikkaToken.rely(rewards.address);
-    await rewards.setIkkaToken(ikkaToken.address);
+    await dgtToken.rely(rewards.address);
+    await rewards.setDgtToken(dgtToken.address);
     await rewards.initPool(masterVault.address, _ilkCeMatic, _rewardsRate, {gasLimit: 2000000}), //6%
-    await rewards.setOracle(ikkaOracle.address);
+    await rewards.setOracle(dgtOracle.address);
 
     _vat = vat.address,
     _spot = spot.address,
-    _sikka = sikka.address,
-    _sikkaJoin = sikkaJoin.address,
+    _davos = davos.address,
+    _davosJoin = davosJoin.address,
     _jug = jug.address,
     _dog = dog.address,
     _rewards = rewards.address;
 
     // Contracts Fetching
-    this.Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    this.Rewards = await hre.ethers.getContractFactory("DgtRewards");
     rewards = this.Rewards.attach(_rewards);
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
     let auctionProxy = await this.AuctionProxy.deploy();
@@ -234,8 +234,8 @@ async function main() {
     let interaction = await upgrades.deployProxy(this.Interaction, [
         _vat,
         _spot,
-        _sikka,
-        _sikkaJoin,
+        _davos,
+        _davosJoin,
         _jug,
         _dog,
         rewards.address
@@ -256,21 +256,21 @@ async function main() {
     console.log("Interaction implementation: ", interactionImplAddress);
 
     // Contracts Fetching
-    this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
-    this.SMatic = await hre.ethers.getContractFactory("sMATIC");
+    this.DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
+    this.DMatic = await hre.ethers.getContractFactory("dMATIC");
     this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
 
-    sikkaProvider = await upgrades.deployProxy(this.SikkaProvider, [sMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
-    await sikkaProvider.deployed();
-    sikkaProviderImplementation = await upgrades.erc1967.getImplementationAddress(sikkaProvider.address);
-    console.log("sikkaProvider  : " + sikkaProvider.address);
-    console.log("imp           : " + sikkaProviderImplementation);
+    davosProvider = await upgrades.deployProxy(this.DavosProvider, [dMatic.address, masterVault.address, interaction.address], {initializer: "initialize"});
+    await davosProvider.deployed();
+    davosProviderImplementation = await upgrades.erc1967.getImplementationAddress(davosProvider.address);
+    console.log("davosProvider  : " + davosProvider.address);
+    console.log("imp           : " + davosProviderImplementation);
 
     masterVault = this.MasterVault.attach(masterVault.address);
-    sMatic = await this.SMatic.attach(sMatic.address);
-    await sMatic.changeMinter(sikkaProvider.address);
-    await masterVault.changeProvider(sikkaProvider.address);
+    dMatic = await this.DMatic.attach(dMatic.address);
+    await dMatic.changeMinter(davosProvider.address);
+    await masterVault.changeProvider(davosProvider.address);
 
     // Store deployed addresses
     const addresses = {
@@ -278,8 +278,8 @@ async function main() {
         ceaMATICcImp   : ceaMATICcImp,
         ceVault        : ceVault.address,
         ceVaultImp     : ceVaultImp,
-        sMatic         : sMatic.address,
-        sMaticImp      : sMaticImp,
+        dMatic         : dMatic.address,
+        dMaticImp      : dMaticImp,
         cerosRouter    : cerosRouter.address,
         cerosRouterImp : cerosRouterImp,
         masterVault    : masterVault.address,
@@ -292,10 +292,10 @@ async function main() {
         vatImp         : vatImp,
         spot           : spot.address,
         spotImp        : spotImp,
-        sikka          : sikka.address,
-        sikkaImp       : sikkaImp,
-        sikkaJoin      : sikkaJoin.address,
-        sikkaJoinImp   : sikkaJoinImp,
+        davos          : davos.address,
+        davosImp       : davosImp,
+        davosJoin      : davosJoin.address,
+        davosJoinImp   : davosJoinImp,
         gemJoin        : ceaMATICcJoin.address,
         gemJoinImp     : ceaMATICcJoinImp,
         jug            : jug.address,
@@ -311,8 +311,8 @@ async function main() {
         abacusImp      : abacusImp,
         rewards        : rewards.address,
         rewardsImp     : rewardsImp,
-        ikkaToken      : ikkaToken.address,
-        ikkaTokenImp   : ikkaTokenImp,
+        dgtToken      : dgtToken.address,
+        dgtTokenImp   : dgtTokenImp,
         auctionProxy   : auctionProxy.address
     }
 
@@ -327,9 +327,9 @@ async function main() {
 
     // Contracts Attachments
     this.Vat = await hre.ethers.getContractFactory("Vat");
-    this.Rewards = await hre.ethers.getContractFactory("IkkaRewards");
+    this.Rewards = await hre.ethers.getContractFactory("DgtRewards");
     this.GemJoin = await hre.ethers.getContractFactory("GemJoin");
-    this.SikkaJoin = await hre.ethers.getContractFactory("SikkaJoin");
+    this.DavosJoin = await hre.ethers.getContractFactory("DavosJoin");
     this.Dog = await hre.ethers.getContractFactory("Dog");
     this.Jug = await hre.ethers.getContractFactory("Jug");
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
@@ -341,10 +341,10 @@ async function main() {
       }
     });
     this.Spot = await hre.ethers.getContractFactory("Spotter");
-    this.Sikka = await hre.ethers.getContractFactory("Sikka");
+    this.Davos = await hre.ethers.getContractFactory("Davos");
     this.Clip = await hre.ethers.getContractFactory("Clipper");
     this.Vow = await hre.ethers.getContractFactory("Vow");
-    this.SikkaProvider = await hre.ethers.getContractFactory("SikkaProvider");
+    this.DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
     this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
     this.Oracle = await hre.ethers.getContractFactory("MaticOracle");
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
@@ -352,15 +352,15 @@ async function main() {
     vat = await this.Vat.attach(_vat);
     rewards = await this.Rewards.attach(_rewards);
     gemJoin = await this.GemJoin.attach(ceaMATICcJoin.address);
-    sikkaJoin = await this.SikkaJoin.attach(_sikkaJoin);
+    davosJoin = await this.DavosJoin.attach(_davosJoin);
     dog = await this.Dog.attach(_dog);
     jug = await this.Jug.attach(_jug);
     interaction = await this.Interaction.attach(interaction.address);
     spot = await this.Spot.attach(_spot);
-    sikka = await this.Sikka.attach(_sikka);
+    davos = await this.Davos.attach(_davos);
     clip = await this.Clip.attach(clip.address);
     vow = await this.Vow.attach(vow.address);
-    sikkaProvider = await this.SikkaProvider.attach(sikkaProvider.address);
+    davosProvider = await this.DavosProvider.attach(davosProvider.address);
     masterVault = await this.MasterVault.attach(masterVault.address);
     oracle = await this.Oracle.attach(oracle.address);
     abacus = await this.Abacus.attach(abacus.address);
@@ -369,7 +369,7 @@ async function main() {
     console.log("Vat init...");
     await vat.rely(ceaMATICcJoin.address);
     await vat.rely(_spot);
-    await vat.rely(_sikkaJoin);
+    await vat.rely(_davosJoin);
     await vat.rely(_jug);
     await vat.rely(_dog);
     // await vat.rely(interaction.address);
@@ -384,11 +384,11 @@ async function main() {
     console.log("All init...");
     // await rewards.rely(interaction.address);
     await gemJoin.rely(interaction.address);
-    await sikkaJoin.rely(interaction.address);
+    await davosJoin.rely(interaction.address);
     await dog.rely(interaction.address);
     await jug.rely(interaction.address);
     await clip.rely(interaction.address);
-    await interaction.setSikkaProvider(masterVault.address, sikkaProvider.address);
+    await interaction.setDavosProvider(masterVault.address, davosProvider.address);
 
     // 2.000000000000000000000000000 ($) * 0.8 (80%) = 1.600000000000000000000000000,
     // 2.000000000000000000000000000 / 1.600000000000000000000000000 = 1.250000000000000000000000000 = mat
@@ -404,8 +404,8 @@ async function main() {
     await jug["file(bytes32,uint256)"](ethers.utils.formatBytes32String("base"), BR); // 10% Yearly
     await jug["file(bytes32,address)"](ethers.utils.formatBytes32String("vow"), vow.address);
 
-    console.log("Sikka...");
-    await sikka.rely(sikkaJoin.address);
+    console.log("Davos...");
+    await davos.rely(davosJoin.address);
 
     console.log("Dog...");
     await dog.rely(clip.address);

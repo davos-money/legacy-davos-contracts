@@ -19,14 +19,14 @@ describe('===GemJoin===', function () {
         // Contract factory
         this.GemJoin = await ethers.getContractFactory("GemJoin");
         this.Vat = await ethers.getContractFactory("Vat");
-        this.Sikka = await ethers.getContractFactory("Sikka");
+        this.Davos = await ethers.getContractFactory("Davos");
 
         // Contract deployment
         gemjoin = await this.GemJoin.connect(deployer).deploy();
         await gemjoin.deployed();
         vat = await this.Vat.connect(deployer).deploy();
         await vat.deployed();
-        gem = await this.Sikka.connect(deployer).deploy();
+        gem = await this.Davos.connect(deployer).deploy();
         await gem.deployed();
     });
 
@@ -76,7 +76,7 @@ describe('===GemJoin===', function () {
             await gemjoin.initialize(vat.address, collateral, gem.address);
             await expect(gemjoin.join(deployer.address, "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")).to.be.revertedWith("GemJoin/overflow");
         });
-        it('joins sikka erc20', async function () {
+        it('joins davos erc20', async function () {
             await gemjoin.initialize(vat.address, collateral, gem.address);
             await gem.initialize(97, "GEM", "100" + wad);
             await vat.initialize();
@@ -95,7 +95,7 @@ describe('===GemJoin===', function () {
             await gemjoin.initialize(vat.address, collateral, gem.address);
             await expect(gemjoin.exit(deployer.address, "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")).to.be.revertedWith("GemJoin/overflow");
         });
-        it('exits sikka erc20', async function () {
+        it('exits davos erc20', async function () {
             await gemjoin.initialize(vat.address, collateral, gem.address);
             await gem.initialize(97, "GEM", "100" + wad);
             await vat.initialize();
@@ -113,7 +113,7 @@ describe('===GemJoin===', function () {
         });
     });
 });
-describe('===SikkaJoin===', function () {
+describe('===DavosJoin===', function () {
     let deployer, signer1, signer2;
 
     let wad = "000000000000000000", // 18 Decimals
@@ -129,65 +129,65 @@ describe('===SikkaJoin===', function () {
         [deployer, signer1, signer2] = await ethers.getSigners();
 
         // Contract factory
-        this.SikkaJoin = await ethers.getContractFactory("SikkaJoin");
+        this.DavosJoin = await ethers.getContractFactory("DavosJoin");
         this.Vat = await ethers.getContractFactory("Vat");
-        this.Sikka = await ethers.getContractFactory("Sikka");
+        this.Davos = await ethers.getContractFactory("Davos");
 
         // Contract deployment
-        sikkajoin = await this.SikkaJoin.connect(deployer).deploy();
-        await sikkajoin.deployed();
+        davosjoin = await this.DavosJoin.connect(deployer).deploy();
+        await davosjoin.deployed();
         vat = await this.Vat.connect(deployer).deploy();
         await vat.deployed();
-        sikka = await this.Sikka.connect(deployer).deploy();
-        await sikka.deployed();
+        davos = await this.Davos.connect(deployer).deploy();
+        await davos.deployed();
     });
 
     describe('--- initialize()', function () {
         it('initialize', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            expect(await sikkajoin.vat()).to.be.equal(vat.address);
+            await davosjoin.initialize(vat.address, davos.address);
+            expect(await davosjoin.vat()).to.be.equal(vat.address);
         });
     });
     describe('--- rely()', function () {
-        it('reverts: SikkaJoin/not-authorized', async function () {
-            await expect(sikkajoin.rely(signer1.address)).to.be.revertedWith("SikkaJoin/not-authorized");
-            expect(await sikkajoin.wards(signer1.address)).to.be.equal("0");
+        it('reverts: DavosJoin/not-authorized', async function () {
+            await expect(davosjoin.rely(signer1.address)).to.be.revertedWith("DavosJoin/not-authorized");
+            expect(await davosjoin.wards(signer1.address)).to.be.equal("0");
         });
         it('relies on address', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikkajoin.rely(signer1.address);
-            expect(await sikkajoin.wards(signer1.address)).to.be.equal("1");
+            await davosjoin.initialize(vat.address, davos.address);
+            await davosjoin.rely(signer1.address);
+            expect(await davosjoin.wards(signer1.address)).to.be.equal("1");
         });
     });
     describe('--- deny()', function () {
-        it('reverts: SikkaJoin/not-authorized', async function () {
-            await expect(sikkajoin.deny(signer1.address)).to.be.revertedWith("SikkaJoin/not-authorized");
+        it('reverts: DavosJoin/not-authorized', async function () {
+            await expect(davosjoin.deny(signer1.address)).to.be.revertedWith("DavosJoin/not-authorized");
         });
         it('denies an address', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikkajoin.rely(signer1.address);
-            expect(await sikkajoin.wards(signer1.address)).to.be.equal("1");
-            await sikkajoin.deny(signer1.address);
-            expect(await sikkajoin.wards(signer1.address)).to.be.equal("0");
+            await davosjoin.initialize(vat.address, davos.address);
+            await davosjoin.rely(signer1.address);
+            expect(await davosjoin.wards(signer1.address)).to.be.equal("1");
+            await davosjoin.deny(signer1.address);
+            expect(await davosjoin.wards(signer1.address)).to.be.equal("0");
         });
     });
     describe('--- cage()', function () {
         it('cages', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikkajoin.cage();
-            expect(await sikkajoin.live()).to.be.equal("0");
+            await davosjoin.initialize(vat.address, davos.address);
+            await davosjoin.cage();
+            expect(await davosjoin.live()).to.be.equal("0");
         });
     });
     describe('--- join()', function () {
-        it('joins sikka erc20', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikka.initialize(97, "SIKKA", "100" + wad);
+        it('joins davos erc20', async function () {
+            await davosjoin.initialize(vat.address, davos.address);
+            await davos.initialize(97, "DAVOS", "100" + wad);
             
             await vat.initialize();
             await vat.init(collateral);
-            await vat.rely(sikkajoin.address);
-            await sikka.rely(sikkajoin.address);
-            await vat.hope(sikkajoin.address);
+            await vat.rely(davosjoin.address);
+            await davos.rely(davosjoin.address);
+            await vat.hope(davosjoin.address);
 
             await vat.connect(deployer)["file(bytes32,uint256)"](await ethers.utils.formatBytes32String("Line"), "200" + rad);
             await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, await ethers.utils.formatBytes32String("line"), "200" + rad);  
@@ -197,29 +197,29 @@ describe('===SikkaJoin===', function () {
             await vat.slip(collateral, deployer.address, "1" + wad);
             await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, "1" + wad, 0);
             await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, 0, "15" + wad);
-            await sikkajoin.exit(deployer.address, "1" + wad);
+            await davosjoin.exit(deployer.address, "1" + wad);
 
-            await sikka.approve(sikkajoin.address, "1" + wad);
+            await davos.approve(davosjoin.address, "1" + wad);
             
-            await sikkajoin.join(deployer.address, "1" + wad);
-            expect(await vat.sikka(deployer.address)).to.be.equal("15" + rad);
+            await davosjoin.join(deployer.address, "1" + wad);
+            expect(await vat.davos(deployer.address)).to.be.equal("15" + rad);
         });
     });
     describe('--- exit()', function () {
-        it('reverts: SikkaJoin/not-live', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikkajoin.cage();
-            await expect(sikkajoin.exit(deployer.address, "1" + wad)).to.be.revertedWith("SikkaJoin/not-live");
+        it('reverts: DavosJoin/not-live', async function () {
+            await davosjoin.initialize(vat.address, davos.address);
+            await davosjoin.cage();
+            await expect(davosjoin.exit(deployer.address, "1" + wad)).to.be.revertedWith("DavosJoin/not-live");
         });
-        it('exits sikka erc20', async function () {
-            await sikkajoin.initialize(vat.address, sikka.address);
-            await sikka.initialize(97, "SIKKA", "100" + wad);
+        it('exits davos erc20', async function () {
+            await davosjoin.initialize(vat.address, davos.address);
+            await davos.initialize(97, "DAVOS", "100" + wad);
             
             await vat.initialize();
             await vat.init(collateral);
-            await vat.rely(sikkajoin.address);
-            await sikka.rely(sikkajoin.address);
-            await vat.hope(sikkajoin.address);
+            await vat.rely(davosjoin.address);
+            await davos.rely(davosjoin.address);
+            await vat.hope(davosjoin.address);
 
             await vat.connect(deployer)["file(bytes32,uint256)"](await ethers.utils.formatBytes32String("Line"), "200" + rad);
             await vat.connect(deployer)["file(bytes32,bytes32,uint256)"](collateral, await ethers.utils.formatBytes32String("line"), "200" + rad);  
@@ -229,9 +229,9 @@ describe('===SikkaJoin===', function () {
             await vat.slip(collateral, deployer.address, "1" + wad);
             await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, "1" + wad, 0);
             await vat.connect(deployer).frob(collateral, deployer.address, deployer.address, deployer.address, 0, "15" + wad);
-            await sikkajoin.exit(signer1.address, "1" + wad);
+            await davosjoin.exit(signer1.address, "1" + wad);
 
-            expect(await sikka.balanceOf(signer1.address)).to.be.equal("1" + wad);
+            expect(await davos.balanceOf(signer1.address)).to.be.equal("1" + wad);
         });
     });
 });
