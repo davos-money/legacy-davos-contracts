@@ -288,7 +288,7 @@ async function main() {
     await(await vat.rely(interaction.address)).wait();
     await(await vat["file(bytes32,uint256)"](ethers.utils.formatBytes32String("Line"), _vat_Line + rad)).wait();
     await(await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("line"), _vat_line + rad)).wait();
-    await(await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + ray)).wait();
+    await(await vat["file(bytes32,bytes32,uint256)"](_ilkCeMatic, ethers.utils.formatBytes32String("dust"), _vat_dust + rad)).wait();
     
     console.log("Davos init...");
     await(await davos.rely(davosJoin.address)).wait();
