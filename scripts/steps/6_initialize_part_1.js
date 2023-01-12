@@ -92,7 +92,7 @@ async function main() {
 
     // Initialization
     console.log("SwapPool init...");
-    await (await LP.setSwapPool(swapPool.address)).wait();
+    // await (await LP.setSwapPool(swapPool.address)).wait();
     await (await swapPool.add(_swapPoolManager, 0)).wait();
     await (await swapPool.setFee(_swapPool_stakeFee , 3)).wait();
     await (await swapPool.setFee(_swapPool_unstakeFee, 4)).wait();
