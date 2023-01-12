@@ -33,7 +33,7 @@
     "_clip_tip": "10",
     "_clip_stopped": "0",
     
-    "_multisig": "",
+    "_multisig": "0x8b4b8581d0FA0E4b7FF840531eC914f1B9498B41",
     "_whitelistOperator" : "0x57F9672bA603251C9C03B36cabdBBcA7Ca8Cfcf4",
     
     "_swapPoolManager" : "0x57F9672bA603251C9C03B36cabdBBcA7Ca8Cfcf4",

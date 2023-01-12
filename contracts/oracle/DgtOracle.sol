@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "../interfaces/PipLike.sol";
 
-contract DgtOracle is PipLike, OwnableUpgradeable  {
+contract DGTOracle is PipLike, OwnableUpgradeable  {
 
     event PriceChanged(uint256 newPrice);
 

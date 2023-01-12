@@ -45,9 +45,9 @@ async function main() {
     this.Clip = await hre.ethers.getContractFactory("Clipper");
     this.Abacus = await hre.ethers.getContractFactory("LinearDecrease");
 
-    this.DgtToken = await hre.ethers.getContractFactory("DgtToken");
-    this.DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
-    this.DgtOracle = await hre.ethers.getContractFactory("DgtOracle"); 
+    this.DgtToken = await hre.ethers.getContractFactory("DGTToken");
+    this.DgtRewards = await hre.ethers.getContractFactory("DGTRewards");
+    this.DgtOracle = await hre.ethers.getContractFactory("DGTOracle"); 
     
     this.AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
 
@@ -216,7 +216,7 @@ async function main() {
     console.log("Clip            :", clip.address);
     console.log("ClipImp         :", clipImp);
 
-    let rewards = await upgrades.deployProxy(this.DgtRewards, [vat.address, ether(_dgtRewardsPoolLimitInEth).toString()], {initializer: "initialize"});
+    let rewards = await upgrades.deployProxy(this.DgtRewards, [vat.address, ether(_dgtRewardsPoolLimitInEth).toString(), "5"], {initializer: "initialize"});
     await rewards.deployed();
     rewardsImp = await upgrades.erc1967.getImplementationAddress(rewards.address);
     console.log("Rewards         :", rewards.address);
