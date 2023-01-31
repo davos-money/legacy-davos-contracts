@@ -90,16 +90,16 @@ async function main() {
   let _nonce = await ethers.provider.getTransactionCount(deployer.address);
 
   console.log("--All relies to multisig");
-  // await (await vat.rely(_multisig, {nonce: _nonce})).wait();
-  // console.log("vat relied to            : " + _multisig);
-  // await (await spot.rely(_multisig, {nonce: _nonce})).wait();
-  // console.log("spot relied to           : " + _multisig);
-  // await (await davos.rely(_multisig, {nonce: _nonce})).wait();
-  // console.log("davos relied to          : " + _multisig);
-  // await (await gemjoin.rely(_multisig, {nonce: _nonce})).wait();
-  // console.log("gemjoin relied to        : " + _multisig);
-  // await (await davosjoin.rely(_multisig, {nonce: _nonce})).wait();
-  // console.log("davosjoin relied to      : " + _multisig);
+  await (await vat.rely(_multisig, {nonce: _nonce})).wait();
+  console.log("vat relied to            : " + _multisig);
+  await (await spot.rely(_multisig, {nonce: _nonce})).wait();
+  console.log("spot relied to           : " + _multisig);
+  await (await davos.rely(_multisig, {nonce: _nonce})).wait();
+  console.log("davos relied to          : " + _multisig);
+  await (await gemjoin.rely(_multisig, {nonce: _nonce})).wait();
+  console.log("gemjoin relied to        : " + _multisig);
+  await (await davosjoin.rely(_multisig, {nonce: _nonce})).wait();
+  console.log("davosjoin relied to      : " + _multisig);
   await (await jug.rely(_multisig, {nonce: _nonce})).wait(); _nonce += 1;
   console.log("jug relied to            : " + _multisig);
   await (await vow.rely(_multisig, {nonce: _nonce})).wait(); _nonce += 1;
@@ -136,38 +136,6 @@ async function main() {
   console.log("swappool transfered to   : " + _multisig);
   await (await proxyadmin.transferOwnership(_multisig, {nonce: _nonce})).wait(); _nonce += 1;
   console.log("proxyadmin transfered to : " + _multisig);
-
-  // Risk alert.
-  // We comment part below until we confirm every single 'rely' TX above,
-  // Otherwise there is potential loss of ownership if we 'deny' before 'rely'.
-
-  // console.log("--All denies to old owner");
-  // await (await vat.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("vat denied to            : " + deployer.address);
-  // await (await spot.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("spot denied to           : " + deployer.address);
-  // await (await davos.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("davos denied to          : " + deployer.address);
-  // await (await gemjoin.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("gemjoin denied to        : " + deployer.address);
-  // await (await davosjoin.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("davosjoin denied to      : " + deployer.address);
-  // await (await jug.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("jug denied to            : " + deployer.address);
-  // await (await vow.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("vow denied to            : " + deployer.address);
-  // await (await dog.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("dog denied to            : " + deployer.address);
-  // await (await clip.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("clip denied to           : " + deployer.address);
-  // await (await abaci.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("abaci denied to          : " + deployer.address);
-  // await (await dgtrewards.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("dgtrewards denied to     : " + deployer.address);
-  // await (await interaction.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("interaction denied to    : " + deployer.address);
-  // await (await jar.deny(deployer.address, {nonce: _nonce})).wait(); _nonce += 1;
-  // console.log("jar denied to            : " + deployer.address);
 
   console.log("---------------------------");
   console.log("Ownerships transfer complete...");
