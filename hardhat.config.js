@@ -64,7 +64,8 @@ module.exports = {
         polygon: {
             url: process.env.POLYGON_URL,
             chainId: 137,
-            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
+            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`],
+            gasPrice: 200000000000
         },
         avalanche_testnet: {
             url: process.env.AVALANCHE_TESTNET_URL,
