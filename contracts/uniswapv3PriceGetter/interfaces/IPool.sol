@@ -125,7 +125,7 @@ interface IPool {
 
   function tickBitmap(int16) external view returns (uint256);
 
-  function observations(uint16) external view returns (Observation memory);
+  function observations(uint256) external view returns (Observation memory);
 
   function ticks(int24) external view returns (Info memory);
 }
