@@ -131,6 +131,7 @@ ReentrancyGuardUpgradeable
             IWETH(asset()).deposit{value: amount}();
         }
         _mint(src, shares);
+        allocate(); 
         emit Deposit(src, src, amount, shares);
     }
 
@@ -339,7 +340,7 @@ ReentrancyGuardUpgradeable
 
     /// @dev Tries to allocate funds to strategies based on their allocations.
     ///      (It will be triggered mostly in case of deposits to avoid unnecessary swapFees)
-    function allocate() external {
+    function allocate() public {
         for(uint8 i = 0; i < strategies.length; i++) {
             if(strategyParams[strategies[i]].active) {
                 StrategyParams memory strategy =  strategyParams[strategies[i]];
