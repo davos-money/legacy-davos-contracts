@@ -50,6 +50,8 @@ ReentrancyGuardUpgradeable
 
     mapping(address => bool) public manager;
     mapping (address => StrategyParams) public strategyParams;
+
+    uint256 public swapFeeStatus;
     
     /**
      * Modifiers
@@ -115,7 +117,8 @@ ReentrancyGuardUpgradeable
         address src = msg.sender;
         uint256 amount = msg.value;
         require(amount > 0, "invalid amount");
-        shares = _assessSwapFee(amount, swapPool.stakeFee());
+
+        shares = swapFeeStatus == 1 || swapFeeStatus == 3 ? _assessSwapFee(amount, swapPool.stakeFee()) : amount;
         shares = _assessFee(shares, depositFee);
 
         uint256 waitingPoolDebt = waitingPool.totalDebt();
@@ -151,11 +154,12 @@ ReentrancyGuardUpgradeable
         shares = amount;
         _burn(src, shares);
         uint256 wethBalance = totalAssetInVault();
+        bool _swapFeeStatus = swapFeeStatus == 2 || swapFeeStatus == 3 ? true : false;
         if(wethBalance < amount) {
             shares = withdrawFromActiveStrategies(amount - wethBalance);
             if(shares == 0) {
                 // deduct swapFee and withdrawalFee and then submit to waiting pool
-                shares = _assessSwapFee(amount, swapPool.unstakeFee());
+                shares = _swapFeeStatus ? _assessSwapFee(amount, swapPool.unstakeFee()) : amount;
                 shares = _assessFee(shares, withdrawalFee);
                 waitingPool.addToQueue(account, shares);
                 if(wethBalance > 0) {
@@ -166,9 +170,9 @@ ReentrancyGuardUpgradeable
                 return amount;
             }
             // assess swapFee only on the assests which were already in the contract.
-            shares += _assessSwapFee(wethBalance, swapPool.unstakeFee());
+            shares += _swapFeeStatus ? _assessSwapFee(wethBalance, swapPool.unstakeFee()) : wethBalance;
         } else {
-            shares = _assessSwapFee(amount, swapPool.unstakeFee());
+            shares = _swapFeeStatus ? _assessSwapFee(amount, swapPool.unstakeFee()) : amount;
         }
         shares = _assessFee(shares, withdrawalFee);
         IWETH(asset()).withdraw(shares);
@@ -270,7 +274,7 @@ ReentrancyGuardUpgradeable
         if(value > 0) {
             require(
                 value <= amount && 
-                value >= _assessSwapFee(amount, swapPool.unstakeFee()) - 100,
+                value >= (swapFeeStatus == 2 || swapFeeStatus == 3 ? _assessSwapFee(amount, swapPool.unstakeFee()) - 100 : amount - 100),
                 "invalid withdrawn amount");
             totalDebt -= amount;
             strategyParams[strategy].debt -= amount;
@@ -480,6 +484,13 @@ ReentrancyGuardUpgradeable
         require(maxWithdrawalFee > newWithdrawalFee,"more than maxWithdrawalFee");
         withdrawalFee = newWithdrawalFee;
         emit WithdrawalFeeChanged(newWithdrawalFee);
+    }
+
+    /// @dev only owner can change SwapFee status
+    /// @param _status 0-Disabled, 1-OnDeposit, 2-OnWithdrawal, 3-Both
+    function changeSwapFeeStatus(uint256 _status) external onlyOwner {
+        require(_status >= 0 && _status < 4, "status range 0-3");
+        swapFeeStatus = _status;
     }
 
     /// @dev only owner can set new waiting pool address
