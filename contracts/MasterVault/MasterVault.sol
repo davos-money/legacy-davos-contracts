@@ -52,6 +52,7 @@ ReentrancyGuardUpgradeable
     mapping (address => StrategyParams) public strategyParams;
 
     uint256 public swapFeeStatus;
+    uint256 public allocateOnDeposit;
     
     /**
      * Modifiers
@@ -134,7 +135,10 @@ ReentrancyGuardUpgradeable
             IWETH(asset()).deposit{value: amount}();
         }
         _mint(src, shares);
-        allocate(); 
+
+        if(allocateOnDeposit == 1) {
+            allocate();
+        }
         emit Deposit(src, src, amount, shares);
     }
 
@@ -220,15 +224,16 @@ ReentrancyGuardUpgradeable
         require(amount > 0, "invalid deposit amount");
         require(strategyParams[strategy].active, "invalid strategy address");
         require(totalAssetInVault() >= amount, "insufficient balance");
-        if (IBaseStrategy(strategy).canDeposit(amount)) {
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset()), strategy, amount);
-            uint256 value = IBaseStrategy(strategy).deposit(amount);
-            if(value > 0) {
-                totalDebt += value;
-                strategyParams[strategy].debt += value;
-                emit DepositedToStrategy(strategy, amount, value);
-                return true;
-            }
+
+        amount = IBaseStrategy(strategy).canDeposit(amount);
+
+        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset()), strategy, amount);
+        uint256 value = IBaseStrategy(strategy).deposit(amount);
+        if(value > 0) {
+            totalDebt += value;
+            strategyParams[strategy].debt += value;
+            emit DepositedToStrategy(strategy, amount, value);
+            return true;
         }
     }
 
@@ -491,6 +496,15 @@ ReentrancyGuardUpgradeable
     function changeSwapFeeStatus(uint256 _status) external onlyOwner {
         require(_status >= 0 && _status < 4, "status range 0-3");
         swapFeeStatus = _status;
+        emit SwapFeeStatusChanged(_status);
+    }
+
+    /// @dev only owner can change Deposit allocation status
+    /// @param _status 0-Disabled, 1-Enabled
+    function changeAllocateOnDeposit(uint256 _status) external onlyOwner {
+        require(_status >= 0 && _status < 2, "status range 0-1");
+        allocateOnDeposit = _status;
+        emit AllocationOnDepositChangeed(_status);
     }
 
     /// @dev only owner can set new waiting pool address

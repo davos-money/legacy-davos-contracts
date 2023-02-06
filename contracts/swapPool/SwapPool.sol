@@ -438,6 +438,33 @@ contract SwapPool is
     }
   }
 
+  /**
+   * @notice view function which retruns amount in by amount out
+   * @param nativeToCeros - if 'true' then will show native token to ceros, else ceros-native
+   * @param amountOut - the amount of tokens that you want to get
+   * @param isExcludedFromFee - if 'true' will calculate amount out without fees
+   */
+  function getAmountIn(
+    bool nativeToCeros,
+    uint256 amountOut,
+    bool isExcludedFromFee
+  ) external view virtual returns (uint256 amountIn, bool enoughLiquidity) {
+    uint256 ratio = ICerosToken(cerosToken).ratio();
+    if (nativeToCeros) {
+      amountIn = (amountOut * 1e18) / ratio;
+      if (!isExcludedFromFee) {
+        amountIn = (amountIn * FEE_MAX) / (FEE_MAX - stakeFee); // amountIn with Fee
+      }
+      enoughLiquidity = cerosTokenAmount >= amountOut;
+    } else {
+      amountIn = (amountOut * ratio) / 1e18;
+      if (!isExcludedFromFee) {
+        amountIn = (amountIn * FEE_MAX) / (FEE_MAX - unstakeFee); // amountIn with Fee
+      }
+      enoughLiquidity = nativeTokenAmount >= amountOut;
+    }
+  }
+
   /// sends the amount to the receiver address
   function _sendValue(address receiver, uint256 amount) internal virtual {
     payable(receiver).transfer(amount);

@@ -30,5 +30,5 @@ function balanceOfPool() external view returns(uint256);
 // set the recipient address of the collected fee
 function setFeeRecipient(address newFeeRecipient) external;
 
-function canDeposit(uint256 amount) external view returns(bool);
+function canDeposit(uint256 amount) external view returns(uint256 correctAmount);
 }

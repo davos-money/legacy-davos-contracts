@@ -13,9 +13,18 @@ interface ISwapPool {
         uint amountIn,
         bool isExcludedFromFee) 
         external view returns(uint amountOut, bool enoughLiquidity);
+
+    function getAmountIn(
+        bool nativeToCeros,
+        uint amountOut,
+        bool isExcludedFromFee)
+        external view returns(uint amountIn, bool enoughLiquidity);
     
     function unstakeFee() external view returns (uint24 unstakeFee);
     function stakeFee() external view returns (uint24 stakeFee);
 
     function FEE_MAX() external view returns (uint24 feeMax);
+
+    function cerosTokenAmount() external view returns(uint256);
+
 }

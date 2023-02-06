@@ -64,10 +64,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         require(!depositPaused, "deposits are paused");
         require(amount > 0, "invalid amount");
         _beforeDeposit(amount);
-        (, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false); // (amount * ratio) / 1e18
-        if (enoughLiquidity) {
-            return _ceRouter.depositWMatic(amount);
-        }
+        return _ceRouter.depositWMatic(amount);
     }
 
     /// @dev withdraws the given amount of underlying tokens from ceros and transfers to masterVault
@@ -108,9 +105,14 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         require(msg.sender == address(underlying)); // only accept ETH from the WETH contract
     }
 
-    function canDeposit(uint256 amount) public view returns(bool) {
+    /// @dev returns the depositable amount based on liquidity
+    function canDeposit(uint256 amount) public view returns(uint256 correctAmount) {
+        correctAmount = amount;
         (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false);
-        return enoughLiquidity;
+        if (!enoughLiquidity) { // If liquidity not enough, calculate amountIn for remaining liquidity
+            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount(), false);
+            correctAmount = amountIn;
+        }
     }
 
     /// @dev claims yeild from ceros in aMATICc and transfers to feeRecipient
