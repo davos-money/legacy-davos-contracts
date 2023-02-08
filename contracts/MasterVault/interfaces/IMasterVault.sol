@@ -20,6 +20,8 @@ interface IMasterVault {
     event SwapPoolChanged(address swapPool);
     event StrategyAdded(address strategy, uint256 allocation);
     event StrategyMigrated(address oldStrategy, address newStrategy, uint256 newAllocation);
+    event SwapFeeStatusChanged(uint256 status);
+    event AllocationOnDepositChangeed(uint256 status);
     
     // amount: asset that are deposited to strategy
     // actualAmount: amount - strategyFee, if any
