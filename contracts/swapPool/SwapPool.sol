@@ -449,15 +449,17 @@ contract SwapPool is
     uint256 amountOut,
     bool isExcludedFromFee
   ) external view virtual returns (uint256 amountIn, bool enoughLiquidity) {
+    uint256 dust = 1;
+    dust = amountOut == 0 ? 0 : 1;
     uint256 ratio = ICerosToken(cerosToken).ratio();
     if (nativeToCeros) {
-      amountIn = (amountOut * 1e18) / ratio;
+      amountIn = ((amountOut * 1e18) / ratio) + dust;
       if (!isExcludedFromFee) {
         amountIn = (amountIn * FEE_MAX) / (FEE_MAX - stakeFee); // amountIn with Fee
       }
       enoughLiquidity = cerosTokenAmount >= amountOut;
     } else {
-      amountIn = (amountOut * ratio) / 1e18;
+      amountIn = ((amountOut * ratio) / 1e18) + dust;
       if (!isExcludedFromFee) {
         amountIn = (amountIn * FEE_MAX) / (FEE_MAX - unstakeFee); // amountIn with Fee
       }

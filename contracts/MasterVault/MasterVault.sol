@@ -160,7 +160,7 @@ ReentrancyGuardUpgradeable
         uint256 wethBalance = totalAssetInVault();
         bool _swapFeeStatus = swapFeeStatus == 2 || swapFeeStatus == 3 ? true : false;
         if(wethBalance < amount) {
-            shares = withdrawFromActiveStrategies(amount - wethBalance);
+            shares = _withdrawFromActiveStrategies(amount - wethBalance);
             if(shares == 0) {
                 // deduct swapFee and withdrawalFee and then submit to waiting pool
                 shares = _swapFeeStatus ? _assessSwapFee(amount, swapPool.unstakeFee()) : amount;
@@ -196,7 +196,7 @@ ReentrancyGuardUpgradeable
             uint256 withdrawAmount = 
                     ((waitingPoolDebt - waitingPoolBal) * maxFee) /
                     (maxFee - swapPool.unstakeFee());
-            uint256 withdrawn = withdrawFromActiveStrategies(withdrawAmount + 1);
+            uint256 withdrawn = _withdrawFromActiveStrategies(withdrawAmount + 1);
             if(withdrawn > 0) {
                 IWETH(asset()).withdraw(withdrawn);
                 payable(address(waitingPool)).transfer(withdrawn);
@@ -208,7 +208,7 @@ ReentrancyGuardUpgradeable
     /// @dev attemps withdrawal from the strategies
     /// @param amount assets to withdraw from strategy
     /// @return withdrawn - assets withdrawn from the strategy
-    function withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn) {
+    function _withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn) {
         for(uint8 i = 0; i < strategies.length; i++) {
            if(strategyParams[strategies[i]].active && 
               strategyParams[strategies[i]].debt >= amount) {

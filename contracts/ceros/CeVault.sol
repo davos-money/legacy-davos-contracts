@@ -49,7 +49,8 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256)
     {
-        return _deposit(msg.sender, amount);
+        revert("not-allowed");
+        // return _deposit(msg.sender, amount);
     }
     // deposit
     function depositFor(address recipient, uint256 amount)
@@ -113,7 +114,8 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256)
     {
-        return _withdraw(msg.sender, recipient, amount);
+        revert("not-allowed");
+        // return _withdraw(msg.sender, recipient, amount);
     }
     // withdraw
     function withdrawFor(

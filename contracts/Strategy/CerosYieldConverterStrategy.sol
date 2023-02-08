@@ -110,7 +110,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         correctAmount = amount;
         (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false);
         if (!enoughLiquidity) { // If liquidity not enough, calculate amountIn for remaining liquidity
-            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount(), false);
+            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount() - 1, false);
             correctAmount = amountIn;
         }
     }
