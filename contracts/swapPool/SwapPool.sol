@@ -695,6 +695,55 @@ contract SwapPool is
     }
   }
 
+  /**
+   * @notice triggers the rebalance and stakes/unstakes the amounts of tokens to balance the pool MATIC balance with given percent
+   * @dev ignore threshold
+   */
+  function triggerRebalanceAnkrWithPercent(uint16 percent) external virtual nonReentrant onlyManager {
+    require(percent >= 0 && percent <= 10000, "percent should be in range 0-100.00");
+
+    skim();
+    uint256 ratio = ICerosToken(cerosToken).ratio();
+
+    // MATIC balance of pool
+    uint256 amountAInNative = nativeTokenAmount;
+    // ankrMATIC balance of pool in MATIC
+    uint256 amountBInNative = (cerosTokenAmount * 1e18) / ratio;
+    // total pool balance
+    uint256 wholeAmount = amountAInNative + amountBInNative;
+
+    uint256 expectedNative = wholeAmount * percent / 10000;
+
+    uint256 amount;
+    if (expectedNative < amountAInNative) {
+      // we need stake to decrease MATIC amount
+      amount = amountAInNative - expectedNative;
+
+      require(nativeTokenAmount >= amount, "not enough MATIC to stake");
+      nativeTokenAmount -= amount;
+      INativeERC20(nativeToken).withdraw(amount);
+      maticPool.stake{ value: amount }(false);
+    } else if (expectedNative > amountAInNative) {
+      // we need unstake to increase MATIC amount
+      // set diff as amount to unstake
+      amount = expectedNative - amountAInNative;
+
+      uint256 cerosAmt = (amount * ratio) / 1e18;
+      uint256 commission = maticPool.unstakeCommission();
+
+      require(cerosTokenAmount >= cerosAmt, "not enough to pay ankrMATIC commission");
+      require(nativeTokenAmount >= commission, "not enough to pay MATIC commission");
+
+      cerosTokenAmount -= cerosAmt;
+      nativeTokenAmount -= commission;
+
+      INativeERC20(nativeToken).withdraw(commission);
+      maticPool.unstake{ value: commission }(cerosAmt, false);
+    } else {
+      revert("already balanced");
+    }
+  }
+
   function approveToMaticPool() external virtual {
     IERC20Upgradeable(cerosToken).safeApprove(address(maticPool), type(uint256).max);
   }
