@@ -226,6 +226,7 @@ ReentrancyGuardUpgradeable
         require(totalAssetInVault() >= amount, "insufficient balance");
 
         amount = IBaseStrategy(strategy).canDeposit(amount);
+        if(amount <= 0) return false;
 
         SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset()), strategy, amount);
         uint256 value = IBaseStrategy(strategy).deposit(amount);
@@ -359,7 +360,7 @@ ReentrancyGuardUpgradeable
                     uint256 strategyRatio = (strategy.debt * 1e6) / totalAssetAndDebt;
                     if(strategyRatio < allocation) {
                         uint256 depositAmount = ((totalAssetAndDebt * allocation) / 1e6) - strategy.debt;
-                        if(totalAssetInVault() > depositAmount) {
+                        if(totalAssetInVault() > depositAmount && depositAmount > 0) {
                             _depositToStrategy(strategies[i], depositAmount);
                         }
                     }
