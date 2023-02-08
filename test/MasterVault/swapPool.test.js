@@ -46,6 +46,7 @@ describe("SwapPool", () => {
   // mocks
   let wNative;
   let cerosToken;
+  let native;
 
   const mintAmount = parseEther("10000000");
 
@@ -58,7 +59,10 @@ describe("SwapPool", () => {
     const SwapPoolFactory = await ethers.getContractFactory("SwapPool");
     const WNativeFactory = await ethers.getContractFactory("WNative");
     const CerosTokenFactory = await ethers.getContractFactory("CerosToken");
+    const MaticPool = await ethers.getContractFactory("MaticPoolMock");
+    const Native = await ethers.getContractFactory("NativeMock");
 
+    native = await Native.connect(deployer).deploy();
     lp = await LPFactory.connect(deployer).deploy();
     await lp.deployed();
     wNative = await WNativeFactory.connect(deployer).deploy();
@@ -76,6 +80,13 @@ describe("SwapPool", () => {
     );
     await swapPool.deployed();
 
+    const maticPool = await MaticPool.connect(deployer).deploy();
+    await maticPool.initialize(
+      native.address,
+      cerosToken.address,
+      parseEther('1')
+    )
+
     await wNative.connect(user1).deposit({ value: mintAmount });
     await cerosToken.connect(user1).mintMe(mintAmount);
     await wNative.connect(user2).deposit({ value: mintAmount });
@@ -88,6 +99,8 @@ describe("SwapPool", () => {
 
     // Initialize Contracts
     await lp.setSwapPool(swapPool.address);
+    await swapPool.setMaticPool(maticPool.address);
+    await maticPool.changeUnstakeCommission(parseEther('1'));
 
     await networkSnapshotter.firstSnapshot();
   });
@@ -647,6 +660,47 @@ describe("SwapPool", () => {
         const expectedBalance = amount0.mul(2).mul(totalLp).div(allInNative);
         expect(await lp.balanceOf(user2.address)).eq(expectedBalance);
       });
+      it("trigger rebalance with percent should work", async () => {
+        // add manager
+        await swapPool.add(manager.address, UserType.MANAGER);
+        // Set ratio
+        let newRatio = parseEther("1");
+        await cerosToken.connect(deployer).setRatio(newRatio);
+
+        const addAmount = parseEther("30");
+
+        let amount0 = addAmount;
+        let amount1 = addAmount;
+        let value = amount0.mul(newRatio).div(tenPow18);
+        if (amount1.lt(value)) {
+          amount0 = amount1.mul(tenPow18).div(newRatio);
+        } else {
+          amount1 = value;
+        }
+
+        // add liquidity for tests
+        expect(await swapPool.connect(user1).addLiquidity(addAmount, addAmount))
+          .to.emit(swapPool, "LiquidityChange")
+          .withArgs(user1.address, amount0, amount1, amount0, amount1, true);
+
+        // set small ratio
+        newRatio = parseEther("0.09");
+        await cerosToken.connect(deployer).setRatio(newRatio);
+
+        const nativeBefore = await swapPool.nativeTokenAmount();
+        const cerosBefore = (await swapPool.cerosTokenAmount()).mul(tenPow18).div(newRatio);
+
+        const percent = '100';
+
+        // rebalance with 1%, should stake 99% of balance
+        await swapPool.connect(manager).triggerRebalanceAnkrWithPercent(percent);
+
+        const nativeAfter = (await swapPool.nativeTokenAmount()).toString();
+        const cerosAfter = (await swapPool.cerosTokenAmount()).mul(tenPow18).div(newRatio).toString();
+
+        expect(cerosAfter).eq(cerosBefore.toString());
+        expect(nativeAfter).eq(nativeBefore.add(cerosBefore).mul('100').div('10000').toString());
+      })
     });
   });
 
