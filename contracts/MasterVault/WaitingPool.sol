@@ -91,9 +91,9 @@ contract WaitingPool is IWaitingPool, Initializable {
 
     /// @dev users can withdraw their funds if they were not transferred in tryRemove()
     function withdrawUnsettled(uint256 _index) external {
-        require(!lock, "reetrancy");
+        require(!lock, "reentrancy");
         lock = true;
-        
+
         address src = msg.sender;
         require(
             !people[_index]._settled && 
@@ -104,8 +104,10 @@ contract WaitingPool is IWaitingPool, Initializable {
         uint256 withdrawAmount = people[_index]._debt;
         totalDebt -= withdrawAmount;
         people[_index]._settled = true;
+        
         (bool sent,) = src.call{value: withdrawAmount}("");
         require(sent, "unsuccessful");
+
         lock = false;
         emit WithdrawCompleted(src, withdrawAmount);
     }
