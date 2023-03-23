@@ -85,9 +85,10 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             return amount;
         }
         
-        (uint256 amountOut, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, ((amount - wethBalance) * _certToken.ratio()) / 1e18, false); // (amount * ratio) / 1e18
+        uint256 amountOut; bool enoughLiquidity; uint256 remaining = amount - wethBalance;
+        (amountOut, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, false); // (amount * ratio) / 1e18
         if (enoughLiquidity) {
-            value = _ceRouter.withdrawWithSlippage(address(this), amount - wethBalance, amountOut);
+            value = _ceRouter.withdrawWithSlippage(address(this), remaining, amountOut);
             require(value >= amountOut, "invalid out amount");
             uint256 withdrawAmount = wethBalance + value;
             if (amount < withdrawAmount) {
@@ -113,6 +114,21 @@ contract CerosYieldConverterStrategy is BaseStrategy {
             (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount() - 1, false);
             correctAmount = amountIn;
         }
+    }
+
+    /// @dev returns the withdrawable amount based on liquidity
+    function canWithdraw(uint256 amount) public view returns(uint256 correctAmount) {
+        uint256 wethBalance = underlying.balanceOf(address(this));
+        if(amount < wethBalance) return amount;
+        
+        bool enoughLiquidity; uint256 remaining = amount - wethBalance;
+        (, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, false);
+
+        if (!enoughLiquidity) {
+            remaining = ISwapPool(_swapPool).nativeTokenAmount();
+            return remaining + wethBalance;
+        }
+        correctAmount = amount;
     }
 
     /// @dev claims yeild from ceros in aMATICc and transfers to feeRecipient

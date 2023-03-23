@@ -31,4 +31,6 @@ function balanceOfPool() external view returns(uint256);
 function setFeeRecipient(address newFeeRecipient) external;
 
 function canDeposit(uint256 amount) external view returns(uint256 correctAmount);
+
+function canWithdraw(uint256 amount) external view returns(uint256 correctAmount);
 }

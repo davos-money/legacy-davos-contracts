@@ -27,4 +27,5 @@ interface ISwapPool {
 
     function cerosTokenAmount() external view returns(uint256);
 
+    function nativeTokenAmount() external view returns(uint256);
 }

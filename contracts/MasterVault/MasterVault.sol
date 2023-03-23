@@ -146,7 +146,7 @@ ReentrancyGuardUpgradeable
     /// @param account receipient's address
     /// @param amount amount of assets to withdraw
     /// @return shares : amount of assets(excluding fee)
-    function withdrawETH(address account, uint256 amount) 
+    function withdrawETH(address account, uint256 amount) // 100
     external
     override
     nonReentrant 
@@ -155,20 +155,24 @@ ReentrancyGuardUpgradeable
     returns (uint256 shares) {
         require(amount > 0, "invalid withdrawal amount");
         address src = msg.sender;
-        shares = amount;
+        shares = amount; // 100
         _burn(src, shares);
-        uint256 wethBalance = totalAssetInVault();
+        uint256 wethBalance = totalAssetInVault(); // 40
         bool _swapFeeStatus = swapFeeStatus == 2 || swapFeeStatus == 3 ? true : false;
         if(wethBalance < amount) {
-            shares = _withdrawFromActiveStrategies(amount - wethBalance);
-            if(shares == 0) {
+            uint256 diff = amount - wethBalance; // 60
+            bool incomplete;
+            (shares, incomplete) = _withdrawFromActiveStrategies(diff); // 
+            
+            if(shares == 0 || incomplete || (waitingPool.totalDebt() > 0 && address(waitingPool).balance < waitingPool.totalDebt())) {
                 // deduct swapFee and withdrawalFee and then submit to waiting pool
-                shares = _swapFeeStatus ? _assessSwapFee(amount, swapPool.unstakeFee()) : amount;
+                uint256 withdrawn = wethBalance + shares;
+                shares = _assessSwapFee(amount, swapPool.unstakeFee());
                 shares = _assessFee(shares, withdrawalFee);
                 waitingPool.addToQueue(account, shares);
-                if(wethBalance > 0) {
-                    IWETH(asset()).withdraw(wethBalance);
-                    payable(address(waitingPool)).transfer(wethBalance);
+                if(withdrawn > 0) {
+                    IWETH(asset()).withdraw(withdrawn);
+                    payable(address(waitingPool)).transfer(withdrawn);
                 }
                 emit Withdraw(src, src, src, amount, shares);
                 return amount;
@@ -196,7 +200,7 @@ ReentrancyGuardUpgradeable
             uint256 withdrawAmount = 
                     ((waitingPoolDebt - waitingPoolBal) * maxFee) /
                     (maxFee - swapPool.unstakeFee());
-            uint256 withdrawn = _withdrawFromActiveStrategies(withdrawAmount + 1);
+            (uint256 withdrawn,) = _withdrawFromActiveStrategies(withdrawAmount + 1);
             if(withdrawn > 0) {
                 IWETH(asset()).withdraw(withdrawn);
                 payable(address(waitingPool)).transfer(withdrawn);
@@ -205,14 +209,11 @@ ReentrancyGuardUpgradeable
         waitingPool.tryRemove();
     }
 
-    /// @dev attemps withdrawal from the strategies
-    /// @param amount assets to withdraw from strategy
-    /// @return withdrawn - assets withdrawn from the strategy
-    function _withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn) {
+    function _withdrawFromActiveStrategies(uint256 amount) private returns(uint256 withdrawn, bool incomplete) {
         for(uint8 i = 0; i < strategies.length; i++) {
            if(strategyParams[strategies[i]].active && 
               strategyParams[strategies[i]].debt >= amount) {
-                return _withdrawFromStrategy(strategies[i], amount);
+                (withdrawn, incomplete) = _withdrawFromStrategy(strategies[i], amount);
            }
         }
     }
@@ -255,14 +256,14 @@ ReentrancyGuardUpgradeable
     /// @param strategy address of the strategy
     /// @param amount assets to withdraw from the strategy
     function withdrawFromStrategy(address strategy, uint256 amount) public onlyManager {
-        uint256 withdrawn = _withdrawFromStrategy(strategy, amount);
+        (uint256 withdrawn,) = _withdrawFromStrategy(strategy, amount);
         require(withdrawn > 0, "cannot withdraw from strategy");
     }
 
     /// @dev withdraw strategy's total debt
     /// @param strategy address of the strategy
     function withdrawAllFromStrategy(address strategy) external onlyManager {
-        uint256 withdrawn = _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
+        (uint256 withdrawn,) = _withdrawFromStrategy(strategy, strategyParams[strategy].debt);
         require(withdrawn > 0, "cannot withdraw from strategy");
     }
 
@@ -272,21 +273,26 @@ ReentrancyGuardUpgradeable
     /// NOTE: subtracts the given amount of assets instead of value(withdrawn funds) because 
     ///       of the swapFee that is deducted in the swapPool contract and that fee needs 
     ///       to be paid by the users only
-    function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256) {
+    function _withdrawFromStrategy(address strategy, uint256 amount) private returns(uint256,bool incomplete) {
         require(amount > 0, "invalid withdrawal amount");
         // check if strategy have debt >= amount(no need to check if strategy is active)
         require(strategyParams[strategy].debt >= amount, "insufficient assets in strategy");
-        uint256 value = IBaseStrategy(strategy).withdraw(amount);
+
+        uint256 correctAmount = IBaseStrategy(strategy).canWithdraw(amount);
+        if(correctAmount <= 0) return (0, false);
+        else if(correctAmount < amount) incomplete = true;
+
+        uint256 value = IBaseStrategy(strategy).withdraw(correctAmount);
         if(value > 0) {
             require(
-                value <= amount && 
-                value >= (swapFeeStatus == 2 || swapFeeStatus == 3 ? _assessSwapFee(amount, swapPool.unstakeFee()) - 100 : amount - 100),
+                value <= correctAmount && 
+                value >= (swapFeeStatus == 2 || swapFeeStatus == 3 ? _assessSwapFee(correctAmount, swapPool.unstakeFee()) - 100 : correctAmount - 100),
                 "invalid withdrawn amount");
-            totalDebt -= amount;
-            strategyParams[strategy].debt -= amount;
-            emit WithdrawnFromStrategy(strategy, amount, value);
+            totalDebt -= correctAmount;
+            strategyParams[strategy].debt -= correctAmount;
+            emit WithdrawnFromStrategy(strategy, correctAmount, value);
         }
-        return value;
+        return (value, incomplete);
     }
 
     /// @dev sets new strategy
@@ -407,7 +413,7 @@ ReentrancyGuardUpgradeable
         uint256 oldStrategyDebt = strategyParams[oldStrategy].debt;
         
         if(oldStrategyDebt > 0) {
-            uint256 withdrawn = _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt);
+            (uint256 withdrawn,) = _withdrawFromStrategy(oldStrategy, strategyParams[oldStrategy].debt);
             require(withdrawn > 0, "cannot withdraw from strategy");
         }
         StrategyParams memory params = StrategyParams({

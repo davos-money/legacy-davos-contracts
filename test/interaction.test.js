@@ -121,9 +121,9 @@ describe("Interaction", function () {
         Dog = await hre.ethers.getContractFactory("Dog");
         Clip = await hre.ethers.getContractFactory("Clipper");
         Abacus = await hre.ethers.getContractFactory("LinearDecrease");
-        DgtToken = await hre.ethers.getContractFactory("DgtToken");
-        DgtRewards = await hre.ethers.getContractFactory("DgtRewards");
-        DgtOracle = await hre.ethers.getContractFactory("DgtOracle"); 
+        DgtToken = await hre.ethers.getContractFactory("DGTToken");
+        DgtRewards = await hre.ethers.getContractFactory("DGTRewards");
+        DgtOracle = await hre.ethers.getContractFactory("DGTOracle"); 
         AuctionProxy = await hre.ethers.getContractFactory("AuctionProxy");
 
         const auctionProxy = await this.AuctionProxy.deploy();
