@@ -49,7 +49,7 @@ ReentrancyGuardUpgradeable
     address[] public strategies;
 
     mapping(address => bool) public manager;
-    mapping (address => StrategyParams) public strategyParams;
+    mapping(address => StrategyParams) public strategyParams;
 
     uint256 public swapFeeStatus;
     uint256 public allocateOnDeposit;
@@ -167,7 +167,7 @@ ReentrancyGuardUpgradeable
             if(shares == 0 || incomplete || (waitingPool.totalDebt() > 0 && address(waitingPool).balance < waitingPool.totalDebt())) {
                 // deduct swapFee and withdrawalFee and then submit to waiting pool
                 uint256 withdrawn = wethBalance + shares;
-                shares = _assessSwapFee(amount, swapPool.unstakeFee());
+                shares = _swapFeeStatus ? _assessSwapFee(amount, swapPool.unstakeFee()) : amount;
                 shares = _assessFee(shares, withdrawalFee);
                 waitingPool.addToQueue(account, shares);
                 if(withdrawn > 0) {
