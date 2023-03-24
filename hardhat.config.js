@@ -12,6 +12,8 @@ require('hardhat-storage-layout');
 require('@openzeppelin/hardhat-upgrades');
 const fs = require("fs");
 
+const gasPrice = parseInt(process.env.GAS_PRICE) || 'auto';
+
 module.exports = {
     solidity: {
         compilers: [
@@ -59,13 +61,14 @@ module.exports = {
         mumbai: {
             url: process.env.MUMBAI_URL,
             chainId: 80001,
-            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`]
+            accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`],
+            gasPrice: gasPrice || 500000000000
         },
         polygon: {
             url: process.env.POLYGON_URL,
             chainId: 137,
             accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`],
-            gasPrice: 200000000000
+            gasPrice: gasPrice || 500000000000
         },
         avalanche_testnet: {
             url: process.env.AVALANCHE_TESTNET_URL,
