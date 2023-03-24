@@ -14,7 +14,7 @@ async function main() {
     let mv = await this.MasterVault.deploy();
     await mv.deployed();
     console.log("MasterVault: " + mv.address);
-    let s = await this.MasterVault.deploy();
+    let s = await this.Strat.deploy();
     await s.deployed();
     console.log("Strategy:    " + s.address);
 }

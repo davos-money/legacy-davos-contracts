@@ -146,7 +146,7 @@ ReentrancyGuardUpgradeable
     /// @param account receipient's address
     /// @param amount amount of assets to withdraw
     /// @return shares : amount of assets(excluding fee)
-    function withdrawETH(address account, uint256 amount) // 100
+    function withdrawETH(address account, uint256 amount)
     external
     override
     nonReentrant 
@@ -155,14 +155,14 @@ ReentrancyGuardUpgradeable
     returns (uint256 shares) {
         require(amount > 0, "invalid withdrawal amount");
         address src = msg.sender;
-        shares = amount; // 100
+        shares = amount;
         _burn(src, shares);
-        uint256 wethBalance = totalAssetInVault(); // 40
+        uint256 wethBalance = totalAssetInVault();
         bool _swapFeeStatus = swapFeeStatus == 2 || swapFeeStatus == 3 ? true : false;
         if(wethBalance < amount) {
-            uint256 diff = amount - wethBalance; // 60
+            uint256 diff = amount - wethBalance;
             bool incomplete;
-            (shares, incomplete) = _withdrawFromActiveStrategies(diff); // 
+            (shares, incomplete) = _withdrawFromActiveStrategies(diff);
             
             if(shares == 0 || incomplete || (waitingPool.totalDebt() > 0 && address(waitingPool).balance < waitingPool.totalDebt())) {
                 // deduct swapFee and withdrawalFee and then submit to waiting pool
