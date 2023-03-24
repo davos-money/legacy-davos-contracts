@@ -1,6 +1,6 @@
 const { expect, assert } = require("chai");
 const { parseEther } = require("ethers/lib/utils");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 const ethUtils = ethers.utils;
 const NetworkSnapshotter = require("../helpers/NetworkSnapshotter");
 
@@ -80,7 +80,7 @@ describe("MasterVault", function () {
   }
 
   async function impersonateAccount(address) {
-    await hre.network.provider.request({
+    await network.provider.request({
       method: "hardhat_impersonateAccount",
       params: [address],
     });
@@ -113,9 +113,9 @@ describe("MasterVault", function () {
     WaitingPool = await ethers.getContractFactory("WaitingPool");
     CeRouter = await ethers.getContractFactory("CerosRouter");
     Token = await ethers.getContractFactory("Token");
-    CeaMATICc = await hre.ethers.getContractFactory("CeToken");
-    CeVault = await hre.ethers.getContractFactory("CeVault");
-    PriceGetter = await hre.ethers.getContractFactory("PriceGetter");
+    CeaMATICc = await ethers.getContractFactory("CeToken");
+    CeVault = await ethers.getContractFactory("CeVault");
+    PriceGetter = await ethers.getContractFactory("PriceGetter");
     
     // Deploy Contracts
     wMatic = await Token.attach(wMaticAddress);
@@ -184,7 +184,7 @@ describe("MasterVault", function () {
       maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
     });
 
     it("Deposit: valid amount(when swapFee is set in swapPool)", async function () {
@@ -221,8 +221,8 @@ describe("MasterVault", function () {
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       wMaticTokenBalanceAfter = await getTokenBalance(masterVault.address, wMaticAddress);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
-      assert.equal(wMaticTokenBalanceAfter.toString(), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(wMaticTokenBalanceAfter), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
     });
 
     it("Deposit: wMatic balance of master vault should increase by deposit amount(deposit fee: 0)", async function () {
@@ -237,8 +237,8 @@ describe("MasterVault", function () {
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       wMaticTokenBalanceAfter = await getTokenBalance(masterVault.address, wMaticAddress);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
-      assert.equal(wMaticTokenBalanceAfter.toString(), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(wMaticTokenBalanceAfter), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
     });
 
     it("Deposit: totalsupply of master vault should increase by amount(deposit fee: 0)", async function () {
@@ -257,9 +257,9 @@ describe("MasterVault", function () {
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
 
 
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
-      assert.equal(wMaticTokenBalanceAfter.toString(), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
-      assert.equal(totalSupplyAfter.toString(), Number(totalSupplyBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(wMaticTokenBalanceAfter), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
+      assert.equal(Number(totalSupplyAfter), Number(totalSupplyBefore) + Number(depositAmount) - swapFee);
     });
 
     it("Deposit: totalsupply of master vault should increase by amount(deposit fee: 0.1%)", async function () {
@@ -281,10 +281,10 @@ describe("MasterVault", function () {
       totalSupplyAfter = await masterVault.totalSupply();
       feeEarned = await masterVault.feeEarned();
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(wMaticTokenBalanceAfter.toString(), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee - Number(((Number(depositAmount) - swapFee) * fee) / 1e6));
-      assert.equal(totalSupplyAfter.toString(), Number(totalSupplyBefore) + Number(depositAmount) - swapFee - Number(((Number(depositAmount) - swapFee) * fee) / 1e6));
-      assert.equal(feeEarned.toString(), Number(((depositAmount - swapFee) * fee) / 1e6));
+      assert.equal(Number(wMaticTokenBalanceAfter), Number(wMaticTokenBalanceBefore) + Number(depositAmount));
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee - Number(((Number(depositAmount) - swapFee) * fee) / 1e6));
+      assert.equal(Number(totalSupplyAfter), Number(totalSupplyBefore) + Number(depositAmount) - swapFee - Number(((Number(depositAmount) - swapFee) * fee) / 1e6));
+      assert.equal(Number(feeEarned), Number(((depositAmount - swapFee) * fee) / 1e6));
     });
 
     it("Allocate: wMatic balance should match allocation ratios", async function () {
@@ -358,7 +358,7 @@ describe("MasterVault", function () {
       maticBalanceAfter = await ethers.provider.getBalance(signer1.address);
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
       await masterVault.connect(signer1).withdrawETH(signer1.address, (depositAmount - swapFee).toString());
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
 
@@ -478,10 +478,10 @@ describe("MasterVault", function () {
 
       swapFee = (withdrawAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
       
-      let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
+      let event = (receipt.events?.filter((x) => {return x.event === "Withdraw"}));
       assert.equal(event[0].args.shares, withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
-      expect(maticBalanceAfter.eq(maticBalanceBefore.add(event[0].args.shares).sub(txFee2)));
+      expect(maticBalanceAfter).eq(maticBalanceBefore.add(event[0].args.shares).sub(txFee2));
 
     });
 
@@ -501,7 +501,7 @@ describe("MasterVault", function () {
       // txFee1 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       let withdrawAmount = depositAmount - swapFee;
@@ -516,7 +516,7 @@ describe("MasterVault", function () {
 
       swapFee = (withdrawAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
       
-      let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
+      let event = (receipt.events?.filter((x) => {return x.event === "Withdraw"}));
       assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       assert.equal(Number(vaultTokenBalanceAfter), 0);
       // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(event[0].args.shares) - txFee2);
@@ -539,7 +539,7 @@ describe("MasterVault", function () {
       // txFee1 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       let withdrawAmount = depositAmount - swapFee;
@@ -554,7 +554,7 @@ describe("MasterVault", function () {
 
       swapFee = (withdrawAmount * await swapPool.unstakeFee()) / await swapPool.FEE_MAX();
       
-      let event = (receipt.events?.filter((x) => {return x.event == "Withdraw"}));
+      let event = (receipt.events?.filter((x) => {return x.event === "Withdraw"}));
       assert.equal(Number(event[0].args.shares), withdrawAmount - swapFee - (Number(withdrawAmount - swapFee) * fee / 1e6));
       assert.equal(Number(vaultTokenBalanceAfter), 0);
       expect(maticBalanceBefore.add(event[0].args.shares).sub(txFee2)).to.be.equal(maticBalanceAfter);
@@ -587,7 +587,7 @@ describe("MasterVault", function () {
       vaultTokenBalanceAfter = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
       let withdrawalAmount = depositAmount - swapFee;
-      assert.equal(vaultTokenBalanceAfter.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfter), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       tx = await masterVault.connect(signer1).withdrawETH(signer1.address, withdrawalAmount.toString());
@@ -601,7 +601,7 @@ describe("MasterVault", function () {
 
       assert.equal(Number(vaultTokenBalanceAfter), 0);
       // assert.equal(Number(maticBalanceAfter), Number(maticBalanceBefore) + Number(depositAmount) - Number(swapFee) - (Number(depositAmount) * fee / 1e6) - txFee2);
-      expect(maticBalanceAfter.eq(maticBalanceBefore.add(depositAmount).sub(swapFee).sub(depositAmount.mul(fee).div(ethers.BigNumber.from("1000000"))).sub(txFee2)));
+      expect(maticBalanceAfter).eq(maticBalanceBefore.add(depositAmount).sub(swapFee).sub(depositAmount.mul(fee).div(ethers.BigNumber.from("1000000"))).sub(txFee2));
     });
 
     it("withdraw: withdrawal request should go to the waiting pool(withdrawal fee: 0)", async function () {
@@ -618,7 +618,7 @@ describe("MasterVault", function () {
       // txFee1 = receipt.gasUsed.mul(receipt.effectiveGasPrice)
       vaultTokenBalanceAfterDeposit = await getTokenBalance(signer1.address, masterVault.address);
       swapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
+      assert.equal(Number(vaultTokenBalanceAfterDeposit), Number(vaultTokenBalanceBefore) + Number(depositAmount) - swapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
@@ -649,7 +649,7 @@ describe("MasterVault", function () {
 
       vaultTokenBalanceAfterDeposit = await getTokenBalance(signer1.address, masterVault.address);
       depositSwapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
+      assert.equal(Number(vaultTokenBalanceAfterDeposit), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
@@ -667,7 +667,7 @@ describe("MasterVault", function () {
       poolBalanceBefore = await waitingPool.getPoolBalance()
       await masterVault.connect(signer1).depositETH({value: withdrawalAmount});
       poolBalanceAfter = await waitingPool.getPoolBalance()
-      expect(poolBalanceAfter.gt(poolBalanceBefore));
+      expect(poolBalanceAfter).gt(poolBalanceBefore);
       balanceOfWithdrawerBefore = await ethers.provider.getBalance(signer1.address)
       await masterVault.connect(signer2).payDebt();
       balanceOfWithdrawerAfter = await ethers.provider.getBalance(signer1.address)
@@ -686,7 +686,7 @@ describe("MasterVault", function () {
 
       vaultTokenBalanceAfterDeposit = await getTokenBalance(signer1.address, masterVault.address);
       depositSwapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
+      assert.equal(Number(vaultTokenBalanceAfterDeposit), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
@@ -704,7 +704,7 @@ describe("MasterVault", function () {
       // poolBalanceBefore = await waitingPool.getPoolBalance()
       // await masterVault.connect(signer1).payDebt({value: withdrawalAmount});
       // poolBalanceAfter = await waitingPool.getPoolBalance()
-      // expect(poolBalanceAfter.gt(poolBalanceBefore));
+      // expect(poolBalanceAfter).gt(poolBalanceBefore);
       await swapPool.connect(user1).addLiquidity(ethUtils.parseEther("30"), ethUtils.parseEther("30"));
       balanceOfWithdrawerBefore = await ethers.provider.getBalance(signer1.address)
       await expect(masterVault.connect(signer2).payDebt())
@@ -713,7 +713,7 @@ describe("MasterVault", function () {
 
       balanceOfWithdrawerAfter = await ethers.provider.getBalance(signer1.address)
 
-      expect(balanceOfWithdrawerAfter.gt(balanceOfWithdrawerBefore));
+      expect(balanceOfWithdrawerAfter).gt(balanceOfWithdrawerBefore);
     });
 
     it("revert:: waitingPool: withdrawUnsettled(): cannot withdraw already settled debt", async function () {
@@ -727,7 +727,7 @@ describe("MasterVault", function () {
 
       vaultTokenBalanceAfterDeposit = await getTokenBalance(signer1.address, masterVault.address);
       depositSwapFee = (depositAmount * await swapPool.stakeFee()) / await swapPool.FEE_MAX();
-      assert.equal(vaultTokenBalanceAfterDeposit.toString(), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
+      assert.equal(Number(vaultTokenBalanceAfterDeposit), Number(vaultTokenBalanceBefore) + Number(depositAmount) - depositSwapFee);
 
       maticBalanceBefore = await ethers.provider.getBalance(signer1.address);
       await swapPool.connect(signer1).swap(false, ethUtils.parseEther("20"), signer1.address);
