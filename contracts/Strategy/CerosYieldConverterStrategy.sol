@@ -15,6 +15,8 @@ contract CerosYieldConverterStrategy is BaseStrategy {
 
     address private _swapPool;
 
+    bool feeFlag;
+
     event SwapPoolChanged(address swapPool);
     event CeRouterChanged(address ceRouter);
 
@@ -86,7 +88,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
         
         uint256 amountOut; bool enoughLiquidity; uint256 remaining = amount - wethBalance;
-        (amountOut, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, false); // (amount * ratio) / 1e18
+        (amountOut, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, feeFlag); // (amount * ratio) / 1e18
         if (enoughLiquidity) {
             value = _ceRouter.withdrawWithSlippage(address(this), remaining, amountOut);
             require(value >= amountOut, "invalid out amount");
@@ -109,9 +111,9 @@ contract CerosYieldConverterStrategy is BaseStrategy {
     /// @dev returns the depositable amount based on liquidity
     function canDeposit(uint256 amount) public view returns(uint256 correctAmount) {
         correctAmount = amount;
-        (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, false);
+        (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, feeFlag);
         if (!enoughLiquidity) { // If liquidity not enough, calculate amountIn for remaining liquidity
-            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount() - 1, false);
+            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount() - 1, feeFlag);
             correctAmount = amountIn;
         }
     }
@@ -122,7 +124,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         if(amount < wethBalance) return amount;
         
         bool enoughLiquidity; uint256 remaining = amount - wethBalance;
-        (, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, false);
+        (, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, feeFlag);
 
         if (!enoughLiquidity) {
             remaining = ISwapPool(_swapPool).nativeTokenAmount();
@@ -178,5 +180,9 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         _ceRouter = ICerosRouter(ceRouter);
         underlying.approve(address(_ceRouter), type(uint256).max);
         emit CeRouterChanged(ceRouter);
+    }
+
+    function changeFeeFlag(bool _flag) external onlyOwner {
+        feeFlag = _flag;
     }
 }
