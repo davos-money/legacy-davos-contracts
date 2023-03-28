@@ -9,12 +9,14 @@ const {
     toRay,
     advanceTime,
 } = require("./helpers/utils");
+const {BigNumber} = require("ethers");
 
 describe("Interaction", function () {
 
     let collateral, _chainId, _mat, _dgtRewardsPoolLimitInEth, _vat_Line, _vat_line,
         _spot_par, _dog_Hole, _dog_hole, _dog_chop, _abacus_tau, _clip_buf, _clip_tail,
-        _clip_cusp, _clip_chip, _clip_tip, _clip_stopped, _multisig, _vat_dust, dMatic;
+        _clip_cusp, _clip_chip, _clip_tip, _clip_stopped, _multisig, _vat_dust, dMatic,
+      signers, aMaticRateUSD;
         
     async function deploySwapPool() {
         const { MaxUint256 } = ethers.constants;
@@ -92,6 +94,7 @@ describe("Interaction", function () {
         rad = "000000000000000000000000000000000000000000000", // 45 Decimals
         ONE = 10 ** 27;
         YEAR = 31556952;
+        aMaticRateUSD = "2";
 
         // Signer
         [deployer] = await ethers.getSigners();
@@ -152,7 +155,7 @@ describe("Interaction", function () {
 
         oracle = await this.Oracle.deploy();
         await oracle.deployed();
-        await oracle.setPrice("2" + wad); // 2$
+        await oracle.setPrice(aMaticRateUSD + wad); // 2$
 
         vat = await upgrades.deployProxy(this.Vat, [], {initializer: "initialize"});
         await vat.deployed();
@@ -269,426 +272,799 @@ describe("Interaction", function () {
     
     before(async function () {
         [deployer, signer1, signer2, signer3] = await ethers.getSigners();
+        signers = [signer1, signer2, signer3];
         await init();
         await networkSnapshotter.firstSnapshot();
     });
 
     afterEach("revert", async () => await networkSnapshotter.revert());
     
-    describe('Basic functionality', async () => {
-        it("revert:: whitelist: only authorized account can enable whitelist", async function () {
-            await expect(
-                interaction
-                .connect(signer1)
-                .enableWhitelist()
-            ).to.be.revertedWith("Interaction/not-authorized");
-        });
-
-        it("whitelist: should let authorized account enable whitelist", async function () {
+    describe('--- Wards - list of address with administrative privileges', async () => {
+    
+        it("Authorized user can enable whitelist mode", async function () {
             await interaction.connect(deployer).enableWhitelist();
             const whitelistMode = await interaction.whitelistMode();
             assert.equal(whitelistMode, 1);
         });
-
-        it("revert:: deposit(): cannot deposit collateral for inactive collateral type", async function () {
+       
+        it("Revert: Unauthorized user can not enable whitelist mode", async function () {
+            await expect(
+              interaction
+                .connect(signer1)
+                .enableWhitelist()
+            ).to.be.revertedWith("Interaction/not-authorized");
+        });
+    });
+    
+    describe('--- Whitelist - restrict deposit for the specified addresses', async () => {
+        
+        it("Whitelisted address can provide collateral", async function () {
+            await setCollateralType();
+            //Enable whitelist and add signers
+            await interaction.connect(deployer).enableWhitelist();
+            await interaction.connect(deployer).addToWhitelist(signers.map(signer => signer.address));
+            
+            //Signers can deposit
+            let totalDeposited = BigNumber.from(0);
+            for(const signer of signers){
+                const depositAmount = parseEther("1");
+                await aMaticc.connect(deployer).mint(signer.address, depositAmount);
+                await aMaticc.connect(signer).approve(interaction.address, ethers.constants.MaxUint256)
+                await interaction.connect(signer).deposit(signer.address, aMaticc.address, depositAmount);
+                totalDeposited = totalDeposited.add(depositAmount);
+                expect(await interaction.deposits(aMaticc.address)).to.be.equal(totalDeposited);
+            }
+        });
+        
+        it("Revert: Addresses out of whitelist can not deposit when whitelist mode is enabled", async function () {
+            await setCollateralType();
+            //Enable whitelist
+            await interaction.connect(deployer).enableWhitelist();
+            //Deposit fails
             const depositAmount = parseEther("1");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
             await expect(
-                interaction.connect(signer1).deposit(
+              interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
                 depositAmount
-            )).to.be.revertedWith("Interaction/inactive-collateral");
+              )).to.be.revertedWith("Interaction/not-in-whitelist");
         });
-
-        it("deposit(): should let user deposit collateral", async function () {
+    
+        it("Address removed from whitelist can't deposit when whitelist enabled", async function () {
+    
             await setCollateralType();
+            //Enable whitelist and add signer1
+            await interaction.connect(deployer).enableWhitelist();
+            await interaction.connect(deployer).addToWhitelist(signers.map(signer => signer.address));
+            //Remove signer3 from the whitelist
+            await interaction.connect(deployer).removeFromWhitelist([signer3.address]);
+    
+            //Signer1 can deposit still
             const depositAmount = parseEther("1");
+            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            expect(await interaction.deposits(aMaticc.address)).to.be.equal(depositAmount);
+    
+            //Signer3 cant deposit
+            await aMaticc.connect(deployer).mint(signer3.address, depositAmount);
+            await aMaticc.connect(signer3).approve(interaction.address, ethers.constants.MaxUint256)
+            await expect(
+              interaction.connect(signer3).deposit(
+                signer3.address,
+                aMaticc.address,
+                depositAmount
+              )).to.be.revertedWith("Interaction/not-in-whitelist");
+        })
+    });
+    
+    describe('--- Deposit collateral', async () => {
+        
+        it("User can deposit", async function () {
+            await setCollateralType();
+            const deposited = parseEther("1");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
             await expect(
-            tx = await interaction.connect(signer1).deposit(
+              tx = await interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const deposits = await interaction.deposits(aMaticc.address);
-            expect(deposits).eq(depositAmount);
+                deposited
+              )).to.emit(interaction, "Deposit")
+              .withArgs(signer1.address, collateralToken.address, deposited, deposited);
+            expect(await interaction.deposits(aMaticc.address)).eq(deposited);
         });
-
-        it("revert:: deposit(): only whitelisted account can deposit", async function () {
-            await interaction.connect(deployer).enableWhitelist();
+        
+        it("Deposit many times by many users", async function () {
             await setCollateralType();
-            const depositAmount = parseEther("1");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.be.revertedWith("Interaction/not-in-whitelist");
+            const vat_ilks = await vat.ilks(collateral);
+            let expectedTotalDeposited = BigNumber.from(0);
+            for(const signer of signers){
+                let expectedSignerDeposited = BigNumber.from(0);
+                for (let i = 0; i < 3; i++){
+                    const deposited = parseEther(Math.random().toString());
+                    await aMaticc.mint(signer.address, deposited);
+                    await aMaticc.connect(signer).approve(interaction.address, deposited);
+                
+                    expectedTotalDeposited = expectedTotalDeposited.add(deposited);
+                    expectedSignerDeposited = expectedSignerDeposited.add(deposited);
+                    await expect(
+                      tx = await interaction.connect(signer).deposit(
+                        signer.address,
+                        aMaticc.address,
+                        deposited
+                      )).to.emit(interaction, "Deposit")
+                      .withArgs(signer.address, collateralToken.address, deposited, expectedSignerDeposited);
+                
+                    //aMATICc become locked as a collateral by default
+                    expect(await interaction.locked(collateralToken.address, signer.address)).to.be.equal(expectedSignerDeposited);
+                    //Borrow limit in DAVOS~$ = collateral x collateralRate
+                    expect(await interaction.availableToBorrow(aMaticc.address, signer.address)).to.be.equal(expectedSignerDeposited.mul(vat_ilks.spot).div(`1${ray}`));
+                }
+            }
+            //Total amount of aMATICc deposits
+            expect(await interaction.deposits(aMaticc.address)).to.be.equal(expectedTotalDeposited);
+            //Deposited TVL in $ = tokenDeposits x tokenRate
+            expect(await interaction.depositTVL(collateralToken.address)).to.be.equal(expectedTotalDeposited.mul(aMaticRateUSD));
         });
-
-        it("revert:: deposit(): should not let user deposit collateral directly to interaction", async function () {
+    
+        it("Revert: Direct deposit to Interaction is not allowed when [Davos]Provider is set", async function () {
             await setCollateralType();
             await interaction.setDavosProvider(collateralToken.address, davosProvider.address)
             const depositAmount = parseEther("1");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
             await expect(
-                interaction.connect(signer1).deposit(
+              interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
                 depositAmount
-            )).to.be.revertedWith("Interaction/only davos provider can deposit for this token");
+              )).to.be.revertedWith("Interaction/only davos provider can deposit for this token");
         });
-
-        it("withdraw(): should let user withdraw", async function () {
-            await setCollateralType();
+    
+        it("Revert: User can not deposit collateral of undefined type", async function () {
             const depositAmount = parseEther("1");
-            const withdrawAmount = parseEther("0.5");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
             await expect(
-                interaction.connect(signer1).deposit(
+              interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
                 depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
+              )).to.be.revertedWith("Interaction/inactive-collateral");
+        });
+    });
+    
+    describe('--- Withdraw collateral', async () => {
+        it("User can withdraw part of their collateral back", async function () {
+            await setCollateralType();
+            
+            //Deposit
+            const depositAmount = parseEther("1");
+            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore).eq(depositAmount);
             
+            //Withdraw half of the collateral
+            const withdrawAmount = depositAmount.div(2);
             await expect(
-                interaction.connect(signer1).withdraw(
+              interaction.connect(signer1).withdraw(
                 signer1.address,
                 aMaticc.address,
                 withdrawAmount
-            )).to.emit(interaction, "Withdraw")
-            .withArgs(signer1.address, withdrawAmount);
+              )).to.emit(interaction, "Withdraw")
+              .withArgs(signer1.address, withdrawAmount);
+            
             depositsAfter = await interaction.deposits(aMaticc.address);
-            assert.equal(depositsAfter, depositsBefore - withdrawAmount); 
+            assert.equal(depositsAfter, depositsBefore - withdrawAmount);
         });
-
-        it("revert:: withdraw(): Caller must be the same address as participant(!davosProvider)", async function () {
+    
+        it("Revert: User cannot withdraw another account collateral", async function () {
             await setCollateralType();
+    
+            //Deposit as Signer1
             const depositAmount = parseEther("1");
-            const withdrawAmount = parseEther("0.5");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
+            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore).eq(depositAmount);
             
+            //Withdraw as Signer2 from Signer1 address
+            const withdrawAmount = depositAmount.div(2);
             await expect(
-                interaction.connect(signer2).withdraw(
+              interaction.connect(signer2).withdraw(
                 signer1.address,
                 aMaticc.address,
                 withdrawAmount
-            )).to.be.revertedWith("Interaction/Caller must be the same address as participant");
+              )).to.be.revertedWith("Interaction/Caller must be the same address as participant");
         });
-
-        it("revert:: withdraw(): Caller must be the same address as participant(!davosProvider)", async function () {
+    
+        it("Revert: Direct withdraw from Interaction is not allowed when [Davos]Provider is set", async function () {
             await setCollateralType();
+            
+            //Deposit
             const depositAmount = parseEther("1");
-            const withdrawAmount = parseEther("0.5");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
+            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore).eq(depositAmount);
-           
+        
+            //Set DAVOS provider
             await interaction.setDavosProvider(collateralToken.address, davosProvider.address)
+            
+            //User can not withdraw directly from Interaction (Only DavosProvider can)
+            const withdrawAmount = depositAmount.div(2);
             await expect(
-                interaction.connect(signer2).withdraw(
+              interaction.connect(signer2).withdraw(
                 signer1.address,
                 aMaticc.address,
                 withdrawAmount
-            )).to.be.revertedWith("Interaction/Only davos provider can call this function for this token");
+              )).to.be.revertedWith("Interaction/Only davos provider can call this function for this token");
         });
-
-        it("borrow(): should let user borrow", async function () {
-            await setCollateralType();
-            const depositAmount = parseEther("1000");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const depositsBefore = await interaction.deposits(aMaticc.address);
-            expect(depositsBefore).eq(depositAmount);
-              
-            const vat_ilks = await vat.ilks(collateral);
-            const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
-            expect(depositAmount).eq(locked);
-            assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot))/1e27);
-            
-            const borrowAmount = availableToBorrowBefore
-            await expect(
-                interaction.connect(signer1).borrow(
-                aMaticc.address,
-                borrowAmount
-            )).to.emit(interaction, "Borrow");
-            
-            const availableToBorrowAfter = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            assert.equal(availableToBorrowAfter, availableToBorrowBefore - borrowAmount);
-            expect(await interaction.borrowed(collateralToken.address, signer1.address)).to.be.equal(borrowAmount)
-            expect(await interaction.totalPegLiquidity()).to.be.equal(borrowAmount)
-        });
-
-        it("borrow(): should let user borrow and compare getter function values", async function () {
-            await setCollateralType();
-            const depositAmount = parseEther("1000");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const depositsBefore = await interaction.deposits(aMaticc.address);
-            expect(depositsBefore).eq(depositAmount);
-              
-            const vat_ilks = await vat.ilks(collateral);
-            const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
-            expect(depositAmount).eq(locked);
-            assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot)) / 1e27);
-            await interaction.upchostClipper(collateralToken.address)
-            
-            const borrowAmount = availableToBorrowBefore;
-            await interaction.connect(signer1).borrow(aMaticc.address,borrowAmount);
-            await interaction.borrowApr(collateralToken.address);
-            
-            const estLiqPriceDavos = await interaction.estimatedLiquidationPriceDAVOS(collateralToken.address, signer1.address, borrowAmount);
-            expect(estLiqPriceDavos).gt(borrowAmount);
-
-            const estimatedLiquidationPrice = await interaction.estimatedLiquidationPrice(collateralToken.address, signer1.address, borrowAmount);
-            expect(estimatedLiquidationPrice).gt(borrowAmount);
-
-            const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
-            expect(currentLiquidationPrice).gt(borrowAmount);
-
-            const willBorrow = await interaction.willBorrow(collateralToken.address, signer1.address, depositAmount);
-            expect(willBorrow).eq(borrowAmount.add(borrowAmount));
-
-            const free = await interaction.free(collateralToken.address, signer1.address);
-            expect(free).eq(0);
-
-            const collateralTVL = await interaction.collateralTVL(collateralToken.address);
-            expect(collateralTVL).eq(borrowAmount);
-
-            const depositTVL = await interaction.depositTVL(collateralToken.address);
-            expect(depositTVL).eq(depositAmount);
-
-            
-            const davosPrice = await interaction.davosPrice(collateralToken.address);
-            expect(davosPrice).eq(parseEther("1"));
-            
-            const collateralPrice = await interaction.collateralPrice(collateralToken.address);
-            expect(collateralPrice).eq(parseEther("2"));
-
-            const collateralRate = await interaction.collateralRate(collateralToken.address);
-            assert.equal(collateralRate, 1e45 / _mat);
-        });
-
-        it("revert:: borrow(): should not let borrow more than available", async function () {
-            await setCollateralType();
-            const depositAmount = parseEther("1000");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const depositsBefore = await interaction.deposits(aMaticc.address);
-            expect(depositsBefore).eq(depositAmount);
-              
-            const vat_ilks = await vat.ilks(collateral);
-            const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
-            expect(depositAmount).eq(locked);
-            assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot))/1e27);
-            
-            const borrowAmount = availableToBorrowBefore + 1
-            await expect(
-                interaction.connect(signer1).borrow(
-                aMaticc.address,
-                borrowAmount
-            )).to.be.revertedWith("Vat/not-safe");
-        });
-
+    
         it("revert:: withdraw(): should not let withdraw when user has outstanding debt", async function () {
             await setCollateralType();
             const depositAmount = parseEther("1000");
             const withdrawAmount = parseEther("500");
             await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256)
             await expect(
-                interaction.connect(signer1).deposit(
+              interaction.connect(signer1).deposit(
                 signer1.address,
                 aMaticc.address,
                 depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
+              )).to.emit(interaction, "Deposit")
+              .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
             const depositsBefore = await interaction.deposits(aMaticc.address);
             expect(depositsBefore).eq(depositAmount);
-              
+        
             const vat_ilks = await vat.ilks(collateral);
             const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
             const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
+        
             expect(depositAmount).eq(locked);
             assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot))/1e27);
-            
+        
             const borrowAmount = availableToBorrowBefore
             await expect(
-                interaction.connect(signer1).borrow(
+              interaction.connect(signer1).borrow(
                 aMaticc.address,
                 borrowAmount
-            )).to.emit(interaction, "Borrow");
-            
+              )).to.emit(interaction, "Borrow");
+        
             const availableToBorrowAfter = await interaction.availableToBorrow(aMaticc.address, signer1.address);
             assert.equal(availableToBorrowAfter, availableToBorrowBefore - borrowAmount);
-            
+        
             await expect(
-                interaction.connect(signer1).withdraw(
+              interaction.connect(signer1).withdraw(
                 signer1.address,
                 aMaticc.address,
                 withdrawAmount
-            )).to.be.revertedWith("Vat/not-safe")
+              )).to.be.revertedWith("Vat/not-safe")
         });
-
-        it("payback(): should let user payback outstanding debt(borrowed davos)", async function () {
-            await setCollateralType();
-            const depositAmount = parseEther("1000");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-            await davos.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const depositsBefore = await interaction.deposits(aMaticc.address);
-            expect(depositsBefore).eq(depositAmount);
-              
-            const vat_ilks = await vat.ilks(collateral);
-            const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
-            expect(depositAmount).eq(locked);
-            assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot))/1e27);
-            
-            const borrowAmount = availableToBorrowBefore
-            await expect(
-                interaction.connect(signer1).borrow(
-                aMaticc.address,
-                borrowAmount
-            )).to.emit(interaction, "Borrow");
-            
-            const availableToBorrowAfter = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            assert.equal(availableToBorrowAfter, availableToBorrowBefore - borrowAmount);
-
-            const paybackAmount = (await interaction.borrowed(collateralToken.address, signer1.address)).sub(parseEther("100")).sub("100");
-            await expect(
-                interaction.connect(signer1).payback(
-                aMaticc.address,
-                paybackAmount
-            )).to.emit(interaction, "Payback");
-            
-            const borrowed = await interaction.borrowed(collateralToken.address, signer1.address)
-            expect(borrowed).eq(0);
-        });
-
-        it("revert:: payback(): should revert if user leave dust", async function () {
-            await setCollateralType();
-            const depositAmount = parseEther("1000");
-            await aMaticc.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-            await davos.connect(signer1).approve(interaction.address, ethers.constants.MaxUint256);
-
-            await expect(
-                interaction.connect(signer1).deposit(
-                signer1.address,
-                aMaticc.address,
-                depositAmount
-            )).to.emit(interaction, "Deposit")
-            .withArgs(signer1.address, collateralToken.address, depositAmount, depositAmount);
-            const depositsBefore = await interaction.deposits(aMaticc.address);
-            expect(depositsBefore).eq(depositAmount);
-              
-            const vat_ilks = await vat.ilks(collateral);
-            const availableToBorrowBefore = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            const locked = await interaction.locked(collateralToken.address, signer1.address);
-            
-            expect(depositAmount).eq(locked);
-            assert.equal(Number(availableToBorrowBefore), (depositAmount.mul(vat_ilks.spot))/1e27);
-            
-            const borrowAmount = availableToBorrowBefore
-            await expect(
-                interaction.connect(signer1).borrow(
-                aMaticc.address,
-                borrowAmount
-            )).to.emit(interaction, "Borrow");
-            const availableToBorrowAfter = await interaction.availableToBorrow(aMaticc.address, signer1.address);
-            assert.equal(availableToBorrowAfter, availableToBorrowBefore - borrowAmount);
-            
-            const paybackAmount = borrowAmount.sub(parseEther("1"))
-            await expect(
-                interaction.connect(signer1).payback(
-                aMaticc.address,
-                paybackAmount
-            )).to.be.revertedWith("Vat/dust");            
-        });
-
-        it("auction started as expected", async () => {
-            const collateral1Price = toWad("400");
-            await oracle.connect(deployer).setPrice(collateral1Price);
-
-            await setCollateralType();
-            // Approve and send some collateral inside. collateral value == 400 == `dink`
-            const dink = toWad("10").toString();
-            
-            await aMaticc.connect(signer1).approve(interaction.address, dink);
-            // Deposit collateral(aMATICc) to the interaction contract
-            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, dink);
-            const dart = toWad("1000").toString();
-            await interaction.connect(signer1).borrow(aMaticc.address, dart);
-            
-            // change collateral price
-            await oracle.connect(deployer).setPrice(toWad("124").toString());
-            await spot.connect(deployer).poke(collateral);
-            await interaction
-            .connect(deployer)
-            .startAuction(aMaticc.address, signer1.address, deployer.address);
+    });
+    
+    describe('--- Borrow', async () => {
         
-            const sale = await clip.sales(1);
-            expect(sale.usr).to.not.be.equal(ethers.utils.AddressZero);
+        it("User can borrow", async function () {
+            await setCollateralType();
+            
+            const depositAmount = parseEther(_vat_dust);
+            
+            //Alternative way to calc available to borrow
+            // const collateralRate = await interaction.collateralRate(collateralToken.address);
+            // const availableToBorrow = deposited.mul(aMATICcRate).mul(collateralRate).div(`1${e18}`);
+            
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            expect(await interaction.willBorrow(collateralToken.address, signer1.address, depositAmount)).to.be.equal(availableToBorrow);
+            
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            expect(await interaction.availableToBorrow(collateralToken.address, signer1.address)).to.be.equal(availableToBorrow);
+            
+            await expect(
+              interaction.connect(signer1).borrow(
+                aMaticc.address,
+                availableToBorrow
+              )).to.emit(interaction, "Borrow");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(availableToBorrow.add(100));
+            expect(await interaction.totalPegLiquidity()).to.be.equal(availableToBorrow);
+            expect(await interaction.availableToBorrow(aMaticc.address, signer1.address)).to.be.equal(0);
         });
-
+        
+        it("Borrow limit and liquidation price depending on borrow amount", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther("10000");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const totalDeposited = await interaction.deposits(aMaticc.address);
+            expect(totalDeposited).to.be.equal(deposited);
+            
+            const collateralRate = await interaction.collateralRate(collateralToken.address);
+            expect(collateralRate).to.be.equal(BigNumber.from("1"+rad).div(_mat));
+            
+            const vat_ilks = await vat.ilks(collateral);
+            const expectedBorrowLimit = deposited.mul(vat_ilks.spot).div(`1${ray}`);
+            const numberOfIterations = 100;
+            const borrowStep = expectedBorrowLimit.div(numberOfIterations);
+            let freeCollateral = deposited;
+            const collateralStep = deposited.div(numberOfIterations);
+            let borrowed = BigNumber.from(0);
+            for (let i = 0; i < numberOfIterations; i++) {
+                await interaction.connect(signer1).borrow(aMaticc.address, borrowStep);
+                borrowed = borrowed.add(borrowStep);
+                expect(await interaction.borrowed(collateralToken.address, signer1.address)).to.be.equal(borrowed.add(100), "Borrowed amount increased")
+                expect(await interaction.totalPegLiquidity()).to.be.equal(borrowed, "Total borrowed amount increased");
+                
+                const availableToBorrow = await interaction.availableToBorrow(aMaticc.address, signer1.address);
+                freeCollateral = freeCollateral.sub(collateralStep);
+                const expectedAvailableToBorrow = freeCollateral.mul(vat_ilks.spot).div(`1${ray}`);
+                expect(availableToBorrow).to.be.equal(expectedAvailableToBorrow, "Available to borrow decreased");
+                
+                const locked = await interaction.locked(collateralToken.address, signer1.address);
+                expect(locked).to.be.equal(deposited, "Locked collateral hasn't changed after borrow");
+                
+                const free = await interaction.free(collateralToken.address, signer1.address);
+                expect(free).to.be.equal("0", "Free collateral amount hasn't change after borrow");
+                
+                const davosPrice = await interaction.davosPrice(collateralToken.address);
+                expect(davosPrice).to.be.equal("1"+wad, "Davos USD rate stays the same");
+                const collateralPrice = await interaction.collateralPrice(collateralToken.address);
+                expect(collateralPrice).to.be.equal(aMaticRateUSD+wad, "aMATICc USD rate stays the same");
+                
+                expect(await interaction.collateralRate(collateralToken.address)).to.be.equal(collateralRate, "Collateral rate hasn't change");
+                
+                const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
+                const expectedLiquidationPrice = borrowed.mul("1"+wad+wad).div(deposited.mul(collateralRate)).sub(1);
+                expect(currentLiquidationPrice).to.be.equal(expectedLiquidationPrice, "Current liquidation price in USD");
+                
+                const estLiqPriceDavos = await interaction.estimatedLiquidationPriceDAVOS(collateralToken.address, signer1.address, 0);
+                expect(estLiqPriceDavos).to.be.equal(expectedLiquidationPrice.div(1e9), "");
+                
+                const estimatedLiquidationPrice = await interaction.estimatedLiquidationPrice(collateralToken.address, signer1.address, 0);
+                expect(estimatedLiquidationPrice).to.be.equal(expectedLiquidationPrice, "Estimated liquidation price in USD");
+            }
+        });
+        
+        it("The first borrow has to be greater than min debt position", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther("10000");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const openAmount = parseEther(_vat_dust);
+            let expectedBorrowed = openAmount;
+            await interaction.connect(signer1).borrow(aMaticc.address, openAmount);
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(expectedBorrowed.add(100));
+            
+            const nextAmount = BigNumber.from(1);
+            for (let i = 1; i < 10; i++){
+                expectedBorrowed = expectedBorrowed.add(nextAmount);
+                await interaction.connect(signer1).borrow(aMaticc.address, nextAmount);
+            }
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(expectedBorrowed.add(100));
+        });
+        
+        it("User cant borrow less than min debt position", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther("10000");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const openAmount = parseEther(_vat_dust).sub(1);
+            await expect(interaction.connect(signer1).borrow(aMaticc.address, openAmount)).to.be.revertedWith("Vat/dust");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(0);
+        });
+        
+        it("User cant exceed borrow limit with collateral > 0", async function () {
+            await setCollateralType();
+            
+            let depositAmount = parseEther("1000");
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            await expect(interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow.add(1))).to.be.revertedWith("Vat/not-safe");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(0);
+        });
+        
+        it("User cant exceed borrow limit with collateral = 0", async function () {
+            await setCollateralType();
+            
+            let depositAmount = parseEther("1000");
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            await expect(interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow.add(1))).to.be.revertedWith("Vat/not-safe");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(0);
+        });
+        
+        it("User cant borrow 0", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther(_vat_dust+"0");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const vat_ilks = await vat.ilks(collateral);
+            const borrowed = deposited.div(10).mul(vat_ilks.spot).div(`1${ray}`);
+            await expect(
+              interaction.connect(signer1).borrow(
+                aMaticc.address,
+                borrowed
+              )).to.emit(interaction, "Borrow");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(borrowed.add(100));
+            await expect(interaction.connect(signer1).borrow(aMaticc.address, "0")).to.be.revertedWith("Interaction/invalid-davosAmount");
+        });
+        
+        it("User cant borrow with unknown collateral", async function () {
+            await expect(interaction.connect(signer1).borrow(aMaticc.address, "1")).to.be.revertedWith("Interaction/inactive-collateral");
+        });
+    });
+    
+    describe('--- willBorrow() returns amount of DAVOS that can be borrowed/payedback with specified collateral', async () => {
+        
+        it("willBorrow() changes with the amount", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther(_vat_dust).mul(10);
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = deposited.mul(vat_ilks.spot).div(`1${ray}`);
+            await interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow);
+            
+            console.log(`Amount\tWill borrow\tExpected`)
+            const iterations = 20;
+            for(let i = 0; i < iterations+1; i++){
+                const amount = deposited.mul(i).div(iterations/2).sub(deposited);
+                const willBorrow = await interaction.willBorrow(collateralToken.address, signer1.address, amount);
+                const expectedWillBorrow = amount.mul(vat_ilks.spot).div(`1${ray}`);
+                console.log(`${amount}\t${willBorrow}\t${expectedWillBorrow}`);
+                expect(willBorrow).to.be.equal(expectedWillBorrow);
+            }
+        });
+        
+        it("willBorrow() changes with the collateral price", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther(_vat_dust);
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            const vat_ilks = await vat.ilks(collateral);
+            const willBorrowBefore = deposited.mul(vat_ilks.spot).div(`1${ray}`);
+            expect(await interaction.willBorrow(collateralToken.address, signer1.address, deposited)).to.be.equal(willBorrowBefore);
+            
+            //Decrease collateral price by half
+            const collateralPriceBefore = await interaction.collateralPrice(collateralToken.address);
+            const collateralPrice = collateralPriceBefore.div(2);
+            await oracle.connect(deployer).setPrice(collateralPrice);
+            await spot.connect(deployer).poke(collateral);
+            
+            expect(await interaction.willBorrow(collateralToken.address, signer1.address, deposited)).to.be.equal(willBorrowBefore.div(2));
+        });
+        
+        it("willBorrow() of negative amount is 0 for depositors who hasn't borrow yet", async function () {
+            await setCollateralType();
+            let deposited = parseEther(_vat_dust);
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            expect(await interaction.willBorrow(collateralToken.address, signer1.address, deposited.mul(-1))).to.be.equal(0);
+        });
+        
+        it("willBorrow() of negative amount cant be calculated for users who hasn't deposited yet", async function () {
+            await setCollateralType();
+            let deposited = parseEther(_vat_dust);
+            await expect(interaction.willBorrow(collateralToken.address, signer1.address, deposited.mul(-1))).to.be.revertedWith("Cannot withdraw more than current amount");
+        });
+    });
+    
+    describe('--- Payback', async () => {
+        
+        it("User can payback", async function () {
+            await setCollateralType();
+            const depositAmount = parseEther(_vat_dust);
+            const vat_ilks = await vat.ilks(collateral);
+            const borrowed = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(borrowed.add(100));
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            
+            //Payback
+            await expect(
+              interaction.connect(signer1).payback(
+                aMaticc.address,
+                borrowed
+              )).to.emit(interaction, "Payback");
+            
+            expect(await interaction.deposits(aMaticc.address)).to.be.equal(depositAmount, "Deposited amount stays the same");
+            expect(await interaction.borrowed(collateralToken.address, signer1.address)).to.be.equal(0, "Borrowed amount reduced to 0");
+            expect(await interaction.collateralTVL(collateralToken.address)).to.be.equal(0, "Collateral TVL reduced to 0");
+        })
+        
+        it("User can pay back partially to 0", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther("10000");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const totalDeposited = await interaction.deposits(aMaticc.address);
+            expect(totalDeposited).to.be.equal(deposited);
+            
+            const collateralRate = await interaction.collateralRate(collateralToken.address);
+            expect(collateralRate).to.be.equal(BigNumber.from("1"+rad).div(_mat));
+            
+            const vat_ilks = await vat.ilks(collateral);
+            let borrowed = deposited.mul(vat_ilks.spot).div(`1${ray}`);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            
+            const numberOfIterations = 10;
+            const paybackStep = borrowed.div(numberOfIterations);
+            let freeCollateral = BigNumber.from(0);
+            const collateralStep = deposited.div(numberOfIterations);
+            for (let i = 0; i < numberOfIterations; i++) {
+                await interaction.connect(signer1).payback(aMaticc.address, paybackStep);
+                borrowed = borrowed.sub(paybackStep);
+                
+                if(borrowed.gt(0)){
+                    expect(await interaction.borrowed(collateralToken.address, signer1.address)).to.be.equal(borrowed.add(100), "Borrowed amount is decreasing")
+                } else {
+                    expect(await interaction.borrowed(collateralToken.address, signer1.address)).to.be.equal(borrowed, "Borrowed amount is decreasing")
+                }
+                
+                expect(await interaction.totalPegLiquidity()).to.be.equal(borrowed, "Total borrowed amount is decreasing");
+                
+                const availableToBorrow = await interaction.availableToBorrow(aMaticc.address, signer1.address);
+                freeCollateral = freeCollateral.add(collateralStep);
+                const expectedAvailableToBorrow = freeCollateral.mul(vat_ilks.spot).div(`1${ray}`);
+                expect(availableToBorrow).to.be.equal(expectedAvailableToBorrow, "Available to borrow is increasing");
+                
+                const locked = await interaction.locked(collateralToken.address, signer1.address);
+                expect(locked).to.be.equal(deposited, "Locked collateral hasn't changed after borrow");
+                
+                const free = await interaction.free(collateralToken.address, signer1.address);
+                expect(free).to.be.equal("0", "Free collateral amount hasn't change after borrow");
+                
+                const davosPrice = await interaction.davosPrice(collateralToken.address);
+                expect(davosPrice).to.be.equal("1"+wad, "Davos USD rate stays the same");
+                const collateralPrice = await interaction.collateralPrice(collateralToken.address);
+                expect(collateralPrice).to.be.equal(aMaticRateUSD+wad, "aMATICc USD rate stays the same");
+                
+                expect(await interaction.collateralRate(collateralToken.address)).to.be.equal(collateralRate, "Collateral rate hasn't change");
+                
+                const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
+                let expectedLiquidationPrice = borrowed.mul("1"+wad+wad).div(deposited.mul(collateralRate));
+                if (borrowed.gt(0)){
+                    expectedLiquidationPrice = expectedLiquidationPrice.sub(1);
+                }
+                expect(currentLiquidationPrice).to.be.equal(expectedLiquidationPrice, "Current liquidation price is decreasing");
+                
+                const estLiqPriceDavos = await interaction.estimatedLiquidationPriceDAVOS(collateralToken.address, signer1.address, 0);
+                expect(estLiqPriceDavos).to.be.equal(expectedLiquidationPrice.div(1e9), "");
+                
+                const estimatedLiquidationPrice = await interaction.estimatedLiquidationPrice(collateralToken.address, signer1.address, 0);
+                expect(estimatedLiquidationPrice).to.be.equal(expectedLiquidationPrice, "Estimated liquidation price is decreasing");
+            }
+        });
+        
+        it("Payback rounding checks", async function () {
+            await setCollateralType();
+            
+            let deposited = parseEther("1000");
+            await aMaticc.connect(signer1).approve(interaction.address, deposited);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, deposited);
+            
+            const vat_ilks = await vat.ilks(collateral);
+            let borrowed = deposited.mul(vat_ilks.spot).div(`1${ray}`);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            
+            const numberOfIterations = 100;
+            const paybackStep = BigNumber.from("111111111111111111");
+            for (let i = 1; i <= numberOfIterations; i++) {
+                
+                await interaction.connect(signer1).payback(aMaticc.address, paybackStep);
+                const borrowedActual = await interaction.borrowed(collateralToken.address, signer1.address);
+                const borrowedExpected = borrowed.sub(paybackStep.mul(i)).add(100);
+                expect(borrowedActual).to.be.equal(borrowedActual)
+                console.log(`Borrowed: ${borrowedActual}\tBorrowed diff ${borrowedActual.sub(borrowedExpected)}`);
+            }
+        });
+        
+        it("User can not payback more than borrowed", async function () {
+            await setCollateralType();
+            
+            const depositAmount = parseEther(_vat_dust);
+            const vat_ilks = await vat.ilks(collateral);
+            const borrowed = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            //Payback
+            await expect(interaction.connect(signer1).payback(aMaticc.address, borrowed.add(1))).to
+              .emit(interaction, "Payback")
+              .withArgs(signer1.address, aMaticc.address,borrowed, 0, 0); //Event contains correct borrowed amount
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(0);
+            expect(await interaction.deposits(aMaticc.address)).to.be.equal(depositAmount);
+        });
+        
+        it("Reverts: user cant leave less than dust amount", async function () {
+            await setCollateralType();
+            
+            const depositAmount = parseEther(_vat_dust);
+            const vat_ilks = await vat.ilks(collateral);
+            const borrowed = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            
+            //Payback
+            await expect(interaction.connect(signer1).payback(aMaticc.address, borrowed.sub(1))).to.be.revertedWith("Vat/dust");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(borrowed.add(100));
+        });
+        
+        it("Reverts: amount = 0", async function () {
+            await setCollateralType();
+            
+            const depositAmount = parseEther(_vat_dust);
+            const vat_ilks = await vat.ilks(collateral);
+            const borrowed = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            await interaction.connect(signer1).borrow(aMaticc.address, borrowed);
+            await davos.connect(signer1).approve(interaction.address, borrowed);
+            
+            //Payback
+            await expect(interaction.connect(signer1).payback(aMaticc.address, 0)).to.be.revertedWith("Interaction/invalid-davosAmount");
+            expect(await interaction.borrowed(aMaticc.address, signer1.address)).to.be.equal(borrowed.add(100));
+        });
+    });
+    
+    describe('--- Liquidation and auction', async () => {
+        
+        it("Reverts: Auction can not be started for the client whom collateral is sufficient", async () => {
+            await setCollateralType();
+            
+            //Approve and deposit
+            const depositAmount = parseEther(_vat_dust);
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            
+            //Borrow max amount
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            await interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow);
+            //No auctions have started yet
+            expect(await clip.list()).to.be.empty;
+            
+            //Start auction - reverted
+            await expect(interaction.connect(signer2).startAuction(aMaticc.address, signer1.address, deployer.address))
+              .to.be.revertedWith("Dog/not-unsafe");
+            expect(await clip.list()).to.be.empty;
+        })
+        
+        it("Auction can be started when the price drops to a liquidation level", async () => {
+            await setCollateralType();
+            
+            //Approve and deposit
+            const depositAmount = parseEther(_vat_dust);
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            
+            //Borrow max amount
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            console.log(`Going to borrow: ${availableToBorrow}`)
+            await interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow);
+            //No auctions have started yet
+            expect(await clip.list()).to.be.empty
+            
+            //Get current liquidation price
+            const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
+            
+            //Set new collateral price = liquidation price
+            await oracle.connect(deployer).setPrice(currentLiquidationPrice);
+            await spot.connect(deployer).poke(collateral);
+            //Start auction
+            await interaction.connect(signer2).startAuction(aMaticc.address, signer1.address, deployer.address);
+            const sale = await clip.sales(1);
+            expect(sale.usr).to.be.equal(signer1.address);
+            console.log(sale);
+            //User who started auction rewarded with tip and chip
+            console.log(`Auction initiator balance: ${await davos.balanceOf(signer2.address)}`);
+            
+        });
+        
+        it("Get active auctions", async () => {
+            await setCollateralType();
+            
+            //Approve and deposit
+            const depositAmount = parseEther(_vat_dust);
+            await aMaticc.connect(deployer).mint(signer2.address, depositAmount);
+            //Signer1
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            //Signer2
+            await aMaticc.connect(signer2).approve(interaction.address, depositAmount);
+            await interaction.connect(signer2).deposit(signer2.address, aMaticc.address, depositAmount);
+            
+            //Borrow max amount
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            console.log(`Going to borrow: ${availableToBorrow}`)
+            //Signer1
+            await interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow);
+            //Signer2
+            await interaction.connect(signer2).borrow(aMaticc.address, availableToBorrow);
+            //No auctions have started yet
+            expect(await clip.list()).to.be.empty
+            
+            //Set new collateral price = liquidation price
+            const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
+            await oracle.connect(deployer).setPrice(currentLiquidationPrice);
+            await spot.connect(deployer).poke(collateral);
+            
+            const auctionsBefore = await interaction.getAllActiveAuctionsForToken(collateralToken.address);
+            expect(auctionsBefore).to.be.empty;
+            
+            //Start auction
+            await interaction.connect(signer3).startAuction(aMaticc.address, signer1.address, deployer.address);
+            await interaction.connect(signer3).startAuction(aMaticc.address, signer2.address, deployer.address);
+            
+            const auctionsAfter = await interaction.getAllActiveAuctionsForToken(collateralToken.address);
+            console.log(auctionsAfter);
+            expect(auctionsAfter[0].usr).to.be.equal(signer1.address);
+            expect(auctionsAfter[1].usr).to.be.equal(signer2.address);
+            
+            console.log(`Auction[1] status ${await interaction.getAuctionStatus(collateralToken.address, 1)}`);
+            console.log(`Auction[2] status ${await interaction.getAuctionStatus(collateralToken.address, 2)}`);
+            
+        });
+        
+        it("Reverts: User provides additional collateral after price drops below liquidation but before start of auction", async () => {
+            await setCollateralType();
+            
+            //Approve and deposit
+            const depositAmount = parseEther(_vat_dust);
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            
+            //Borrow max amount
+            const vat_ilks = await vat.ilks(collateral);
+            const availableToBorrow = depositAmount.mul(vat_ilks.spot).div(`1${ray}`);
+            await interaction.connect(signer1).borrow(aMaticc.address, availableToBorrow);
+            const currentLiquidationPrice = await interaction.currentLiquidationPrice(collateralToken.address, signer1.address);
+            
+            //Set new collateral price = liquidation price
+            await oracle.connect(deployer).setPrice(currentLiquidationPrice);
+            await spot.connect(deployer).poke(collateral);
+            
+            //Signer1 had provided more collateral before auction started
+            await aMaticc.connect(signer1).approve(interaction.address, depositAmount);
+            await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, depositAmount);
+            
+            //Start auction - reverted
+            await expect(interaction.connect(signer2).startAuction(aMaticc.address, signer1.address, deployer.address))
+              .to.be.revertedWith("Dog/not-unsafe");
+            expect(await clip.list()).to.be.empty;
+        });
+        
         it("revert:: cannot reset auction if status is false(redo not required)", async () => {
             const collateral1Price = toWad("400");
             await oracle.connect(deployer).setPrice(collateral1Price);
-
+            
             await setCollateralType();
             // await aMaticc.connect(deployer).mint(signer1.address, toWad("10000").toString());
             // Approve and send some collateral inside. collateral value == 400 == `dink`
@@ -704,12 +1080,12 @@ describe("Interaction", function () {
             await oracle.connect(deployer).setPrice(toWad("124").toString());
             await spot.connect(deployer).poke(collateral);
             await interaction
-            .connect(deployer)
-            .startAuction(aMaticc.address, signer1.address, deployer.address);
-        
+              .connect(deployer)
+              .startAuction(aMaticc.address, signer1.address, deployer.address);
+            
             const sale = await clip.sales(1);
             expect(sale.usr).to.not.be.equal(ethers.utils.AddressZero);
-
+            
             const auctions = await interaction.getAllActiveAuctionsForToken(collateralToken.address);
             assert.equal(auctions[0].usr, signer1.address);
             
@@ -717,24 +1093,24 @@ describe("Interaction", function () {
             const auctionStatus = await interaction.getAuctionStatus(collateralToken.address, list[0]);
             // returns true if AuctionRedo is required else returns false
             assert.equal(auctionStatus[0], false);
-
+            
             // since redo is not required, therefore cannot reset the auction
             await expect(
-                interaction
+              interaction
                 .resetAuction(collateralToken.address, list[0], deployer.address)
             ).to.be.revertedWith("Clipper/cannot-reset");
         });
-
+        
         it("auction works as expected", async () => {
             const collateral1Price = toWad("400");
             await oracle.connect(deployer).setPrice(collateral1Price);
-
+            
             await setCollateralType();
-
+            
             await aMaticc.connect(deployer).mint(signer1.address, toWad("10000").toString());
             await aMaticc.connect(deployer).mint(signer2.address, toWad("10000").toString());
             await aMaticc.connect(deployer).mint(signer3.address, toWad("10000").toString());
-        
+            
             const dink1 = toWad("10").toString();
             const dink2 = toWad("1000").toString();
             const dink3 = toWad("1000").toString();
@@ -744,53 +1120,53 @@ describe("Interaction", function () {
             await interaction.connect(signer1).deposit(signer1.address, aMaticc.address, dink1);
             await interaction.connect(signer2).deposit(signer2.address, aMaticc.address, dink2);
             await interaction.connect(signer3).deposit(signer3.address, aMaticc.address, dink3);
-        
+            
             const dart1 = toWad("1000").toString();
             const dart2 = toWad("5000").toString();
             const dart3 = toWad("5000").toString();
             await interaction.connect(signer1).borrow(aMaticc.address, dart1);
             await interaction.connect(signer2).borrow(aMaticc.address, dart2);
             await interaction.connect(signer3).borrow(aMaticc.address, dart3);
-        
+            
             await oracle.connect(deployer).setPrice(toWad("124").toString());
             await spot.connect(deployer).poke(collateral);
-        
+            
             const auctionId = 1;
-        
+            
             let res = await interaction
               .connect(deployer)
               .startAuction(aMaticc.address, signer1.address, deployer.address);
             expect(res).to.emit(clip, "Kick");
-        
+            
             await vat.connect(signer2).hope(clip.address);
             await vat.connect(signer3).hope(clip.address);
-        
+            
             await davos.connect(signer2).approve(interaction.address, toWad("10000").toString());
             await davos.connect(signer3).approve(interaction.address, toWad("10000").toString());
-        
+            
             await advanceTime(1000);
-        
+            
             const aMaticcSigner2BalanceBefore = await aMaticc.balanceOf(signer2.address);
-        
+            
             await interaction.connect(signer2).buyFromAuction(
-                aMaticc.address,
-                auctionId,
-                toWad("7").toString(),
-                toRay("150").toString(),
-                signer2.address,
+              aMaticc.address,
+              auctionId,
+              toWad("7").toString(),
+              toRay("150").toString(),
+              signer2.address,
             );
-        
+            
             await interaction.connect(signer3).buyFromAuction(
-                aMaticc.address,
-                auctionId,
-                toWad("3").toString(),
-                toRay("150").toString(),
-                signer3.address,
+              aMaticc.address,
+              auctionId,
+              toWad("3").toString(),
+              toRay("150").toString(),
+              signer3.address,
             );
-
+            
             const aMaticcSigner2BalanceAfter = await aMaticc.balanceOf(signer2.address);
             const sale = await clip.sales(auctionId);
-        
+            
             expect(aMaticcSigner2BalanceAfter.sub(aMaticcSigner2BalanceBefore)).to.be.equal(toWad("7").toString());
             expect(sale.pos).to.equal(0);
             expect(sale.tab).to.equal(0);
@@ -799,7 +1175,28 @@ describe("Interaction", function () {
             expect(sale.top).to.equal(0);
             expect(sale.usr).to.equal(ethers.constants.AddressZero);
         });
-
+    });
+    
+    describe('--- Collateral management', async () => {
+        it("removeCollateralType(): should remove an active collateral type", async () => {
+            await setCollateralType();
+            const tx = await interaction.removeCollateralType(collateralToken.address)
+            const receipt = await tx.wait(1);
+        
+            let event = (receipt.events?.filter((x) => {return x.event === "CollateralDisabled"}));
+            assert.equal(event[0].args.token, collateralToken.address);
+            assert.equal(event[0].args.ilk, collateral);
+        });
+    
+        it("revert:: removeCollateralType(): cannot remove an inactive collateral type", async () => {
+            await expect(
+              interaction
+                .removeCollateralType(collateralToken.address)
+            ).to.be.revertedWith("Interaction/token-not-init");
+        });
+    });
+    
+    describe('--- Helpers', async () => {
         it("stringToBytes32(): should convert string to bytes32", async () => {
             let bytes = await interaction.stringToBytes32("aMATICc");
             assert.equal(bytes, collateral);
@@ -809,26 +1206,9 @@ describe("Interaction", function () {
             let bytes = await interaction.stringToBytes32("");
             assert.equal(bytes, "0x0000000000000000000000000000000000000000000000000000000000000000");
         });
-
-        it("removeCollateralType(): should remove an active collateral type", async () => {
-            await setCollateralType();
-            const tx = await interaction.removeCollateralType(collateralToken.address)
-            const receipt = await tx.wait(1);
-            
-            let event = (receipt.events?.filter((x) => {return x.event === "CollateralDisabled"}));
-            assert.equal(event[0].args.token, collateralToken.address);
-            assert.equal(event[0].args.ilk, collateral);
-        });
-
-        it("revert:: removeCollateralType(): cannot remove an inactive collateral type", async () => {
-            await expect(
-                interaction
-                .removeCollateralType(collateralToken.address)
-            ).to.be.revertedWith("Interaction/token-not-init");
-        });
     });
 
-    describe("setters", function () {
+    describe('--- Setters', function () {
 
         it("revert:: whitelist: only authorized account can enable whitelist", async function () {
             await expect(
