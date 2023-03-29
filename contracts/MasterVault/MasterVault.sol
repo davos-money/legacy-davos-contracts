@@ -196,10 +196,15 @@ ReentrancyGuardUpgradeable
         uint256 waitingPoolBal = address(waitingPool).balance;
         
         if (waitingPoolDebt > waitingPoolBal) {
-            uint256 maxFee = swapPool.FEE_MAX();
-            uint256 withdrawAmount = 
-                    ((waitingPoolDebt - waitingPoolBal) * maxFee) /
-                    (maxFee - swapPool.unstakeFee());
+            
+            uint256 withdrawAmount = waitingPoolDebt - waitingPoolBal;
+            bool _swapFeeStatus = swapFeeStatus == 2 || swapFeeStatus == 3 ? true : false;
+
+            if(_swapFeeStatus) {
+                uint256 maxFee = swapPool.FEE_MAX();
+                withdrawAmount = (withdrawAmount * maxFee) / (maxFee - swapPool.unstakeFee());
+            }
+
             (uint256 withdrawn,) = _withdrawFromActiveStrategies(withdrawAmount + 1);
             if(withdrawn > 0) {
                 IWETH(asset()).withdraw(withdrawn);

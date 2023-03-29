@@ -113,7 +113,7 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         correctAmount = amount;
         (,bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(true, amount, feeFlag);
         if (!enoughLiquidity) { // If liquidity not enough, calculate amountIn for remaining liquidity
-            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount() - 1, feeFlag);
+            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(true, ISwapPool(_swapPool).cerosTokenAmount(), feeFlag);
             correctAmount = amountIn;
         }
     }
@@ -123,11 +123,12 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         uint256 wethBalance = underlying.balanceOf(address(this));
         if(amount < wethBalance) return amount;
         
-        bool enoughLiquidity; uint256 remaining = amount - wethBalance;
-        (, enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, feeFlag);
+        uint256 remaining = amount - wethBalance;
+        (, bool enoughLiquidity) = ISwapPool(_swapPool).getAmountOut(false, (remaining * _certToken.ratio()) / 1e18, feeFlag);
 
         if (!enoughLiquidity) {
-            remaining = ISwapPool(_swapPool).nativeTokenAmount();
+            (uint256 amountIn,) = ISwapPool(_swapPool).getAmountIn(false, ISwapPool(_swapPool).nativeTokenAmount(), feeFlag);
+            (remaining,) = ISwapPool(_swapPool).getAmountOut(false, amountIn, feeFlag);
             return remaining + wethBalance;
         }
         correctAmount = amount;
