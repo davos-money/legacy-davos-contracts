@@ -90,7 +90,7 @@ ReentrancyGuardUpgradeable
 
     function _deposit(uint256 amount) internal returns (uint256 value) {
         require(amount > 0, "invalid deposit amount");
-        uint256 dexAmount = getAmountOut(_wMaticAddress, address(_certToken), amount);
+        uint256 dexAmount = 0; // getAmountOut(_wMaticAddress, address(_certToken), amount); // Dex disabled !
         // uint256 minAmount = (amount * _certToken.ratio()) / 1e18;
         (uint256 minAmount,) = _pool.getAmountOut(true, amount, false);
         uint256 realAmount;
@@ -163,7 +163,7 @@ ReentrancyGuardUpgradeable
         uint256 outAmount
     ) external override nonReentrant returns (uint256 realAmount) {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-        uint256 dexAmount = getAmountOut(address(_certToken), _wMaticAddress, realAmount);
+        uint256 dexAmount = 0; // getAmountOut(address(_certToken), _wMaticAddress, realAmount); // Dex disabled !
         uint256 amountOut;
         if(dexAmount > outAmount) {
             amountOut = swapV3(address(_certToken), _wMaticAddress, realAmount, outAmount, recipient);

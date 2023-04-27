@@ -7,16 +7,12 @@ async function main() {
     [deployer] = await ethers.getSigners();
         
     // Fetching
-    this.MasterVault = await hre.ethers.getContractFactory("MasterVault");
-    this.Strat = await hre.ethers.getContractFactory("CerosYieldConverterStrategy");
+    this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
 
     // Deployment
-    let mv = await this.MasterVault.deploy();
-    await mv.deployed();
-    console.log("MasterVault: " + mv.address);
-    let s = await this.Strat.deploy();
-    await s.deployed();
-    console.log("Strategy:    " + s.address);
+    let cr = await this.CerosRouter.deploy();
+    await cr.deployed();
+    console.log("CerosRouter: " + cr.address);
 }
 
 main()
