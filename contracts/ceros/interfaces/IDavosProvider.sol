@@ -29,7 +29,7 @@ interface IDavosProvider {
      */
 
     // in MATIC
-    function provide() external payable returns (uint256);
+    function provide(uint256 _amount) external payable returns (uint256);
 
     // in aMATICc
     // function provideInAMATICc(uint256 amount) external returns (uint256);

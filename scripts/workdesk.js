@@ -7,12 +7,12 @@ async function main() {
     [deployer] = await ethers.getSigners();
         
     // Fetching
-    this.CerosRouter = await hre.ethers.getContractFactory("CerosRouter");
+    this.DavosProvider = await hre.ethers.getContractFactory("DavosProvider");
 
     // Deployment
-    let cr = await this.CerosRouter.deploy();
-    await cr.deployed();
-    console.log("CerosRouter: " + cr.address);
+    let dp = await this.DavosProvider.deploy();
+    await dp.deployed();
+    console.log("DP: " + dp.address);
 }
 
 main()

@@ -58,7 +58,7 @@ ReentrancyGuardUpgradeable
     /**
      * DEPOSIT
      */
-    function provide()
+    function provide(uint256 _amount)
     external
     payable
     override
@@ -66,6 +66,7 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
+        require(_amount == 0, "DavosProvider/erc20-not-accepted");
         value = _masterVault.depositETH{value: msg.value}();
         // deposit ceToken as collateral
         value = _provideCollateral(msg.sender, value);
