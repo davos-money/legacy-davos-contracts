@@ -77,17 +77,17 @@ ReentrancyGuardUpgradeable
      * RELEASE
      */
     // withdrawal in MATIC
-    function release(address recipient, uint256 amount)
+    function release(address _recipient, uint256 _amount)
     external
     override
     whenNotPaused
     nonReentrant
     returns (uint256 realAmount)
     {
-        require(recipient != address(0));
-        realAmount = _withdrawCollateral(msg.sender, amount);
-        realAmount = _masterVault.withdrawETH(recipient, realAmount);
-        emit Withdrawal(msg.sender, recipient, realAmount);
+        require(_recipient != address(0));
+        realAmount = _withdrawCollateral(msg.sender, _amount);
+        realAmount = _masterVault.withdrawETH(_recipient, realAmount);
+        emit Withdrawal(msg.sender, _recipient, realAmount);
         return realAmount;
     }
     /**
